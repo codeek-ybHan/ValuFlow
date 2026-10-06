@@ -1,8 +1,10 @@
 import { HashRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { StateProvider } from './store/state';
+import { ProjectProvider } from './store/project';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Valuation } from './pages/Valuation';
+import { Workspace } from './pages/Workspace';
 import { PlannedPage } from './pages/PlannedPage';
 import { LearnHome } from './pages/LearnHome';
 import { Roadmap } from './pages/Roadmap';
@@ -28,12 +30,13 @@ function LegacyStepRedirect() {
 export default function App() {
   return (
     <StateProvider>
+      <ProjectProvider>
       <HashRouter>
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="workspace" element={<PlannedPage eyebrow="Workspace" title="Workspace" comingIn="STEP 06 · Financial Data Pipeline" description="기업 선택과 원천 재무데이터 확인 영역입니다." items={['Company Header', 'Overview / Income Statement / Balance Sheet / Cash Flow / Historical Analysis 탭', 'Historical Financial Table (A = Actual)']} />} />
+            <Route path="workspace" element={<Workspace />} />
             <Route path="valuation" element={<Valuation />} />
             <Route path="valuation/:stage" element={<Valuation />} />
             <Route path="analysis" element={<PlannedPage eyebrow="Analysis" title="Analysis" comingIn="MVP 2 · Analysis" description="DCF 결과를 다른 관점으로 검증하는 영역입니다." items={['Comparable Companies', 'Sensitivity Matrix', 'Scenario (Bear / Base / Bull)']} />} />
@@ -59,6 +62,7 @@ export default function App() {
           </Route>
         </Routes>
       </HashRouter>
+      </ProjectProvider>
     </StateProvider>
   );
 }

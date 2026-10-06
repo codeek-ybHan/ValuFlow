@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { stages, type WorkflowStage } from '../../valuation/workflow';
+import { stages, type WorkflowStage } from './workflow';
 
 // 계산 컴포넌트가 들어갈 자리. 계산식은 두지 않으며, 가짜 결과도 보여주지 않는다.
 export function StageSlot({ stage }: { stage: WorkflowStage }) {

@@ -232,3 +232,7 @@ dl { margin: 6px 0 0; display: grid; grid-template-columns: 170px 1fr; gap: 2px 
 .slot-nav { margin-top: 8px; }
 @media (max-width: 960px) { .dash-grid, .slot-grid { grid-template-columns: 1fr; } }
 .brand + .side-label { border-top: 0; margin-top: 0; }
+.steptabs button { font: inherit; padding: 6px 14px; color: var(--ink-2); font-size: 13.5px; white-space: nowrap; border: 0; background: none; border-radius: 7px; cursor: pointer; }
+.steptabs button.active { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
+.action-row { gap: 8px; margin: 0 0 16px; flex-wrap: wrap; }
+.basis-panel { margin: 0 0 20px; }

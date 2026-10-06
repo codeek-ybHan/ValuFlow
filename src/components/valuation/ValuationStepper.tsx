@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { stages, type StageId } from '../../valuation/workflow';
+import { stages, type StageId } from './workflow';
 
 export function ValuationStepper({ current }: { current: StageId }) {
   const cur = stages.findIndex((s) => s.id === current);

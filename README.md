@@ -32,7 +32,7 @@ Node 22.6 이상이 필요합니다. 엔진 테스트가 TypeScript 파일을 �
 
 ```text
 /dashboard                 제품 Dashboard (기본 화면)
-/workspace                 기업·재무데이터 (예정)
+/workspace                 기업·재무데이터 (삼성전자 FY2023~2025 불러오기)
 /valuation/:stage          forecast | wacc | dcf | equity  ← Workflow Stepper
 /analysis                  비교기업 · 민감도 · 시나리오 (예정)
 /ai                        AI Analyst (예정)
@@ -54,7 +54,8 @@ Node 22.6 이상이 필요합니다. 엔진 테스트가 TypeScript 파일을 �
 | App Layout / Sidebar | 완료 |
 | Dashboard | 뼈대 완료. 수치는 Engine 연결 전이라 `—` 로 표시 |
 | Valuation | Workflow Stepper(Forecast → WACC → DCF → Equity Value)와 계산 컴포넌트 슬롯 완료. 계산 UI 연결 예정 |
-| Workspace / Analysis / AI Analyst / Report | 예정 화면만 표시 |
+| Workspace | 삼성전자 Historical Data 불러오기, 재무제표 탭, 파생지표(성장률·영업이익률·NWC·ΔNWC·CFO−CAPEX) |
+| Analysis / AI Analyst / Report | 예정 화면만 표시 |
 
 `/valuation` 의 각 단계는 입력 영역과 Engine 결과 영역, 연결할 Engine 함수 이름을 보여 줍니다. 가짜 결과는 만들지 않습니다.
 
@@ -87,18 +88,19 @@ MVP 순서: ① Dashboard + Valuation + Learn → ② Sensitivity · Comparable 
 ```text
 src/
 ├── content/      STEP / Lesson / Quiz / Practice / Build 데이터 (bodiesNN.ts = Lesson 해설)
-├── store/        사용자 상태(진행·메모·Practice·데이터셋)와 진행률 계산
+├── data/         fixture: 삼성전자 Historical(공시 기반), STEP 04 학습용 가정(가상값)
+├── store/        LEARN 상태(state.tsx) / PROJECT 상태(project.tsx: historicalData · valuationAssumptions · valuationResult)
 ├── engine/       재무분석·FCFF·WACC·DCF·민감도 순수 함수 + 단위 테스트
 ├── routes.ts     LEARN 라우트 헬퍼 (step-01 ↔ stepId)
-├── valuation/    Valuation Workflow 단계 정의 (화면이 읽는 설정, 계산식 없음)
 ├── build/        STEP별 Project Build 위젯
 ├── pages/        라우트 페이지 (Dashboard, Valuation, Learn 계열)
-└── components/   레이아웃, 차트, 공통 UI, valuation/ (Stepper, 단계 슬롯)
+└── components/   레이아웃, 차트, 공통 UI, valuation/ (Stepper, 단계 슬롯, workflow.ts 단계 정의 — 계산식 없음)
 ```
 
 설계 원칙:
 
 - **UI 와 계산 로직 분리.** 계산은 `engine/` 에만 두고 화면은 결과 객체를 렌더링만 합니다. 같은 엔진을 Web UI, AI Agent, Report Generator, API 가 공유하는 것이 목표입니다.
+- 공시 기반 Historical Data 와 학습용 Valuation Assumption 은 타입·fixture·상태를 분리합니다. STEP 04 가상값으로 계산한 결과를 삼성전자의 가치평가처럼 표시하지 않습니다.
 - LLM 은 핵심 숫자를 직접 계산하지 않고 엔진을 Tool 로 호출만 합니다.
 - `engine/` 은 LEARN 의 학습용 계산기입니다. PROJECT 의 Valuation Engine 은 `src/valuation/` 에 TypeScript 로 새로 구현할 예정입니다(STEP 05).
 - 계산 불가 입력(0으로 나누기, 비어 있는 값, WACC ≤ g)은 임의의 값을 만들지 않고 `null` 또는 오류 메시지로 처리합니다.

@@ -2,9 +2,10 @@ import { Link } from 'react-router-dom';
 import { BRAND } from '../content';
 import { steps } from '../content';
 import { useApp } from '../store/state';
+import { useProject } from '../store/project';
 import { overallProgress } from '../store/progress';
 import { StatusBadge, fmtPct } from '../components/ui';
-import { dashboardWorkflow } from '../valuation/workflow';
+import { dashboardWorkflow } from '../components/valuation/workflow';
 import { projectRoadmap } from '../content/roadmap';
 
 // Engine / 데이터 파이프라인 연결 전이므로 수치는 '—' 로 두고 가짜 결과를 만들지 않는다.
@@ -13,6 +14,8 @@ const assumptions = ['WACC', 'Terminal Growth', 'Forecast Period'];
 
 export function Dashboard() {
   const { state } = useApp();
+  const { project } = useProject();
+  const h = project.historicalData;
   const learn = overallProgress(steps, state);
   return (
     <>
@@ -27,9 +30,9 @@ export function Dashboard() {
 
       <section className="dash-grid">
         <div className="panel">
-          <div className="panel-head"><h3>Current Company</h3><span className="badge badge-not-started">NOT SELECTED</span></div>
-          <p className="step-title">선택된 기업 없음</p>
-          <p className="small muted">기업 선택과 재무데이터는 Data Pipeline 단계에서 연결됩니다.</p>
+          <div className="panel-head"><h3>Current Company</h3>{h ? <span className="badge badge-complete">LOADED</span> : <span className="badge badge-not-started">NOT SELECTED</span>}</div>
+          <p className="step-title">{h ? `${h.company.name} (${h.company.ticker})` : '선택된 기업 없음'}</p>
+          <p className="small muted">{h ? `${h.company.period.join(' · ')} · ${h.company.basis} · ${h.company.currency} ${h.company.unit}` : 'Workspace 에서 학습용 기업 데이터를 불러올 수 있습니다. 자동 수집은 Data Pipeline 단계에서 연결됩니다.'}</p>
           <Link className="btn" to="/workspace">Open Workspace</Link>
         </div>
         <div className="panel">
