@@ -38,6 +38,7 @@ const base: Step = {
     ],
     deliverables: ['기업 재무상태 5줄 요약', 'DCF를 위해 추가로 확인해야 할 질문 3개'],
     extra: 'three-year',
+    samsungLoad: 'dataset',
   },
   build: {
     title: '재무분석 자동 계산 + 차트',

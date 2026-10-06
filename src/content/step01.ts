@@ -203,6 +203,7 @@ export const step01: Step = {
       { id: 'a6', prompt: '추가로 확인하고 싶은 항목은 무엇인가?' },
     ],
     extra: 'dataset-import',
+    samsungLoad: 'form',
   },
   build: {
     title: '재무데이터 수동 입력 Form + 저장',

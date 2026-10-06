@@ -11,6 +11,8 @@ import { computeMetrics, operatingMargin, balanceCheck } from '../engine/analysi
 import { calculateEnterpriseValue, forecastFcff } from '../engine/dcf';
 import { sampleCompany } from '../engine/sample';
 import type { FinancialRecord } from '../types';
+import { samsungHistoricalData } from '../data/samsungHistorical';
+import { historicalToRecords } from '../data/toFinancialRecords';
 
 const blank: PracticeState = { values: {}, completed: false };
 const n = (v: string | undefined) => (v === undefined || v.trim() === '' || !Number.isFinite(Number(v.replace(/,/g, ''))) ? undefined : Number(v.replace(/,/g, '')));
@@ -33,6 +35,10 @@ export function PracticePage() {
       <StepTabs step={step} />
       <section><Rich blocks={cfg.brief} /></section>
       {cfg.deliverables && <section><h3>산출물</h3><ul className="plain-list">{cfg.deliverables.map((d) => <li key={d}>{d}</li>)}</ul></section>}
+
+      {cfg.samsungLoad && (
+        <SamsungLoader mode={cfg.samsungLoad} onFill={(v) => save({ values: { ...p.values, ...v } })} />
+      )}
 
       {cfg.fields?.map((g) => (
         <section key={g.group}>
@@ -153,6 +159,58 @@ function DcfCheck({ values }: { values: Record<string, string> }) {
           })}</tbody>
         </table>
       )}
+    </section>
+  );
+}
+
+const FORM_KEYS = ['assets', 'liabilities', 'equity', 'revenue', 'operatingIncome', 'netIncome', 'cfo'] as const;
+
+/**
+ * 삼성전자 FY2023~FY2025 공시 기반 데이터를 Practice 에 불러온다 (Workspace 와 같은 fixture).
+ * 직접 찾아 입력하는 것이 원칙이므로 기본은 비어 있고, 막힐 때나 검증용으로 선택해서 쓴다.
+ */
+function SamsungLoader({ mode, onFill }: { mode: 'form' | 'dataset'; onFill: (v: Record<string, string>) => void }) {
+  const { update } = useApp();
+  const records = useMemo(() => historicalToRecords(samsungHistoricalData), []);
+  const [year, setYear] = useState(records[records.length - 1].year);
+  const [msg, setMsg] = useState('');
+
+  const fillForm = () => {
+    const r = records.find((x) => x.year === year)!;
+    const v: Record<string, string> = { company: r.company, year: String(r.year), unit: r.unit };
+    for (const k of FORM_KEYS) if (r[k] != null) v[k] = String(r[k]);
+    onFill(v);
+    setMsg(`${r.company} FY${r.year} 값을 입력했습니다. 투자·재무활동현금흐름(CFI, CFF)은 불러올 데이터에 없어 비워 둡니다. 직접 찾아 입력하세요.`);
+  };
+  const loadDataset = () => {
+    // 같은 id 가 이미 있으면 불러온 값으로 덮되, 사용자가 따로 입력한 항목(CFI, CFF 등)은 유지한다.
+    update((s) => ({
+      ...s,
+      dataset: [...s.dataset.filter((d) => !records.some((r) => r.id === d.id)), ...records.map((r) => ({ ...s.dataset.find((d) => d.id === r.id), ...r }))],
+    }));
+    setMsg(`${records[0].company} FY${records[0].year}~FY${records[records.length - 1].year} ${records.length}개년을 데이터셋에 불러왔습니다. 아래 비교표에서 확인하세요.`);
+  };
+
+  return (
+    <section className="card">
+      <div className="row between">
+        <h3>삼성전자 학습 데이터 불러오기</h3>
+        <span className="badge badge-complete">공시 기반</span>
+      </div>
+      <p className="small muted">2025 사업보고서 연결재무제표 기준, 단위 백만원. 직접 찾아 입력하는 것이 원칙이며, 막힐 때나 내 값을 검증할 때 사용하세요.</p>
+      <div className="row action-row">
+        {mode === 'form' ? (
+          <>
+            <select value={year} onChange={(e) => setYear(Number(e.target.value))} aria-label="불러올 연도">
+              {records.map((r) => <option key={r.year} value={r.year}>FY{r.year}</option>)}
+            </select>
+            <button className="btn primary" onClick={fillForm}>삼성전자 데이터 불러오기</button>
+          </>
+        ) : (
+          <button className="btn primary" onClick={loadDataset}>삼성전자 3개년 데이터 불러오기</button>
+        )}
+      </div>
+      {msg && <div className="callout" role="status">{msg}</div>}
     </section>
   );
 }

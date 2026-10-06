@@ -43,3 +43,15 @@ test('Practice Assumption 은 Historical 과 별개 fixture (억원 단위 가�
   assert.equal(a.sharesOutstanding, 1_000_000);
   assert.notEqual(a.currentRevenue, d.incomeStatement.revenue[2]);
 });
+
+import { historicalToRecords } from '../data/toFinancialRecords.ts';
+test('HistoricalData → FinancialRecord 변환: 값 보존, 없는 항목은 비워 둠', () => {
+  const recs = historicalToRecords(d);
+  assert.deepEqual(recs.map((r) => r.year), [2023, 2024, 2025]);
+  assert.equal(recs[2].id, '삼성전자-2025-연결');
+  assert.equal(recs[2].revenue, 333605938);
+  assert.equal(recs[2].operatingIncome, 43601051);
+  assert.equal(recs[1].capex, 51406355);
+  assert.equal(recs[0].cfi, undefined);
+  assert.equal(recs[0].cff, undefined);
+});

@@ -55,6 +55,8 @@ export interface PracticeConfig {
   deliverables?: string[];
   /** 전용 보조 위젯 */
   extra?: 'dataset-import' | 'three-year' | 'dcf-hand-check';
+  /** 삼성전자 학습 데이터 불러오기 버튼: 'form' = 입력 폼 채움(최신연도 선택), 'dataset' = 3개년 데이터셋에 추가 */
+  samsungLoad?: 'form' | 'dataset';
 }
 
 export type BuildKind = 'dataset' | 'analysis' | 'dcf' | 'valuation' | 'planned';
