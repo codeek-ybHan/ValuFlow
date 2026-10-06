@@ -1,2 +1,6 @@
 node_modules
 dist
+
+# 내부 기획 문서 (저장소에 올리지 않음)
+ValuFlow*.md
+.DS_Store
