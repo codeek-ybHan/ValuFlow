@@ -32,10 +32,34 @@ export interface DartRawAccount {
   raw: Readonly<Record<string, unknown>>;
 }
 
-/** 기업 개황 원본. */
-export interface DartRawCompany {
+/** backend 가 돌려주는 검색 결과 한 건. OpenDART 원본이 아니라 backend 가 변환한 구조다. */
+export interface DartCompanySummary {
   corpCode: string;
   corpName: string;
-  stockCode?: string;
-  raw: Readonly<Record<string, unknown>>;
+  /** 비상장사는 null. */
+  stockCode: string | null;
+  modifyDate: string | null;
 }
+
+/** backend 가 돌려주는 기업개황. OpenDART 원본 필드명은 backend 안에서 변환된다. */
+export interface DartCompanyDetail {
+  corpCode: string;
+  corpName: string;
+  corpNameEng: string | null;
+  stockCode: string | null;
+  ceoName: string | null;
+  /** Y 유가 · K 코스닥 · N 코넥스 · E 기타 */
+  corpClass: string | null;
+  address: string | null;
+  homepage: string | null;
+  industryCode: string | null;
+  /** YYYY-MM-DD */
+  establishmentDate: string | null;
+  fiscalMonth: number | null;
+  source: 'OpenDART';
+  /** backend 가 OpenDART 에서 조회한 시각 (ISO 8601). */
+  fetchedAt: string;
+}
+
+/** backend 오류 코드. backend 의 ErrorCode 와 같고, 서버에 닿지 못한 경우만 프론트에서 추가한다. */
+export type DartErrorCode = 'invalid-key' | 'no-data' | 'rate-limit' | 'dart-unavailable' | 'invalid-request' | 'unknown' | 'backend-unreachable';

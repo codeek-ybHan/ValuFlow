@@ -242,3 +242,13 @@
 }
 @media (max-width: 960px) { .basis-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .basis-row { grid-template-columns: minmax(0, 1fr); } }
+
+/* ===== Company Search (Workspace) ===== */
+.company-search { margin-bottom: 8px; }
+.company-form { gap: 10px; flex-wrap: wrap; }
+.company-form input { flex: 1 1 280px; min-width: 0; height: 40px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; }
+.company-results { list-style: none; margin: 14px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.company-results li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+.company-results li > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.company-selected { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line-strong); }
+.company-selected h4 { margin: 0 0 8px; font-size: 16px; }

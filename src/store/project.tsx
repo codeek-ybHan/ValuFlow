@@ -1,13 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AssumptionsDraft } from './assumptions';
-import type { HistoricalData } from '../data/types';
+import type { HistoricalData, SelectedCompany } from '../data/types';
 import type { ForecastInputs } from '../engine/forecastForm';
 import type { WaccInputs } from '../engine/waccForm';
 import type { DcfInputs } from '../engine/dcfForm';
 import type { RelativeInput } from '../valuation';
 import {
   emptyProjectState, restoreProjectState, toPersisted, withAssumptions, withForecastInputs, withHistoricalData, withPracticeAssumptions,
-  withResultsCleared, withWaccInputs, withDcfInputs, withRelativeInputs, withSamsungHistorical, withSensitivityRun, withValuationReset, withValuationRun, type ProjectState,
+  withResultsCleared, withWaccInputs, withDcfInputs, withRelativeInputs, withSamsungHistorical, withSelectedCompany, withSensitivityRun, withValuationReset, withValuationRun, type ProjectState,
 } from './projectModel';
 
 // PROJECT 영역 상태 (LEARN 상태 store/state.tsx 와 분리). 상태 전이는 projectModel.ts 의 순수 함수가 담당하고,
@@ -29,6 +29,8 @@ function load(): ProjectState {
 
 interface Ctx {
   project: ProjectState;
+  /** 기업만 선택 (historicalData 는 바뀌지 않는다) */
+  setSelectedCompany: (c: SelectedCompany | null) => void;
   /** historicalData 만 설정 */
   setHistoricalData: (h: HistoricalData | null) => void;
   /** 가정을 설정. 이전 결과는 비워진다(재계산 필요) */
@@ -71,6 +73,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
   }, [persisted]);
 
+  const setSelectedCompany = useCallback((c: SelectedCompany | null) => setProject((p) => withSelectedCompany(p, c)), []);
   const setHistoricalData = useCallback((h: HistoricalData | null) => setProject((p) => withHistoricalData(p, h)), []);
   const setValuationAssumptions = useCallback((a: AssumptionsDraft | null) => setProject((p) => withAssumptions(p, a)), []);
   const setForecastInputs = useCallback((f: ForecastInputs) => setProject((p) => withForecastInputs(p, f)), []);
@@ -86,8 +89,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const reset = useCallback(() => setProject(emptyProjectState), []);
 
   const value = useMemo(
-    () => ({ project, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, setDcfInputs, setRelativeInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, loadSamsung, applyPracticeAssumptions, reset }),
-    [project, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, setDcfInputs, setRelativeInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, loadSamsung, applyPracticeAssumptions, reset],
+    () => ({ project, setSelectedCompany, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, setDcfInputs, setRelativeInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, loadSamsung, applyPracticeAssumptions, reset }),
+    [project, setSelectedCompany, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, setDcfInputs, setRelativeInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, loadSamsung, applyPracticeAssumptions, reset],
   );
   return <ProjectCtx.Provider value={value}>{children}</ProjectCtx.Provider>;
 }

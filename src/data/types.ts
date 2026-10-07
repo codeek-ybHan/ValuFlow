@@ -16,6 +16,19 @@ export interface HistoricalMeta {
   fetchedAt?: string;
 }
 
+/** Workspace 에서 사용자가 고른 기업. Historical 재무데이터와는 별개이며, 선택만으로 재무데이터가 붙지 않는다. */
+export interface SelectedCompany {
+  corpCode: string;
+  corpName: string;
+  corpNameEng: string | null;
+  /** 비상장사는 null. */
+  stockCode: string | null;
+  corpClass: string | null;
+  source: 'OpenDART';
+  /** OpenDART 에서 조회한 시각 (ISO 8601). */
+  fetchedAt: string;
+}
+
 export interface HistoricalData {
   meta?: HistoricalMeta;
   company: {

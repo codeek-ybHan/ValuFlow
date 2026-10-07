@@ -19,6 +19,18 @@
 
 ## 실행
 
+Frontend 와 backend(FastAPI)를 따로 실행합니다. OpenDART API Key 는 backend 에만 두고 브라우저 번들에는 들어가지 않습니다.
+
+```bash
+# backend  (http://127.0.0.1:8000)
+cd backend && uv venv .venv && uv pip install -p .venv/bin/python -r requirements-dev.txt
+cp .env.example .env            # DART_API_KEY= 에 본인 키를 입력 (.env 는 git 에 올라가지 않음)
+.venv/bin/uvicorn app.main:get_app --factory --port 8000
+.venv/bin/python -m pytest      # DART_API_KEY 가 있으면 실제 OpenDART smoke test 도 실행, 없으면 skip
+```
+
+기업 검색은 backend 가 켜져 있어야 동작합니다 (dev 서버가 `/api` 를 8000 포트로 전달).
+
 ```bash
 npm install
 npm run dev           # http://localhost:5173
@@ -88,7 +100,7 @@ LEARN 은 STEP 01~04 만 포함합니다. STEP 05 이후는 아래 PROJECT 로�
 
 ```text
 STEP 05 Valuation Engine v1       Forecast · FCFF · CAPM · WACC · DCF · EV · Equity · 주당가치 · Sensitivity · Scenario · 상대가치   ✅
-STEP 06 Financial Data Pipeline   OpenDART → 파서 → 정규화 → PostgreSQL → Historical 테이블   (06-1 구조 완료 · 06-2 OpenDART 연결 다음)
+STEP 06 Financial Data Pipeline   OpenDART → 파서 → 정규화 → PostgreSQL → Historical 테이블   (06-1 구조 · 06-2 기업 검색 완료 · 06-3 재무제표 수집 다음)
 STEP 07 Valuation Workspace       Historical → Forecast → WACC → DCF/Equity → Result → Validation   ✅
 STEP 08 AI Valuation Analyst      Agent + Tool Calling + RAG (계산은 엔진, LLM 은 해석)
 STEP 09 Report Automation         보고서 생성 · 미리보기 · PDF 내보내기

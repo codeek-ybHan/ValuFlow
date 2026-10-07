@@ -12,7 +12,7 @@ import { capexForValuation } from './normalization/derived.ts';
 import { assessHistoricalQuality, fromSamsungFixture } from './repository/fixtureAdapter.ts';
 import { FixtureFinancialRepository } from './repository/fixtureRepository.ts';
 import type { FinancialRepository } from './repository/financialRepository.ts';
-import { unconnectedDartClient } from './dart/client.ts';
+import { BackendDartClient } from './dart/client.ts';
 import { buildHistoricalView } from '../engine/historicalView.ts';
 import { deriveHistoricalMetrics } from '../engine/historical.ts';
 import { krwMillionToEok } from '../engine/units.ts';
@@ -198,7 +198,7 @@ test('Samsung fixture adapter: source=Fixture, 값은 그대로, fixture 는 변
   assert.notEqual(h.incomeStatement, samsungHistoricalData.incomeStatement);
   h.incomeStatement.revenue[0] = 1;
   assert.equal(JSON.stringify(samsungHistoricalData), before);
-  assert.equal(samsungHistoricalData.meta, undefined);
+  assert.deepEqual(samsungHistoricalData.meta, { stockCode: '005930', source: 'Fixture' }); // fixture 자체의 meta 는 그대로
   const q = assessHistoricalQuality(h);
   assert.equal(q.basisUsed, 'Consolidated');
   assert.equal(q.fields.revenue?.status, 'available');
@@ -232,7 +232,7 @@ test('Repository interface: Workspace 는 구현체를 모르고 interface 로�
   assert.ok(!nf.ok && nf.reason === 'not-found');
   const un = await repo.getHistoricalFinancials({ stockCode: '005930', fiscalYears: [2019] });
   assert.ok(!un.ok && un.reason === 'unavailable');
-  await assert.rejects(unconnectedDartClient.fetchFinancials({ corpCode: '1', reportYear: 2025, basis: 'Consolidated' }), /STEP 06-2/);
+  await assert.rejects(new BackendDartClient().fetchFinancials(), /STEP 06-3/);
 });
 
 // 10. 기존 Historical View / metrics 와 호환

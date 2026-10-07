@@ -12,7 +12,7 @@
 // (입력과 결과가 어긋난 stale state 를 만들지 않기 위해).
 import { calculateWacc, runSensitivity, runValuation, ValuationError } from '../valuation/index.ts';
 import type { RelativeInput, SensitivityResult, ValuationInput, ValuationResult } from '../valuation/index.ts';
-import type { HistoricalData } from '../data/types.ts';
+import type { HistoricalData, SelectedCompany } from '../data/types.ts';
 import type { ForecastInputs } from '../engine/forecastForm.ts';
 import type { WaccInputs } from '../engine/waccForm.ts';
 import { buildSensitivityAxes } from '../engine/sensitivityAxes.ts';
@@ -22,6 +22,8 @@ import { samsungHistoricalData } from '../data/samsungHistorical.ts';
 import { step04PracticeAssumptions } from '../data/step04PracticeAssumptions.ts';
 
 export interface ProjectState {
+  /** Workspace 에서 고른 기업(OpenDART). Historical 재무데이터와 별개이며 선택만으로 historicalData 가 바뀌지 않는다. */
+  selectedCompany: SelectedCompany | null;
   historicalData: HistoricalData | null;
   valuationAssumptions: AssumptionsDraft | null;
   valuationResult: ValuationResult | null;
@@ -35,12 +37,14 @@ export interface ProjectState {
 
 /** 저장되는 부분. 결과와 오류는 파생값이라 저장하지 않는다. */
 export interface PersistedProject {
+  selectedCompany?: SelectedCompany | null;
   historicalData: HistoricalData | null;
   valuationAssumptions: AssumptionsDraft | null;
   relativeInputs: RelativeInput;
 }
 
 export const emptyProjectState: ProjectState = {
+  selectedCompany: null,
   historicalData: null,
   valuationAssumptions: null,
   valuationResult: null,
@@ -58,6 +62,11 @@ function toMessage(e: unknown): string {
 }
 
 // ---- 상태 전이 (모두 새 상태를 반환하며 입력 상태를 변경하지 않는다) ----
+
+/** 기업만 선택한다. 가정 · 결과 · historicalData 는 건드리지 않는다 (재무데이터는 STEP 06-3 에서 별도로 불러온다). */
+export function withSelectedCompany(state: ProjectState, selectedCompany: SelectedCompany | null): ProjectState {
+  return { ...state, selectedCompany };
+}
 
 /** Historical Data 만 설정한다. 가정과 결과는 건드리지 않는다. */
 export function withHistoricalData(state: ProjectState, historicalData: HistoricalData | null): ProjectState {
@@ -182,7 +191,17 @@ export function applyPracticeWithConfirmation(state: ProjectState, confirmed: bo
 // ---- 저장 / 복원 ----
 
 export function toPersisted(state: ProjectState): PersistedProject {
-  return { historicalData: state.historicalData, valuationAssumptions: state.valuationAssumptions, relativeInputs: state.relativeInputs };
+  return { selectedCompany: state.selectedCompany, historicalData: state.historicalData, valuationAssumptions: state.valuationAssumptions, relativeInputs: state.relativeInputs };
+}
+
+const str = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
+/** 저장된 선택 기업의 형식이 맞을 때만 복원한다 (손상된 값 방어). */
+function sanitizeSelectedCompany(raw: unknown): SelectedCompany | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const corpCode = str(r.corpCode), corpName = str(r.corpName), fetchedAt = str(r.fetchedAt);
+  if (!corpCode || !/^\d{8}$/.test(corpCode) || !corpName || !fetchedAt || r.source !== 'OpenDART') return null;
+  return { corpCode, corpName, corpNameEng: str(r.corpNameEng), stockCode: str(r.stockCode), corpClass: str(r.corpClass), source: 'OpenDART', fetchedAt };
 }
 
 const RELATIVE_KEYS = ['netIncome', 'per', 'bookEquity', 'pbr', 'ebitda', 'evEbitda'] as const;
@@ -206,6 +225,7 @@ export function restoreProjectState(raw: unknown): ProjectState {
   const p = (typeof raw === 'object' && raw !== null ? raw : {}) as Partial<PersistedProject>;
   const base: ProjectState = {
     ...emptyProjectState,
+    selectedCompany: sanitizeSelectedCompany(p.selectedCompany),
     historicalData: p.historicalData ?? null,
     valuationAssumptions: p.valuationAssumptions ?? null,
     relativeInputs: sanitizeRelativeInputs(p.relativeInputs),

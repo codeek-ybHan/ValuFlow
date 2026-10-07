@@ -5,6 +5,8 @@ import type { HistoricalData } from './types';
  * 공시 기반 Historical Data 이며, 학습용 Valuation Assumption(step04PracticeAssumptions)과 섞지 않는다.
  */
 export const samsungHistoricalData: HistoricalData = {
+  // 학습용 fixture: 실제 OpenDART 조회 결과가 아니다. corpCode 는 일부러 비워 둔다.
+  meta: { stockCode: '005930', source: 'Fixture' },
   company: {
     name: '삼성전자',
     ticker: '005930',

@@ -6,3 +6,11 @@ ValuFlow*.md
 .DS_Store
 docs/archive/
 docs/ValuFlow v2 기획서.md
+
+# 환경변수 / backend
+.env
+.env.*
+!.env.example
+backend/.venv/
+__pycache__/
+.pytest_cache/

@@ -107,10 +107,10 @@ test('resetValuation: 가정·결과·오류는 비우고 historicalData 는 유
   assert.equal(s.sensitivityResult, null);
 });
 
-test('저장 대상은 입력(historicalData, valuationAssumptions, relativeInputs)뿐이다', () => {
+test('저장 대상은 입력(selectedCompany, historicalData, valuationAssumptions, relativeInputs)뿐이다', () => {
   const s = withPracticeAssumptions(withSamsungHistorical(emptyProjectState));
   const persisted = toPersisted(s);
-  assert.deepEqual(Object.keys(persisted).sort(), ['historicalData', 'relativeInputs', 'valuationAssumptions']);
+  assert.deepEqual(Object.keys(persisted).sort(), ['historicalData', 'relativeInputs', 'selectedCompany', 'valuationAssumptions']);
   const json = JSON.stringify(persisted);
   assert.ok(!json.includes('enterpriseValue'));
   assert.ok(!json.includes('cells'));
