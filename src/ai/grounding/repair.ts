@@ -9,7 +9,8 @@ import type { ToolResult } from '../tools/result.ts';
 import type { CheckpointKind, WorkflowAnswer } from '../agent/types.ts';
 import { extractEvidence, groundAnalysis, type EvidenceIndex, type GroundOutput } from './verify.ts';
 import { matchesValue, parseNumbers } from './numbers.ts';
-import type { Evidence, GroundedClaim, GroundingAuditEvent, GroundingIssue, GroundingReport } from './types.ts';
+import { formatFinancialValue, formatPercent, isAmountUnit, normalizeDisplayUnit } from '../tools/display.ts';
+import type { Evidence, GroundedClaim, GroundingAuditEvent, GroundingIssue, GroundingPassMetrics, GroundingReport } from './types.ts';
 import type { Proposal } from './wacc.ts';
 
 const MAX_REGEN_EVIDENCE = 120;
@@ -45,15 +46,18 @@ function runPass(raw: RawWorkflowAnswer, results: ToolResult<unknown>[], index: 
 
 const blockingOf = (p: Pass): GroundingIssue[] => p.out.issues.filter((i) => i.blocking);
 
-/** 금액 · 비율 값의 표시 형식을 deterministic 하게 만든다 (재생성에서 모델이 단위를 직접 환산하다 틀리지 않게: KRW million 37,792,969 = 377,930억원 = 37.79조원). */
+function metricsOf(p: Pass): GroundingPassMetrics {
+  const r = p.out.report;
+  const nums = [...r.claims.flatMap((c) => c.numbers), ...r.summaryNumbers];
+  return { claims: r.stats.claims, supported: r.stats.supported, unsupported: r.stats.unsupported, coverage: r.coverage, unsupportedNumbers: r.stats.numbersUngrounded, unitSlips: nums.filter((n) => n.unitSlip).length, blocking: blockingOf(p).map((i) => i.code), issueCounts: r.claims.flatMap((c) => c.issues).reduce<Record<string, number>>((m, c) => ({ ...m, [c]: (m[c] ?? 0) + 1 }), {}) };
+}
+
+/** 재생성 요청에 붙이는 표시용 문자열: display.ts 의 deterministic 환산을 쓴다 (모델이 단위를 직접 환산하다 틀리지 않게: KRW million 37,792,969 = 377,930억원 = 37.79조원). */
 function displayHints(e: Evidence): Record<string, string> | undefined {
   if (typeof e.value !== 'number') return undefined;
-  const v = e.value;
-  const fmt = (x: number, d = 0) => x.toLocaleString('ko-KR', { maximumFractionDigits: d, minimumFractionDigits: d });
-  if (e.unit?.startsWith('KRW million')) return { 억원: `${fmt(v / 100)}억원`, 조원: `${fmt(v / 1e6, 2)}조원` };
-  if (e.unit === '억원') return { 억원: `${fmt(v, 2)}억원`, 조원: `${fmt(v / 1e4, 2)}조원` };
-  if (e.unit === 'KRW') return { 억원: `${fmt(v / 1e8)}억원`, 조원: `${fmt(v / 1e12, 2)}조원` };
-  if (e.unit?.startsWith('ratio')) return { percent: `${fmt(v * 100, 2)}%` };
+  const du = normalizeDisplayUnit(e.unit);
+  if (isAmountUnit(du)) return { 억원: formatFinancialValue(e.value, e.unit, 'eok')!, 조원: formatFinancialValue(e.value, e.unit, 'jo')! };
+  if (du === 'ratio') return { percent: formatPercent(e.value) };
   return undefined;
 }
 
@@ -78,6 +82,8 @@ export async function groundWithRepair(args: { question: string; raw: RawWorkflo
   const violations: AnswerViolation[] = [];
   const corrections: string[] = [];
   let pass = runPass(args.raw, args.results, index, args.unsupported);
+  const firstPass = metricsOf(pass);
+  let afterRegeneration: GroundingPassMetrics | null = null;
   violations.push(...pass.g.violations);
   corrections.push(...pass.g.corrections);
   for (const i of pass.out.issues) violations.push({ code: i.code as AnswerViolation['code'], detail: `${i.target}: ${i.detail}` });
@@ -94,6 +100,7 @@ export async function groundWithRepair(args: { question: string; raw: RawWorkflo
       });
       const next = runPass(res.answer as RawWorkflowAnswer, args.results, index, args.unsupported);
       regenerated = true;
+      afterRegeneration = metricsOf(next);
       corrections.push('regenerated');
       if (blockingOf(next).length < blockingOf(pass).length || blockingOf(next).length === 0) pass = next;   // 나아지지 않은 재생성은 쓰지 않는다
     } catch { /* 재생성 실패는 fallback 으로 이어진다 */ }
@@ -112,7 +119,7 @@ export async function groundWithRepair(args: { question: string; raw: RawWorkflo
     // safe fallback: 근거 없는 claim · 숫자를 제거하고 검증된 사실만 남긴다
     fallbackUsed = true;
     claims = pass.out.claims.filter((c) => c.status !== 'unsupported');
-    const numbersOk = (s: string) => parseNumbers(s).every((n) => index.list.some((e) => !e.missing && typeof e.value === 'number' && matchesValue(n, e.value)));
+    const numbersOk = (s: string) => parseNumbers(s).every((n) => index.list.some((e) => !e.missing && typeof e.value === 'number' && matchesValue(n, e.value, e.unit)));
     // 요약 자체에 근거 없는 숫자 · 충돌이 있을 때만 요약을 검증된 claim 으로 다시 쓴다 (claim 하나가 빠진 것만으로 모델의 요약을 버리지 않는다)
     const summaryBlocked = stillBlocking.some((i) => i.target === 'summary');
     answer = { ...answer, summary: summaryBlocked ? fallbackSummary(pass.out.claims) : answer.summary, evidence: answer.evidence.filter((e) => numbersOk(e.value)) };
@@ -129,7 +136,7 @@ export async function groundWithRepair(args: { question: string; raw: RawWorkflo
   const report: GroundingReport = { ...pass.out.report, claims, hallucinatedSources: firstHallucinated };
   const grounded = claims.filter((c) => c.status === 'supported').length;
   const audit: GroundingAuditEvent = {
-    totalClaims: pass.out.report.stats.claims, groundedClaims: grounded, violations: [...new Set(violations.map((v) => v.code))],
+    firstPass, afterRegeneration, totalClaims: pass.out.report.stats.claims, groundedClaims: grounded, violations: [...new Set(violations.map((v) => v.code))],
     unsupportedNumbers: pass.out.report.stats.numbersUngrounded, hallucinatedSources: firstHallucinated, contradictions: pass.out.report.contradictions.length,
     corrections: [...new Set(corrections)], fallbackUsed, regenerated, coverage: pass.out.report.stats.claims > 0 ? grounded / pass.out.report.stats.claims : null, evidenceCount: index.list.length,
   };

@@ -21,6 +21,8 @@ const FIELD_UNIT: Record<string, string> = {
   enterpriseValue: '억원', equityValue: '억원', netDebt: '억원', fcff: '억원', equityMarketValue: '억원', debtMarketValue: '억원', interestBearingDebt: '억원', cash: '억원', currentRevenue: '억원',
 };
 const lastKey = (path: string) => path.split('.').pop()!.replace(/\[\d+\]/g, '');
+/** field 이름의 접미사로 표시용 값의 단위를 정한다 (valuesEok · enterpriseValueEok → 억원, …Trillion → 조원, …Percent → percent, …Won → 원). */
+const unitOfKey = (key: string): string | undefined => FIELD_UNIT[key] ?? (/Eok$/.test(key) ? '억원' : /Trillion$/.test(key) ? '조원' : /Percent$/.test(key) ? 'percent' : /Won$/.test(key) ? '원' : undefined);
 const DOC_TOOLS = new Set(['searchDisclosures', 'searchUploadedDocuments', 'searchKnowledge']);
 
 export interface EvidenceIndex {
@@ -89,11 +91,18 @@ export function extractEvidence(results: ToolResult<unknown>[]): EvidenceIndex {
       continue;
     }
 
+    // 정성 근거: Tool 이 낸 경고(warnings[i])와 엔진의 검토 경고(validationWarnings[i]) · 추세 방향(direction)은 위험 · 해석 claim 의 근거가 된다 (숫자가 아니라 문장)
+    r.warnings.forEach((w, i) => push({ fieldPath: `warnings[${i}]`, sourceLabel: w.code, excerpt: clip(w.text), fullText: w.text.slice(0, 1000) }));
+    const vws = Array.isArray(data.validationWarnings) ? (data.validationWarnings as Rec[]) : [];
+    vws.forEach((w, i) => push({ fieldPath: `validationWarnings[${i}]`, sourceLabel: String(w.code ?? ''), excerpt: clip(`${String(w.message ?? '')} (${String(w.basis ?? '')})`), fullText: `${String(w.message ?? '')} ${String(w.basis ?? '')}`.slice(0, 1000) }));
+    const trends = rec(data.trends);
+    if (trends) for (const [k, tv] of Object.entries(trends)) { const dir = rec(tv)?.direction; if (typeof dir === 'string') push({ fieldPath: `trends.${k}.direction`, value: dir, sourceLabel: label, excerpt: `${k} trend: ${dir}`, fullText: `${k} trend: ${dir}` }); }
+
     const walk = (node: unknown, path: string, unit: string | undefined, asOf: string | undefined, quality: string | undefined) => {
       if (typeof node === 'number') {
         if (!Number.isFinite(node)) return;
         const m = /\[(\d+)\]$/.exec(path);
-        push({ fieldPath: path, value: node, unit: FIELD_UNIT[lastKey(path)] ?? unit, period: periods && m ? periods[Number(m[1])] : undefined, asOf: asOf ?? topAsOf, sourceLabel: label, provider, quality: quality ?? (histReview ? 'review' : undefined) });
+        push({ fieldPath: path, value: node, unit: unitOfKey(lastKey(path)) ?? unit, period: periods && m ? periods[Number(m[1])] : undefined, asOf: asOf ?? topAsOf, sourceLabel: label, provider, quality: quality ?? (histReview ? 'review' : undefined) });
         return;
       }
       if (Array.isArray(node)) { node.forEach((v, i) => walk(v, `${path}[${i}]`, unit, asOf, quality)); return; }

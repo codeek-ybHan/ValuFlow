@@ -50,7 +50,12 @@ export interface NumberCheck {
   text: string;
   status: 'grounded' | 'grounded-other-tool' | 'derived' | 'ungrounded';
   evidenceIds: string[];
+  /** 근거가 없지만 어떤 금액 근거의 10^n 배다: 모델의 단위 환산 착오 */
+  unitSlip?: boolean;
 }
+
+/** claim 의 근거 권위(source authority)를 정하는 범주: 같은 숫자가 여러 source 에 있을 때 어느 source 를 근거로 삼는지가 범주마다 다르다. */
+export type ClaimCategory = 'historical' | 'valuation' | 'market' | 'management' | 'industry' | 'news';
 
 /** 모델이 만든 claim (검증 전). evidenceRefs 는 Tool 이름과 그 결과 data 안의 fieldPath. */
 export interface RawClaim {
@@ -74,6 +79,8 @@ export interface GroundedClaim {
   issues: GroundingIssueCode[];
   /** 이 claim 의 신뢰도를 낮춘 이유 (provider 등급 · 데이터 품질 · 검색 품질) */
   confidenceNotes: string[];
+  /** 존재하지 않아 해석하지 못한 인용 (`tool:fieldPath`). 다른 근거로 검증된 claim 에서는 정보로만 남는다. */
+  invalidRefs?: string[];
 }
 
 export interface Contradiction {
@@ -102,13 +109,35 @@ export interface GroundingReport {
   timeBasis: { historical?: string; market?: string; news?: string } | null;
   hallucinatedSources: number;
   issues: GroundingIssue[];
+  /** 최종 분석 구조: 검증된 사실 · 해석 · valuation 위험 · 권고 (claim id). 한계는 답변의 limitations. */
+  sections: { verifiedFacts: string[]; interpretations: string[]; valuationRisks: string[]; recommendations: string[] };
+  /** 검증 전 claim 중 개수 제한(MAX_CLAIMS)을 넘어 버린 수 */
+  claimsDropped: number;
   /** groundedClaims / totalClaims (핵심 claim 만; 모든 문장을 claim 으로 세지 않는다) */
   coverage: number | null;
   stats: { claims: number; supported: number; partial: number; unsupported: number; numbersChecked: number; numbersUngrounded: number };
 }
 
 /** audit 용: 개수와 코드만 담는다 (근거 값 · 발췌 · 문장은 저장하지 않는다). */
+/** 한 번의 검증 결과 요약 (first-pass / 재생성 후 비교용: 왜 재생성이 실패했는지 보려고 단계별로 남긴다). */
+export interface GroundingPassMetrics {
+  claims: number;
+  supported: number;
+  unsupported: number;
+  coverage: number | null;
+  unsupportedNumbers: number;
+  unitSlips: number;
+  /** 막아야 할 위반의 코드 (target 없이 코드만) */
+  blocking: string[];
+  /** claim 의 이슈 코드별 개수 (partially-supported 의 원인을 보기 위한 것: 코드와 개수만) */
+  issueCounts: Record<string, number>;
+}
+
 export interface GroundingAuditEvent {
+  /** 모델의 첫 답변 */
+  firstPass: GroundingPassMetrics;
+  /** 교정 재생성 후 (재생성하지 않았으면 null) */
+  afterRegeneration: GroundingPassMetrics | null;
   totalClaims: number;
   groundedClaims: number;
   violations: string[];

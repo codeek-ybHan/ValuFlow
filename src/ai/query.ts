@@ -23,7 +23,13 @@ export interface RunAiQueryOptions extends AiContextOptions {
   now?: () => Date;
 }
 
+/**
+ * 기술부채: 일반 질문(runAiQuery)에는 Grounded Analysis(claim ↔ evidence 검증 · 교정 재생성)를 아직 적용하지 않는다 — 답변에 claim 구조가 없다.
+ * 통합 지점: `groundWithRepair`(src/ai/grounding/repair.ts)는 claims 가 비어 있어도 summary 의 숫자 검증을 하므로, 일반 질문도 같은 경로에 태우면 된다
+ * (답변 schema 에 claims 를 추가하거나 summary 숫자 검증만 적용). UI 는 `groundingLevel` 로 두 경로의 수준 차이를 구분해서 보여야 한다.
+ */
 export interface AiQueryOutcome {
+  groundingLevel: 'tool-guardrails';
   status: AiFinalStatus;
   answer: AiAnalystAnswer | null;
   /** 모델 답변에서 감지한 위반 (보정 전) */
@@ -87,7 +93,7 @@ export async function runAiQuery(options: RunAiQueryOptions): Promise<AiQueryOut
       corrections: extra.corrections ?? [],
       errorCode: extra.error?.code ?? null,
     };
-    return { status, answer, violations: extra.violations ?? [], corrections: extra.corrections ?? [], results, audit, message: extra.message ?? extra.error?.message ?? null, error: extra.error ?? null };
+    return { groundingLevel: 'tool-guardrails', status, answer, violations: extra.violations ?? [], corrections: extra.corrections ?? [], results, audit, message: extra.message ?? extra.error?.message ?? null, error: extra.error ?? null };
   };
 
   try {

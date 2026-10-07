@@ -1,5 +1,7 @@
 // 숫자 추출 · 허용 변환 매칭. 변환 규칙은 deterministic 이다 (LLM 의 임의 계산은 근거가 아니다).
 // 허용: 비율 ↔ 퍼센트(0.131 → 13.1%), KRW 단위 환산(원 · KRW million · 억원 · 조원), 표시 반올림(문장에 적힌 소수 자릿수의 절반 이내), 같은 값의 표시 형식 변환.
+import { isAmountUnit, normalizeDisplayUnit, toKrw, type DisplayUnit } from '../tools/display.ts';
+
 export type NumUnit = 'jo' | 'eok' | 'man' | 'won' | 'pct' | 'pctp' | 'x' | 'shares' | 'plain';
 
 export interface ParsedNumber {
@@ -35,6 +37,12 @@ export function parseNumbers(text: string): ParsedNumber[] {
   for (const re of NOISE) t = t.replace(re, (m) => ' '.repeat(m.length));
   const out: ParsedNumber[] = [];
   const taken: [number, number][] = [];
+  // 복합 금액(만 단위): "26만 8,500원" · "3억 5,000만원" → 원 단위 한 값으로 읽는다
+  for (const m of t.matchAll(/(?<![A-Za-z_\d.,])(?:(\d[\d,]*)\s*억\s*)?(\d[\d,]*)\s*만\s*(\d[\d,]*)?\s*원/g)) {
+    const krw = (m[1] ? num(m[1]) * 1e8 : 0) + num(m[2]) * 1e4 + (m[3] ? num(m[3]) : 0);
+    out.push({ text: m[0].trim(), value: krw, unit: 'won', decimals: 0, start: m.index! });
+    taken.push([m.index!, m.index! + m[0].length]);
+  }
   // 복합 금액: "1,763조 1,222억원" · "52.7조원"
   for (const m of t.matchAll(/(?<![A-Za-z_])(\d[\d,]*(?:\.\d+)?)\s*조\s*(?:(\d[\d,]*(?:\.\d+)?)\s*억)?\s*원?/g)) {
     const jo = num(m[1]);
@@ -58,8 +66,10 @@ const half = (p: ParsedNumber) => 0.5 * 10 ** -p.decimals * 1.0001;
 const near = (p: ParsedNumber, b: number) => Math.abs(p.value - b) <= Math.max(half(p), Math.abs(p.value) * 0.003);
 
 /** 평가용 값 v(단위를 모르는 Tool 값)가 문장의 숫자 p 와 같은 값인가: 허용 변환 후보를 모두 시도한다. */
-export function matchesValue(p: ParsedNumber, v: number): boolean {
+export function matchesValue(p: ParsedNumber, v: number, evidenceUnit?: string | null): boolean {
   if (!Number.isFinite(v)) return false;
+  const du = normalizeDisplayUnit(evidenceUnit);
+  if (du !== 'unknown') return matchesKnownUnit(p, v, du);   // 단위를 아는 근거는 그 단위로만 환산한다 (우연한 값 일치를 줄인다)
   const cands: number[] = (() => {
     switch (p.unit) {
       case 'pct': case 'pctp': return [v * 100, v];                                  // 0.131 → 13.1%, 이미 percent 인 값
@@ -73,6 +83,24 @@ export function matchesValue(p: ParsedNumber, v: number): boolean {
     }
   })();
   return cands.some((c) => near(p, c) || near(p, Math.abs(c)));
+}
+
+const CLAIM_KRW: Partial<Record<NumUnit, number>> = { jo: 1e12, eok: 1e8, man: 1e4, won: 1 };
+
+/** 근거의 단위가 알려진 경우: 같은 종류(금액 · 비율 · 퍼센트 · 주식수 · 배수)끼리만 비교하고, 금액은 원화로 환산해서 비교한다 (display.ts 의 환산 규칙). */
+function matchesKnownUnit(p: ParsedNumber, v: number, du: DisplayUnit): boolean {
+  const claimKrw = CLAIM_KRW[p.unit];
+  if (isAmountUnit(du)) {
+    if (p.unit === 'plain') return near(p, v) || near(p, Math.abs(v));   // 단위 없이 적은 값은 근거의 표시 단위와 같은 값이어야 한다
+    if (claimKrw === undefined) return false;
+    const a = p.value * claimKrw, b = toKrw(v, du)!;
+    return Math.abs(a - b) <= Math.max(half(p) * claimKrw, Math.abs(a) * 0.003) || Math.abs(a - Math.abs(b)) <= Math.max(half(p) * claimKrw, Math.abs(a) * 0.003);
+  }
+  if (du === 'ratio') return (p.unit === 'pct' || p.unit === 'pctp') ? near(p, v * 100) || near(p, Math.abs(v) * 100) : p.unit === 'plain' ? near(p, v) || near(p, v * 100) : false;
+  if (du === 'percent') return (p.unit === 'pct' || p.unit === 'pctp' || p.unit === 'plain') && (near(p, v) || near(p, Math.abs(v)));
+  if (du === 'shares') return (p.unit === 'shares' || p.unit === 'plain') && near(p, v);
+  if (du === 'multiple') return (p.unit === 'x' || p.unit === 'plain') && near(p, v);
+  return false;
 }
 
 /** 문서 · 뉴스 발췌에 적힌 숫자 d 와 문장의 숫자 p 가 같은가 (같은 단위 체계로 환산해서 비교). */

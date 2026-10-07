@@ -12,7 +12,7 @@ export { getHistoricalQuality, getMappingTrace } from './tools/quality.ts';
 export { getForecastAssumptions, getValuationResult, getSensitivityAnalysis, getScenarioAnalysis, getRelativeValuation } from './tools/modelTools.ts';
 export { missing } from './tools/result.ts';
 export type { Missing, ToolResult, ToolWarning, SourceInfo } from './tools/result.ts';
-export { auditAnswer, enforceGrounding, toAnswerSource } from './answer.ts';
+export { auditAnswer, enforceGrounding, toAnswerSource, sourceKey } from './answer.ts';
 export type { GroundingOutcome } from './answer.ts';
 export type { AiAnalystAnswer, AnswerEvidence, AnswerSource, AnswerViolation } from './answer.ts';
 export { SYSTEM_POLICY, AI_POLICY_RULES, UNSUPPORTED_DISCLOSURE, buildSystemInstruction } from './policy.ts';

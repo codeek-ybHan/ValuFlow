@@ -226,3 +226,32 @@ def test_regenerate_endpoint_and_provider_payload_without_tools():
     p = OpenAiProvider("sk-test-XXXXXXXXXXXXXXXXXXXX", client=httpx.Client(transport=httpx.MockTransport(handler)))
     p.create_response([{"role": "user", "content": "q"}], [], WORKFLOW_ANSWER_SCHEMA)
     assert "tools" not in seen and "tool_choice" not in seen and "parallel_tool_calls" not in seen and seen["response_format"]["json_schema"]["strict"] is True
+
+
+def test_provider_retries_a_transient_failure_once_but_not_client_errors():
+    import httpx
+    from app.ai.provider import OpenAiProvider
+    body = {"choices": [{"message": {"content": json.dumps(WF_ANSWER)}}]}
+
+    def provider(statuses):
+        seen = []
+
+        def handler(req):
+            seen.append(1)
+            code = statuses[min(len(seen) - 1, len(statuses) - 1)]
+            return httpx.Response(code, json=body) if code == 200 else httpx.Response(code, text="oops sk-secret")
+        return OpenAiProvider("sk-test-XXXXXXXXXXXXXXXXXXXX", client=httpx.Client(transport=httpx.MockTransport(handler))), seen
+    p, seen = provider([503, 200])
+    assert p.create_response([{"role": "user", "content": "q"}], [], WORKFLOW_ANSWER_SCHEMA).kind == "final" and len(seen) == 2, "일시적인 5xx 는 한 번 다시 시도한다"
+    p, seen = provider([502, 502, 200])
+    with pytest.raises(AiGatewayError) as e:
+        p.create_response([{"role": "user", "content": "q"}], [], WORKFLOW_ANSWER_SCHEMA)
+    assert e.value.code == "provider-error" and len(seen) == 2 and "sk-" not in e.value.message, "두 번 실패하면 오류 (원문 노출 없음)"
+    for code, err in ((429, "provider-rate-limit"), (401, "provider-error"), (400, "provider-error")):
+        p, seen = provider([code])
+        with pytest.raises(AiGatewayError) as e2:
+            p.create_response([{"role": "user", "content": "q"}], [], WORKFLOW_ANSWER_SCHEMA)
+        assert e2.value.code == err and len(seen) == 1, f"{code} 는 재시도하지 않는다"
+    boom = httpx.Client(transport=httpx.MockTransport(lambda r: (_ for _ in ()).throw(httpx.ReadTimeout("slow"))))
+    with pytest.raises(AiGatewayError):
+        OpenAiProvider("sk-test-XXXXXXXXXXXXXXXXXXXX", client=boom).create_response([{"role": "user", "content": "q"}], [], WORKFLOW_ANSWER_SCHEMA)

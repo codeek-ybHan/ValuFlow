@@ -307,7 +307,7 @@ test('audit 에는 근거 값 · 문장 · 문서 내용이 없다 (개수와 �
   const raw = rawAnswer('시설투자를 확대한다고 밝혔습니다. 규모는 77조원입니다.', [C('c1', '회사는 시설투자를 확대한다고 밝혔다.', 'fact', ['searchDisclosures', 'results[0]']), C('c2', '시설투자 규모는 77조원이다.', 'fact', ['searchDisclosures', 'results[0]'])]);
   const r = await groundWithRepair({ question: 'q', raw, results: [docs], unsupported: false });
   const json = JSON.stringify(r.audit);
-  assert.deepEqual(Object.keys(r.audit).sort(), ['claimsPlaceholder'].filter(() => false).concat(['contradictions', 'corrections', 'coverage', 'evidenceCount', 'fallbackUsed', 'groundedClaims', 'hallucinatedSources', 'regenerated', 'totalClaims', 'unsupportedNumbers', 'violations']).sort());
+  assert.deepEqual(Object.keys(r.audit).sort(), ['afterRegeneration', 'contradictions', 'corrections', 'coverage', 'evidenceCount', 'fallbackUsed', 'firstPass', 'groundedClaims', 'hallucinatedSources', 'regenerated', 'totalClaims', 'unsupportedNumbers', 'violations'].sort());
   for (const leak of [secret, '77조원', '시설투자를 확대한다']) assert.ok(!json.includes(leak), `audit 에 ${leak} 가 없다`);
   assert.equal(r.audit.fallbackUsed, true);
   assert.ok(r.audit.unsupportedNumbers >= 1 && r.audit.violations.includes('ungrounded-number'));
@@ -323,7 +323,7 @@ test('evidenceRefs 해석: 정확한 경로 → 상위 경로(results[0].text) �
   assert.ok(refs('metrics.nonexistent.values[2]').issues.includes('evidence-ref-invalid'), '없는 경로는 잘못된 인용');
   const o = ground([disclosure], [C('c1', '회사는 HBM 등 첨단 공정 전환을 위해 시설투자를 확대하고 있다.', 'fact', ['searchDisclosures', 'results[0].text']), C('c2', '회사는 HBM 등 첨단 공정 전환을 위해 시설투자를 확대하고 있다.', 'fact', ['searchDisclosures', 'results[0].excerpt'])]);
   assert.deepEqual(o.claims.map((c) => [c.status, c.issues.includes('evidence-ref-invalid')]), [['supported', false], ['supported', false]], '모델이 `.text` / `.excerpt` 처럼 문단 안의 field 를 가리켜도 문단 근거로 해석한다');
-  assert.ok(idx.texts.size === 2 && idx.byId.get('searchDisclosures:results[0]')!.excerpt!.length <= 240);
+  assert.ok(idx.texts.has('searchDisclosures:results[0]') && idx.texts.has('searchDisclosures:results[1]') && idx.byId.get('searchDisclosures:results[0]')!.excerpt!.length <= 240);
 });
 
 test('문서 claim 은 발췌(240자 표시용)가 아니라 전체 문단과 대조한다 · 같은 claim 의 중복 위반은 한 번만 기록한다', () => {
@@ -380,8 +380,8 @@ test('절(clause) 단위 지표 연결 · 기간 표현(52주) · 여러 기사�
     C('c2', '최근 뉴스는 우주 정거장 발사 계획을 포함한다.', 'fact', ['searchCompanyNews', 'results']),
     C('c3', '성과급 · 노조 이슈는 비용 구조 리스크로 작용할 수 있다.', 'risk', ['searchCompanyNews', 'results'], ['getValuationResult', 'warnings']),
   ]);
-  assert.deepEqual(o.claims.map((c) => c.status), ['supported', 'unsupported', 'partially-supported'], '여러 기사가 함께 받치면 인정, 해석은 발췌 일치를 요구하지 않고 잘못된 인용(warnings)은 partial');
-  assert.ok(o.claims[2].issues.includes('evidence-ref-invalid') && o.claims[2].confidence === 'low');
+  assert.deepEqual(o.claims.map((c) => c.status), ['supported', 'unsupported', 'supported'], '여러 기사가 함께 받치면 인정, 해석 · 위험은 발췌 일치를 요구하지 않고 Tool 경고(warnings)도 근거가 된다');
+  assert.ok(o.claims[2].confidence === 'low' && o.claims[2].evidenceIds.some((id) => id.startsWith('getValuationResult:warnings[')));
 });
 
 test('live 에서 나온 오탐 · 누락 보정: 구성 지표로 풀어 쓴 파생 지표, 문장 경계를 넘는 용어 누수 방지', () => {
@@ -402,4 +402,30 @@ test('hallucinated source 는 Tool 출처에 같은 종류 · 문서가 없는 �
   const r = await groundWithRepair({ question: 'q', raw: rawAnswer('공시를 확인했습니다.', [], { sources: [same, fake] }), results, unsupported: false });
   assert.equal(r.audit.hallucinatedSources, 1);
   assert.ok(!r.answer.sources.some((s) => s.documentId === '99999999999999') && r.answer.sources.some((s) => s.documentId === '20260310002820'));
+});
+
+test('정성 근거: Tool 경고(warnings[i]) · 엔진의 검토 경고(validationWarnings[i]) · 추세 방향이 위험 · 해석 claim 의 근거가 된다 (live 에서 validationWarnings 인용이 "근거 없음"으로 처리되던 계약 문제)', () => {
+  const r = [ok('getValuationResult', { wacc: 0.081, tvContribution: 0.8434, validationWarnings: [{ code: 'tv-share', message: '터미널 가치 비중이 높아 가정 변화에 민감합니다.', basis: 'TV 비중 > 75%' }] }, [DOC_SOURCE], [{ code: 'tv-share', text: '터미널 가치 비중이 높습니다.', level: 'review' }]),
+    ...det('getHistoricalAnalysis')];
+  const idx = extractEvidence(r);
+  assert.equal(idx.byId.get('getValuationResult:validationWarnings[0]')!.excerpt, '터미널 가치 비중이 높아 가정 변화에 민감합니다. (TV 비중 > 75%)');
+  assert.ok(idx.byId.has('getValuationResult:warnings[0]') && idx.byId.get('getHistoricalAnalysis:trends.operatingMargin.direction')!.value === 'improving');
+  const o = ground(r, [
+    C('c1', 'DCF 는 터미널 가치 의존도가 높아 가정 변화에 따른 가치 변동성 위험이 있다.', 'risk', ['getValuationResult', 'validationWarnings']),
+    C('c2', '영업이익률 추세는 개선 방향이다.', 'interpretation', ['getHistoricalAnalysis', 'trends.operatingMargin']),
+    C('c3', '해외 규제 위험이 커졌다.', 'risk', ['getValuationResult', 'validationWarnings']),
+  ]);
+  assert.deepEqual(o.claims.map((c) => c.status), ['supported', 'supported', 'unsupported'], '관련 근거가 연결되면 인정되고(내용 일치는 fact 에만 엄격), 엉뚱한 경고를 인용한 위험 서술(해외 규제)은 걸러진다');
+  assert.ok(o.claims[0].evidenceIds.includes('getValuationResult:validationWarnings[0]'));
+  const fact = ground(r, [C('c', '터미널 가치 비중이 높다는 경고가 있다.', 'fact', ['getValuationResult', 'validationWarnings']), C('d', '환율 위험 경고가 있다.', 'fact', ['getValuationResult', 'validationWarnings'])]);
+  assert.deepEqual(fact.claims.map((c) => c.status), ['supported', 'unsupported'], 'fact 는 경고 문장에 실제로 있는 내용이어야 한다');
+});
+
+test('인용한 문단 번호가 틀려도 같은 Tool 이 검색한 다른 문단이 주장을 받치면 인정한다 (인용 오류는 정보로만 남는다)', () => {
+  const o = ground([disclosure], [
+    C('c1', '회사는 HBM 등 첨단 공정 전환을 위해 시설투자를 확대하고 있다.', 'fact', ['searchDisclosures', 'results[1]']),   // 내용은 results[0] 에 있다
+    C('c2', '회사는 신규 데이터센터 사업 진출을 공시했다.', 'fact', ['searchDisclosures', 'results[1]']),
+  ]);
+  assert.deepEqual(o.claims.map((c) => c.status), ['supported', 'unsupported']);
+  assert.ok(o.claims[0].evidenceIds.includes('searchDisclosures:results[0]') && o.claims[0].invalidRefs?.length === 1);
 });

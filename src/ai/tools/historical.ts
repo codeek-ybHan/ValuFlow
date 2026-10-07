@@ -5,8 +5,9 @@ import { HISTORICAL_METRIC_KEYS } from './definitions.ts';
 import { dedupeWarnings, missing, ok, unavailable, type Missing, type ToolResult } from './result.ts';
 import { assumptionSource, historicalSource, qualityWarnings } from './shared.ts';
 import type { MetricSeries } from '../../engine/historicalAnalysis.ts';
+import { displaySeries, percentSeries, percentTextSeries, textSeries } from './display.ts';
 
-type MetricOut = { label: string; unit: string; values: (number | null)[]; status: string; notes: string[]; basis?: string; missing?: Missing };
+type MetricOut = { label: string; unit: string; values: (number | null)[]; display: Record<string, unknown>; status: string; notes: string[]; basis?: string; missing?: Missing };
 
 const D_A_REASON = 'Not available from current OpenDART financial statement source.';
 
@@ -37,7 +38,12 @@ export function getCompanyOverview(ctx: AiValuationContext) {
 }
 
 function metricOut(m: MetricSeries): MetricOut {
-  const out: MetricOut = { label: m.label, unit: m.unit === 'ratio' ? 'ratio (소수)' : 'KRW million', values: [...m.values], status: m.quality.status, notes: [...m.quality.notes] };
+  const unit = m.unit === 'ratio' ? 'ratio (소수)' : 'KRW million';
+  // display: 표시용 deterministic 값. 모델은 금액을 직접 환산하지 말고 이 값을 인용한다 (원본 values 는 full precision 그대로).
+  const display = m.unit === 'ratio'
+    ? { valuesPercent: percentSeries(m.values), valuesPercentText: percentTextSeries(m.values) }
+    : { unit: '억원 · 조원 (원본 values 의 환산 값). 답변에는 환산하지 말고 *Text 문자열을 그대로 쓴다', ...(displaySeries(m.values, unit) ?? {}), valuesEokText: textSeries(m.values, unit, 'eok'), valuesTrillionText: textSeries(m.values, unit, 'jo') };
+  const out: MetricOut = { label: m.label, unit, values: [...m.values], display, status: m.quality.status, notes: [...m.quality.notes] };
   if (m.basis) out.basis = m.basis;
   if (m.quality.status === 'missing') out.missing = missing('Required input accounts are missing, so this metric is not computed.');
   return out;
@@ -63,7 +69,7 @@ export function getHistoricalAnalysis(ctx: AiValuationContext, input: { metrics?
     revenueCagr: a.revenueCagr,
     capexBasis: a.capexBasisLabel,
     // D&A: 값이 없으면 채우지 않고 사유와 함께 missing 으로 전달한다
-    depreciation: daMissing ? missing(D_A_REASON) : { status: 'available' as const, values: [...a.metrics.depreciation.values] },
+    depreciation: daMissing ? missing(D_A_REASON) : { status: 'available' as const, values: [...a.metrics.depreciation.values], display: { ...displaySeries(a.metrics.depreciation.values, 'KRW million'), valuesEokText: textSeries(a.metrics.depreciation.values, 'KRW million', 'eok') } },
     trendThresholds: { note: 'UI 분석용 heuristic 이며 공식 회계 기준이 아닙니다.', growthChangePp: 0.5, marginChangePp: 0.5, nwcChange: 0.03, cashGenerationChange: 0.05 },
   };
   return ok('getHistoricalAnalysis', data, [historicalSource(ctx)], dedupeWarnings(qualityWarnings(ctx)));

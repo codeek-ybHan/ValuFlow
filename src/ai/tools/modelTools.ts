@@ -4,6 +4,7 @@ import type { AiValuationContext } from '../context.ts';
 import { assumptionCompleteness } from '../../store/assumptions.ts';
 import { DIRECTION_NOTES, RANGE_DISCLAIMER } from '../../engine/validationView.ts';
 import { dedupeWarnings, missing, ok, unavailable, type ToolResult, type ToolWarning } from './result.ts';
+import { eokToTrillion, formatFinancialValue, formatPercent, ratioToPercent } from './display.ts';
 import { assumptionSource, assumptionWarnings, calculatedSource, historicalSource, qualityWarnings, validationOf } from './shared.ts';
 
 const NO_RESULT = 'Valuation has not been run (assumptions incomplete or Run Valuation not executed).';
@@ -58,6 +59,17 @@ export function getValuationResult(ctx: AiValuationContext): ToolResult<unknown>
     tvContribution: v?.metrics.terminalValueContribution ?? null, netDebt: r.netDebt,
     fcff: [...r.fcff], costOfEquity: r.costOfEquity, afterTaxCostOfDebt: r.afterTaxCostOfDebt, equityWeight: r.equityWeight, debtWeight: r.debtWeight,
     units: { amounts: '억원', perShareValue: '원', ratios: '소수' },
+    // 표시용 deterministic 값: 모델은 환산하지 말고 이 값을 인용한다 (원본 값은 full precision 그대로)
+    display: {
+      enterpriseValueEok: r.enterpriseValue, enterpriseValueTrillion: eokToTrillion(r.enterpriseValue),
+      equityValueEok: r.equityValue, equityValueTrillion: eokToTrillion(r.equityValue),
+      netDebtEok: r.netDebt, perShareWon: r.perShareValue,
+      // 문자열 표시값: 그대로 옮겨 쓴다
+      enterpriseValueText: formatFinancialValue(r.enterpriseValue, '억원', 'eok'), equityValueText: formatFinancialValue(r.equityValue, '억원', 'eok'), perShareWonText: `${Math.round(r.perShareValue).toLocaleString('ko-KR')}원`, waccPercentText: formatPercent(r.wacc),
+      waccPercent: ratioToPercent(r.wacc), costOfEquityPercent: ratioToPercent(r.costOfEquity), afterTaxCostOfDebtPercent: ratioToPercent(r.afterTaxCostOfDebt),
+      ...(typeof ctx.valuationAssumptions?.terminalGrowth === 'number' ? { terminalGrowthPercent: ratioToPercent(ctx.valuationAssumptions.terminalGrowth) } : {}),
+      ...(typeof v?.metrics.terminalValueContribution === 'number' ? { tvContributionPercent: ratioToPercent(v.metrics.terminalValueContribution) } : {}),
+    },
     validationWarnings: (v?.warnings ?? []).map((w) => ({ code: w.code, message: w.message, basis: w.basis })),
     disclaimer: '엔진이 가정으로 계산한 결과이며 보장된 적정가치가 아닙니다.',
   };

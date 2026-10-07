@@ -37,7 +37,7 @@ function parseValue(s: string | null): ParsedNumber | null {
 function matchEvidence(index: EvidenceIndex, value: string | null): Evidence[] {
   const p = parseValue(value);
   if (!p) return [];
-  return index.list.filter((e) => !e.missing && typeof e.value === 'number' && matchesValue(p, e.value as number));
+  return index.list.filter((e) => !e.missing && typeof e.value === 'number' && matchesValue(p, e.value as number, e.unit));
 }
 
 const typeFor = (c: WaccComponent): CheckpointKind => COMPONENTS.find((x) => x.component === c)!.type;

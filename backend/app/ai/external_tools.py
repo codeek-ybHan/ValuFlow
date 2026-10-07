@@ -54,6 +54,7 @@ def quantity(value: float | None, unit: str | None, as_of: str | None, source: s
     if krw_display and unit == "KRW":
         out["valueEok"] = value / 1e8
         out["valueTrillion"] = value / 1e12
+        out["valueText"] = f"{value / 1e12:,.2f}조원" if abs(value) >= 1e12 else f"{value / 1e8:,.0f}억원"   # 그대로 옮겨 쓰는 표시 문자열 (모델이 단위를 직접 환산하지 않게)
     return out
 
 

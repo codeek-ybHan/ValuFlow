@@ -50,7 +50,7 @@ export interface AiAnalystAnswer {
 export interface AnswerViolation {
   code: 'unknown-tool' | 'missing-warning' | 'missing-sources' | 'unsupported-not-disclosed' | 'empty-summary' | 'missing-value-fabricated' | 'unsupported-figures' | 'ungrounded-number' | 'evidence-from-failed-tool'
     | 'claim-without-evidence' | 'applied-change-claimed' | 'proposal-incomplete'
-    | 'ungrounded-claim' | 'ungrounded-text-number' | 'proposal-semantic-mismatch' | 'proposal-ungrounded' | 'hallucinated-source' | 'provider-contradiction' | 'time-basis-not-stated' | 'missing-value-in-text';
+    | 'too-many-claims' | 'ungrounded-claim' | 'ungrounded-text-number' | 'proposal-semantic-mismatch' | 'proposal-ungrounded' | 'hallucinated-source' | 'provider-contradiction' | 'time-basis-not-stated' | 'missing-value-in-text';
   detail: string;
 }
 

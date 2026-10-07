@@ -69,10 +69,18 @@ class OpenAiProvider:
             payload["tools"] = [{"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.parameters}} for t in tools]
             payload["tool_choice"] = "auto"
             payload["parallel_tool_calls"] = False  # 한 번에 하나의 Tool 만 요청한다 (frontend 가 순서대로 실행)
-        try:
-            res = self._http.post(f"{self._base}/chat/completions", json=payload, headers={"Authorization": f"Bearer {self._key}"})
-        except httpx.HTTPError:
-            raise AiGatewayError("provider-error", MESSAGES["provider-error"], 502) from None
+        res = None
+        for attempt in range(2):   # 일시적인 timeout · 5xx 는 한 번만 다시 시도한다 (4xx · 429 는 재시도하지 않는다)
+            try:
+                res = self._http.post(f"{self._base}/chat/completions", json=payload, headers={"Authorization": f"Bearer {self._key}"})
+            except httpx.HTTPError:
+                if attempt == 0:
+                    continue
+                raise AiGatewayError("provider-error", MESSAGES["provider-error"], 502) from None
+            if res.status_code in (500, 502, 503, 504) and attempt == 0:
+                continue
+            break
+        assert res is not None
         if res.status_code == 429:
             raise AiGatewayError("provider-rate-limit", MESSAGES["provider-rate-limit"], 429)
         if res.status_code >= 400:

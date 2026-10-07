@@ -2,12 +2,13 @@
 //   Claim → Evidence(fieldPath, value, source) 연결, 허용 변환(비율↔퍼센트 · KRW 단위 · 반올림 · 파생 %p), 값 없음(missing) 채우기 감지, 계산 claim 의 deterministic 근거,
 //   valuation 숫자의 엔진 근거, provider 충돌, 시점 표기, WACC 구성요소 의미, 신뢰도(source · DataQuality · 검색 품질), coverage.
 import { extractEvidence, normalizePath, resolveRef, type EvidenceIndex } from './evidence.ts';
-import { claimConfidence, isDeterministic, sourcePriority } from './confidence.ts';
+import { authorityRank, claimConfidence, isDeterministic } from './confidence.ts';
 import { detectContradictions } from './contradiction.ts';
+import { isAmountUnit, normalizeDisplayUnit, toKrw } from '../tools/display.ts';
 import { isDerivedPointChange, matchesDocNumber, matchesValue, parseNumbers, type ParsedNumber } from './numbers.ts';
 import { termsForPath, termsIn, type Term } from './terms.ts';
 import { validateProposal, type Proposal, type ProposalCheck } from './wacc.ts';
-import type { ClaimType, Contradiction, Evidence, EvidenceGraphEdge, GroundedClaim, GroundingIssue, GroundingIssueCode, GroundingReport, NumberCheck, RawClaim } from './types.ts';
+import type { ClaimCategory, ClaimType, Contradiction, Evidence, EvidenceGraphEdge, GroundedClaim, GroundingIssue, GroundingIssueCode, GroundingReport, NumberCheck, RawClaim } from './types.ts';
 
 export { extractEvidence };
 export type { EvidenceIndex };
@@ -19,7 +20,12 @@ const TIME_MARK = /기준|현재|asOf|as of|\d{4}[-./]\d{1,2}|\d{4}\s*년|FY\s*\
 const WACC_CHANGE = /WACC.{0,12}(변경|조정|상향|하향|인상|인하|낮추|높이|낮춰|높여)/i;
 /** 문서 · 뉴스 claim 의 핵심 단어 중 발췌에 들어 있어야 하는 비율 (형태소 분석 없이 어간만 비교하므로 너무 높게 잡지 않는다). */
 const TEXT_SUPPORT = 0.4;
+/** 해석 · 위험 · 권고가 문장 근거와 최소한 이만큼은 단어가 겹쳐야 한다 (사실 claim 보다 느슨하다). */
+const RELATED_MIN = 0.2;
 const STOP = new Set(['최근', '뉴스', '소식', '이슈', '포함', '내용', '언급', '보도', '있는', '있음', '회사', '회사는', '있다', '있습니다', '했다', '했습니다', '대한', '대해', '관련', '통해', '위해', '따라', '등의', '이다', '입니다', '있으며', '하고', '및']);
+
+/** 한 답변에서 검증하는 claim 의 최대 개수: 핵심 claim 만 다룬다 (너무 많으면 한 문장 오류로 전체가 무너진다). 프롬프트는 6개를 권한다. */
+export const MAX_CLAIMS = 8;
 
 export interface GroundInput {
   summary: string;
@@ -34,6 +40,21 @@ export interface GroundOutput {
   proposals: ProposalCheck[];
   /** 위반(violation)으로 기록할 항목. blocking 이면 교정 재생성 / fallback 대상이다. */
   issues: GroundingIssue[];
+}
+
+/** 근거 없는 금액이 어떤 금액 근거의 10^n 배(n≠0)인가: 단위 환산 착오 (예: 37.79조원을 377.93억원으로). */
+function isUnitSlip(n: ParsedNumber, pool: Evidence[]): boolean {
+  const scale: Partial<Record<ParsedNumber['unit'], number>> = { jo: 1e12, eok: 1e8, man: 1e4, won: 1 };
+  const s = scale[n.unit];
+  if (s === undefined || n.value === 0) return false;
+  const claim = Math.abs(n.value * s);
+  return pool.some((e) => {
+    const du = normalizeDisplayUnit(e.unit);
+    if (typeof e.value !== 'number' || !isAmountUnit(du) || e.value === 0) return false;
+    const ratio = claim / Math.abs(toKrw(e.value, du)!);
+    const k = Math.round(Math.log10(ratio));
+    return k !== 0 && Math.abs(k) <= 6 && Math.abs(ratio / 10 ** k - 1) < 0.01;
+  });
 }
 
 // ---- claim 정규화 ----
@@ -66,6 +87,18 @@ function clauseTerms(text: string, pos: number): Term[] {
   return termsIn(text.slice(start, end));
 }
 
+/** claim(절)의 범주: 지표 용어로 정하고, 용어가 없으면 인용한 Tool 로 정한다. */
+function categoryOf(terms: Term[], cited: Set<string>): ClaimCategory | undefined {
+  const has = (cat: string) => terms.some((t) => t.category === cat);
+  if (has('valuation') || has('wacc')) return 'valuation';
+  if (has('historical')) return 'historical';
+  if (has('market') || has('peer')) return 'market';
+  if (cited.has('searchCompanyNews')) return 'news';
+  if (cited.has('searchUploadedDocuments')) return 'industry';
+  if (cited.has('searchDisclosures') || cited.has('searchKnowledge')) return 'management';
+  return undefined;
+}
+
 // ---- 문서 · 뉴스 텍스트 근거 ----
 const josa = /(으로|에서|에게|께서|까지|부터|이다|입니다|했다|했으며|하고|하는|되는|하며|으며|합니다|한다|된다|은|는|이|가|을|를|의|에|도|와|과|로)$/;
 function tokensOf(text: string, numbers: ParsedNumber[]): string[] {
@@ -86,18 +119,18 @@ export function groundAnalysis(input: GroundInput): GroundOutput {
   const issues: GroundingIssue[] = [];
 
   /** 문장의 숫자 하나를 근거에서 찾는다: 인용한 근거 → 인용한 Tool → 전체 순서. 같은 값이 여럿이면 우선순위가 높은 source 를 쓴다. */
-  const checkNumber = (n: ParsedNumber, group: ParsedNumber[], refPool: Evidence[], toolPool: Evidence[], valuationClaim: boolean, flags: Set<GroundingIssueCode>, fieldTerms: Term[] = []): NumberCheck => {
+  const checkNumber = (n: ParsedNumber, group: ParsedNumber[], refPool: Evidence[], toolPool: Evidence[], valuationClaim: boolean, flags: Set<GroundingIssueCode>, fieldTerms: Term[] = [], category?: ClaimCategory): NumberCheck => {
     // 숫자는 문장이 말하는 지표(field)의 근거와 일치해야 한다: 같은 값이 다른 지표(예: 순이익률)에 우연히 있어도 영업이익률 숫자의 근거가 아니다
     const present = fieldTerms.filter((t) => all.some((e) => termsForPath(e.fieldPath ?? '').some((x) => x.key === t.key)));
     const fieldOk = (e: Evidence) => present.length === 0 || e.excerpt !== undefined || termsForPath(e.fieldPath ?? '').some((x) => present.some((t) => related(t.key, x.key)));
     let mismatched = false;
     const find = (pool: Evidence[]) => {
-      const raw = pool.filter((e) => (typeof e.value === 'number' && matchesValue(n, e.value)) || (e.excerpt !== undefined && numsOf(e).some((d) => matchesDocNumber(n, d))));
+      const raw = pool.filter((e) => (typeof e.value === 'number' && matchesValue(n, e.value, e.unit)) || (e.excerpt !== undefined && numsOf(e).some((d) => matchesDocNumber(n, d))));
       const keep = raw.filter(fieldOk);
       if (raw.length > 0 && keep.length === 0) mismatched = true;
       return keep;
     };
-    const pick = (hits: Evidence[]) => [...hits].sort((a, b) => sourcePriority(a) - sourcePriority(b));
+    const pick = (hits: Evidence[]) => [...hits].sort((a, b) => authorityRank(a, category) - authorityRank(b, category));
     let status: NumberCheck['status'] = 'ungrounded';
     let hits: Evidence[] = [];
     for (const [pool, st] of [[refPool, 'grounded'], [toolPool, 'grounded'], [all, 'grounded-other-tool']] as const) {
@@ -114,28 +147,31 @@ export function groundAnalysis(input: GroundInput): GroundOutput {
     }
     if (n.unit === 'pctp' && isDerivedPointChange(n, group)) return { text: n.text, status: 'derived', evidenceIds: [] };
     if (mismatched) flags.add('number-field-mismatch');
-    return { text: n.text, status: 'ungrounded', evidenceIds: [] };
+    return { text: n.text, status: 'ungrounded', evidenceIds: [], ...(isUnitSlip(n, all) ? { unitSlip: true } : {}) };
   };
 
   // ---- claims ----
-  const raws = normalizeClaims(input.claims);
+  const allRaws = normalizeClaims(input.claims);
+  const raws = allRaws.slice(0, MAX_CLAIMS);
+  if (allRaws.length > MAX_CLAIMS) issues.push({ target: 'claims', code: 'too-many-claims', detail: `${allRaws.length} claims were given; only the first ${MAX_CLAIMS} are validated`, blocking: false });
   const claims: GroundedClaim[] = raws.map((c) => {
     const flags = new Set<GroundingIssueCode>();
     const refEv: Evidence[] = [];
+    const invalidRefs: string[] = [];
     const cited = new Set<string>();
     for (const r of c.evidenceRefs) {
       if (!index.okTools.has(r.tool)) { flags.add('tool-not-executed'); continue; }
       cited.add(r.tool);
       if (r.fieldPath) {
         const found = resolveRef(index, r.tool, r.fieldPath);
-        if (found.length === 0) flags.add('evidence-ref-invalid'); else refEv.push(...found);
+        if (found.length === 0) { flags.add('evidence-ref-invalid'); invalidRefs.push(`${r.tool}:${normalizePath(r.fieldPath)}`); } else refEv.push(...found);
       }
     }
     const toolPool = [...cited].flatMap((t) => (index.byTool.get(t) ?? []).filter((e) => !e.missing));
     const nums = parseNumbers(c.text);
     const terms = termsIn(c.text);
     const valuationClaim = terms.some((t) => t.category === 'valuation' || t.key === 'wacc') && !terms.some((t) => t.category === 'market' || t.category === 'peer');
-    const numbers = nums.map((n) => checkNumber(n, nums, refEv.filter((e) => !e.missing), toolPool, valuationClaim, flags, clauseTerms(c.text, n.start)));
+    const numbers = nums.map((n) => checkNumber(n, nums, refEv.filter((e) => !e.missing), toolPool, valuationClaim, flags, clauseTerms(c.text, n.start), categoryOf(clauseTerms(c.text, n.start), cited)));
     const linked = new Map<string, Evidence>();
     const link = (e: Evidence | undefined) => { if (e && !e.missing) linked.set(e.evidenceId, e); };
     refEv.forEach(link);
@@ -165,9 +201,25 @@ export function groundAnalysis(input: GroundInput): GroundOutput {
       // 하나의 문단이 아니라 인용한 여러 문단(뉴스 여러 건 등)이 함께 주장을 받쳐도 된다
       const unionRatio = supportRatio(toks, cands.map(textOf).join(' '));
       if (scored.length > 0 && toks.length >= 2 && (scored[0].r >= TEXT_SUPPORT || unionRatio >= TEXT_SUPPORT)) { if (scored[0].r >= TEXT_SUPPORT) link(scored[0].e); else scored.filter((s) => s.r > 0).slice(0, 3).forEach((s) => link(s.e)); }
-      else if (c.type === 'fact' && (numbers.length === 0 || numbers.every((n) => n.status === 'ungrounded'))) flags.add('text-not-in-evidence');   // 해석 · 위험 · 권고는 발췌와 일치할 필요가 없다 (관련 근거만 있으면 된다)
+      else {
+        // 인용한 문단 번호가 틀렸어도(results[4] 를 인용했는데 내용은 results[0]) 같은 Tool 이 검색한 다른 문단이 주장을 받치면 인정한다 (인용 오류는 정보로만 남긴다)
+        const others = toolPool.filter((e) => e.excerpt !== undefined && !cands.includes(e));
+        const alt = others.map((e) => ({ e, r: supportRatio(toks, textOf(e)) })).sort((a, b) => b.r - a.r)[0];
+        if (alt && toks.length >= 2 && alt.r >= TEXT_SUPPORT) { link(alt.e); flags.add('evidence-ref-invalid'); invalidRefs.push(`${[...cited][0] ?? ''}:cited passage does not contain the claim`); }
+        else if (c.type === 'fact' && (numbers.length === 0 || numbers.every((n) => n.status === 'ungrounded'))) flags.add('text-not-in-evidence');   // 해석 · 위험 · 권고는 발췌와 일치할 필요가 없다 (관련 근거만 있으면 된다)
+      }   // 해석 · 위험 · 권고는 발췌와 일치할 필요가 없다 (관련 근거만 있으면 된다)
     }
 
+    // 해석 · 위험 · 권고가 문장 근거(경고 · 문서 · 기사)에만 기대고 있으면 최소한의 관련성은 있어야 한다 (엉뚱한 경고를 인용한 위험 서술을 걸러낸다). 숫자 · 지표 근거가 연결된 claim 은 대상이 아니다.
+    {
+      const cur = [...linked.values()];
+      const judgment = c.type === 'interpretation' || c.type === 'risk' || c.type === 'recommendation';
+      if (judgment && cur.length > 0 && cur.every((e) => e.excerpt !== undefined)) {
+        const toks = tokensOf(c.text, nums);
+        const union = cur.map((e) => index.texts.get(e.evidenceId) ?? e.excerpt ?? '').join(' ');
+        if (toks.length >= 2 && supportRatio(toks, union) < RELATED_MIN) { flags.add('text-not-in-evidence'); cur.forEach((e) => linked.delete(e.evidenceId)); }
+      }
+    }
     const ev = [...linked.values()];
     if (c.type === 'calculation' && (numbers.length > 0 ? numbers.some((n) => n.status !== 'derived' && n.evidenceIds.some((id) => !isDeterministic(index.byId.get(id)!))) : !ev.some(isDeterministic))) flags.add('calculation-not-deterministic');
     if (c.type === 'calculation' && ev.length > 0 && !ev.some(isDeterministic)) flags.add('calculation-not-deterministic');
@@ -180,10 +232,11 @@ export function groundAnalysis(input: GroundInput): GroundOutput {
 
     const fatal = numbers.some((n) => n.status === 'ungrounded') || flags.has('evidence-missing-value') || flags.has('contradicted-by-priority-source') || flags.has('valuation-number-not-from-engine')
       || flags.has('calculation-not-deterministic') || flags.has('no-evidence') || flags.has('text-not-in-evidence');
-    const partial = !fatal && (numbers.some((n) => n.status === 'grounded-other-tool') || flags.has('evidence-ref-invalid') || flags.has('tool-not-executed') || flags.has('time-basis-not-stated') || flags.has('wacc-component-conflation'));
+    // 잘못된 fieldPath 는 다른 근거로 claim 이 검증되면 정보(invalidRefs)로만 남긴다 (claim 의 근거가 하나도 없으면 no-evidence 로 막힌다)
+    const partial = !fatal && (numbers.some((n) => n.status === 'grounded-other-tool') || flags.has('tool-not-executed') || flags.has('time-basis-not-stated') || flags.has('wacc-component-conflation'));
     const status: GroundedClaim['status'] = fatal ? 'unsupported' : partial ? 'partially-supported' : 'supported';
     const conf = status === 'unsupported' ? { level: undefined, notes: [] } : claimConfidence(ev, c.type);
-    return { claimId: c.claimId, text: c.text, type: c.type, basis: c.type === 'fact' || c.type === 'calculation' ? 'objective' : 'judgment', evidenceIds: ev.map((e) => e.evidenceId).slice(0, 8), status, confidence: conf.level, numbers, issues: [...flags], confidenceNotes: conf.notes };
+    return { claimId: c.claimId, text: c.text, type: c.type, basis: c.type === 'fact' || c.type === 'calculation' ? 'objective' : 'judgment', evidenceIds: ev.map((e) => e.evidenceId).slice(0, 8), status, confidence: conf.level, numbers, issues: [...flags], confidenceNotes: conf.notes, ...(invalidRefs.length ? { invalidRefs } : {}) };
   });
 
   const seen = new Set<string>();
@@ -201,7 +254,7 @@ export function groundAnalysis(input: GroundInput): GroundOutput {
   // ---- summary 의 숫자 (claim 에 속하지 않는 숫자 포함) ----
   const sNums = parseNumbers(input.summary);
   const sFlags = new Set<GroundingIssueCode>();
-  const summaryNumbers = sNums.map((n) => checkNumber(n, sNums, [], all, false, sFlags, clauseTerms(input.summary, n.start)));
+  const summaryNumbers = sNums.map((n) => checkNumber(n, sNums, [], all, false, sFlags, clauseTerms(input.summary, n.start), categoryOf(clauseTerms(input.summary, n.start), new Set())));
   for (const n of summaryNumbers) if (n.status === 'ungrounded') issues.push({ target: 'summary', code: 'ungrounded-text-number', detail: `summary number "${n.text}" is not found in any tool result`, blocking: true });
   if (sFlags.has('contradicted-by-priority-source')) issues.push({ target: 'summary', code: 'provider-contradiction', detail: 'summary uses a provider value that conflicts with a higher-priority source', blocking: true });
 
@@ -226,8 +279,10 @@ export function groundAnalysis(input: GroundInput): GroundOutput {
   const timeBasis = Object.keys(tb).length >= 2 ? tb : null;
   const supported = claims.filter((c) => c.status === 'supported').length;
   const numbersAll = [...claims.flatMap((c) => c.numbers), ...summaryNumbers];
+  const ids = (pred: (c: GroundedClaim) => boolean) => claims.filter((c) => c.status !== 'unsupported' && pred(c)).map((c) => c.claimId);
+  const sections = { verifiedFacts: ids((c) => c.type === 'fact' || c.type === 'calculation'), interpretations: ids((c) => c.type === 'interpretation'), valuationRisks: ids((c) => c.type === 'risk'), recommendations: ids((c) => c.type === 'recommendation') };
   const report: GroundingReport = {
-    evidenceCount: index.list.length, claims, summaryNumbers, evidenceMap, graph, contradictions, timeBasis, hallucinatedSources: 0, issues,
+    evidenceCount: index.list.length, claims, summaryNumbers, evidenceMap, graph, contradictions, timeBasis, hallucinatedSources: 0, issues, sections, claimsDropped: Math.max(0, allRaws.length - raws.length),
     coverage: claims.length > 0 ? supported / claims.length : null,
     stats: { claims: claims.length, supported, partial: claims.filter((c) => c.status === 'partially-supported').length, unsupported: claims.filter((c) => c.status === 'unsupported').length, numbersChecked: numbersAll.length, numbersUngrounded: numbersAll.filter((n) => n.status === 'ungrounded').length },
   };

@@ -4,7 +4,7 @@
 //  Low: 개발용 · 비공식 provider, 뉴스
 //  내려가는 경우: Historical DataQuality 가 partial · ambiguous · missing · review, 검색 품질이 약함(순위가 낮거나 같은 검색의 최고 점수 대비 낮음).
 //  해석 · 위험 · 권고(judgment)는 근거가 아무리 좋아도 high 가 될 수 없다 (객관적 사실이 아니다).
-import type { ClaimType, Confidence, Evidence } from './types.ts';
+import type { ClaimCategory, ClaimType, Confidence, Evidence } from './types.ts';
 
 const ORDER: Confidence[] = ['low', 'medium', 'high'];
 const down = (c: Confidence): Confidence => ORDER[Math.max(0, ORDER.indexOf(c) - 1)];
@@ -22,6 +22,28 @@ export function sourcePriority(e: Evidence): number {
   if (e.sourceType === 'news') return 7;
   if (e.provider && OFFICIAL.has(e.provider.reliability) && e.provider.tier === 'production') return 5;
   return 6;
+}
+
+type EvClass = 'engine' | 'actual' | 'assumption' | 'disclosure' | 'uploaded' | 'official' | 'dev' | 'news';
+const classOf = (e: Evidence): EvClass => (e.sourceKind === 'calculated' ? 'engine' : e.sourceKind === 'actual' ? 'actual' : e.sourceKind === 'assumption' ? 'assumption' : e.sourceType === 'disclosure-document' ? 'disclosure'
+  : e.sourceType === 'uploaded-document' ? 'uploaded' : e.sourceType === 'news' ? 'news' : e.provider && OFFICIAL.has(e.provider.reliability) && e.provider.tier === 'production' ? 'official' : 'dev');
+
+/**
+ * claim 범주별 source authority: 같은 숫자가 여러 source 에 있을 때 어느 source 를 근거로 삼는지.
+ * 기본(단일) 우선순위를 유지하되, 범주에 따라 가장 권위 있는 source 가 앞선다.
+ *   historical: 공시 기반 실적 → OpenDART · valuation: ValuFlow 엔진 · market: 시장 provider · management(경영진 설명): 공시 · industry: 업로드 산업 리포트 · news: 뉴스
+ */
+const AUTHORITY: Record<ClaimCategory, EvClass[]> = {
+  historical: ['actual', 'engine', 'assumption', 'disclosure', 'uploaded', 'official', 'dev', 'news'],
+  valuation: ['engine', 'assumption', 'actual', 'disclosure', 'uploaded', 'official', 'dev', 'news'],
+  market: ['official', 'dev', 'engine', 'actual', 'assumption', 'disclosure', 'uploaded', 'news'],
+  management: ['disclosure', 'uploaded', 'actual', 'engine', 'assumption', 'official', 'dev', 'news'],
+  industry: ['uploaded', 'disclosure', 'official', 'dev', 'actual', 'engine', 'assumption', 'news'],
+  news: ['news', 'disclosure', 'official', 'dev', 'uploaded', 'actual', 'engine', 'assumption'],
+};
+/** 범주가 있으면 그 범주의 authority 순서(1 = 가장 권위), 없으면 기본 우선순위. */
+export function authorityRank(e: Evidence, category?: ClaimCategory): number {
+  return category ? AUTHORITY[category].indexOf(classOf(e)) + 1 : sourcePriority(e);
 }
 
 /** deterministic Tool 결과인가 (calculation claim 의 근거 조건). */

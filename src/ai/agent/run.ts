@@ -119,7 +119,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
       humanCheckpoint: { count: state.checkpoints.length, kinds: state.checkpoints.map((c) => c.kind), pending: state.checkpoints.filter((c) => c.status === 'pending').length },
       status: state.status, durationMs: Math.max(0, now().getTime() - t0), violations: violations.map((v) => v.code), corrections: [...corrections], grounding: groundingSink.audit,
     };
-    return { state, plan, answer, results, violations, corrections, audit, error };
+    return { groundingLevel: 'claim-evidence', state, plan, answer, results, violations, corrections, audit, error };
   };
 
   // ---- 실행할 수 없는 계획: unsupported 기업은 Valuation workflow 를 실행하지 않는다 (이전 기업의 값이 섞이지 않는다) ----

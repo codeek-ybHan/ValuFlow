@@ -126,7 +126,11 @@ export interface WorkflowAuditEvent {
   grounding: GroundingAuditEvent | null;
 }
 
+/** grounding 수준: workflow 분석은 claim ↔ evidence 검증(`claim-evidence`), 일반 질문(runAiQuery)은 Tool 가드레일(`tool-guardrails`: 출처 · 경고 · 실패한 Tool 근거 · 근거 항목의 숫자)만 적용한다. UI 는 두 경로를 같은 수준으로 보이게 하지 않는다. */
+export type GroundingLevel = 'claim-evidence' | 'tool-guardrails';
+
 export interface WorkflowOutcome {
+  groundingLevel: 'claim-evidence';
   state: WorkflowState;
   plan: WorkflowPlan;
   answer: WorkflowAnswer | null;
