@@ -22,7 +22,7 @@ ANSWER = {
     "evidence": [{"label": "Operating Margin 2025", "value": "13.1%", "period": "2025A", "unit": "ratio", "tool": "getHistoricalAnalysis"}],
     "warnings": ["D&A unavailable"], "sources": [{"kind": "actual", "type": "financial-data", "origin": "database", "basis": "Consolidated", "fetchedAt": "2026-10-07T00:00:00+00:00",
                  "corpName": None, "reportName": None, "filingDate": None, "section": None, "receiptNo": None,
-                 "title": None, "page": None, "sourceName": None, "uploadedAt": None, "documentId": None}],
+                 "title": None, "page": None, "sourceName": None, "uploadedAt": None, "documentId": None, "asOf": None, "url": None, "publisher": None, "publishedAt": None}],
     "suggestedNextActions": ["Forecast 가정을 검토하세요."],
 }
 
@@ -329,8 +329,8 @@ def test_openai_provider_request_and_response_mapping():
 
 def test_catalog_and_schema_validator():
     cat = tool_map()
-    assert set(cat) == {"getCompanyOverview", "getHistoricalAnalysis", "getHistoricalQuality", "getMappingTrace", "getForecastAssumptions", "getValuationResult", "getSensitivityAnalysis", "getScenarioAnalysis", "getRelativeValuation", "searchDisclosures", "searchUploadedDocuments", "searchKnowledge"}
-    assert [n for n, t in cat.items() if t["execution"] == "backend"] == ["searchDisclosures", "searchUploadedDocuments", "searchKnowledge"]
+    assert set(cat) == {"getCompanyOverview", "getHistoricalAnalysis", "getHistoricalQuality", "getMappingTrace", "getForecastAssumptions", "getValuationResult", "getSensitivityAnalysis", "getScenarioAnalysis", "getRelativeValuation", "searchDisclosures", "searchUploadedDocuments", "searchKnowledge", "getMarketData", "getMarketAssumptions", "getComparableCompanies", "searchCompanyNews"}
+    assert [n for n, t in cat.items() if t["execution"] == "backend"] == ["searchDisclosures", "searchUploadedDocuments", "searchKnowledge", "getMarketData", "getMarketAssumptions", "getComparableCompanies", "searchCompanyNews"]
     assert "calculation engine" in load_catalog()["systemInstruction"] and "Call one tool at a time" in load_catalog()["systemInstruction"]
     s = cat["getMappingTrace"]["inputSchema"]
     assert validate_value(s, {"field": "revenue", "fiscalYear": 2025}) is None

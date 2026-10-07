@@ -358,10 +358,10 @@ test('context 생성과 Tool 실행은 원본 Project State 를 변경하지 않
 });
 
 // Tool catalog / 실행기
-test('Tool catalog: 12개 Tool(frontend 9 + backend 3)이 이름 · 설명 · 입력/출력 schema 를 갖고, frontend Tool 은 모두 실행된다', () => {
-  assert.deepEqual([...TOOL_NAMES], ['getCompanyOverview', 'getHistoricalAnalysis', 'getHistoricalQuality', 'getMappingTrace', 'getForecastAssumptions', 'getValuationResult', 'getSensitivityAnalysis', 'getScenarioAnalysis', 'getRelativeValuation', 'searchDisclosures', 'searchUploadedDocuments', 'searchKnowledge']);
-  assert.equal(new Set(TOOL_NAMES).size, 12);
-  assert.deepEqual(TOOL_CATALOG.filter((t) => t.execution === 'backend').map((t) => t.name), ['searchDisclosures', 'searchUploadedDocuments', 'searchKnowledge']);
+test('Tool catalog: 16개 Tool(frontend 9 + backend 7)이 이름 · 설명 · 입력/출력 schema 를 갖고, frontend Tool 은 모두 실행된다', () => {
+  assert.deepEqual([...TOOL_NAMES], ['getCompanyOverview', 'getHistoricalAnalysis', 'getHistoricalQuality', 'getMappingTrace', 'getForecastAssumptions', 'getValuationResult', 'getSensitivityAnalysis', 'getScenarioAnalysis', 'getRelativeValuation', 'searchDisclosures', 'searchUploadedDocuments', 'searchKnowledge', 'getMarketData', 'getMarketAssumptions', 'getComparableCompanies', 'searchCompanyNews']);
+  assert.equal(new Set(TOOL_NAMES).size, 16);
+  assert.deepEqual(TOOL_CATALOG.filter((t) => t.execution === 'backend').map((t) => t.name), ['searchDisclosures', 'searchUploadedDocuments', 'searchKnowledge', 'getMarketData', 'getMarketAssumptions', 'getComparableCompanies', 'searchCompanyNews']);
   const ctx = ctxOf(withValuation(live()));
   for (const t of TOOL_CATALOG) {
     assert.ok(t.description.length > 20 && t.inputSchema.type === 'object' && t.outputSchema.type === 'object', t.name);
@@ -386,7 +386,7 @@ test('Tool catalog: 12개 Tool(frontend 9 + backend 3)이 이름 · 설명 · �
 });
 
 test('Capability 정의와 규칙 기반 질문 분류', () => {
-  assert.deepEqual(CAPABILITIES.map((c) => c.id), ['historical', 'data-quality', 'forecast', 'valuation', 'sensitivity', 'scenario', 'relative', 'disclosure', 'knowledge']);
+  assert.deepEqual(CAPABILITIES.map((c) => c.id), ['historical', 'data-quality', 'forecast', 'valuation', 'sensitivity', 'scenario', 'relative', 'disclosure', 'knowledge', 'market', 'market-assumptions', 'comparables', 'news']);
   for (const c of CAPABILITIES) { assert.ok(c.exampleQuestions.length > 0 && c.never.length > 0); for (const t of c.tools) assert.ok(TOOL_NAMES.includes(t), t); }
   const cls = (q: string) => classifyQuestion(q);
   assert.deepEqual([cls('최근 매출 성장률은?').capabilities, cls('최근 매출 성장률은?').mode], [['historical'], 'explain']);

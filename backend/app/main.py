@@ -25,6 +25,10 @@ from app.ai.runtime import make_retrieval_tools
 from app.knowledge.loaders.pdf_loader import PdfError
 from app.knowledge.service import KnowledgeService, parse_meta
 from app.rag.rerank import Reranker, build_reranker
+from app.ai.external_tools import ExternalProviders, TickerInfo, make_external_tools
+from app.external.fred import FredRiskFree
+from app.external.news import GoogleNews
+from app.external.yahoo import YahooComparables, YahooMarketData
 from app.dart.filings import DartDisclosureSource, FilingsSource
 from app.rag.embeddings import EmbeddingProvider, OpenAiEmbeddings
 from app.rag.ingestion import DisclosureIngestionService
@@ -98,7 +102,8 @@ def _error(code: str, message: str) -> JSONResponse:
 
 def create_app(settings: Settings | None = None, dart: DartHttpClient | None = None, cache: CorpCodeCache | None = None, financials: FinancialsService | None = None,
                store: FinancialStore | None = None, historical: HistoricalService | None = None, ai: AiGateway | None = None,
-               embedder: EmbeddingProvider | None = None, disclosure_source: FilingsSource | None = None, reranker: Reranker | None = None) -> FastAPI:
+               embedder: EmbeddingProvider | None = None, disclosure_source: FilingsSource | None = None, reranker: Reranker | None = None,
+               external: ExternalProviders | None = None) -> FastAPI:
     settings = settings or load_settings()
     dart = dart or DartHttpClient(settings)
     cache = cache or CorpCodeCache(dart.fetch_corp_code_zip)
@@ -122,6 +127,16 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
 
         knowledge = KnowledgeService(embedder, disclosure_store, max_bytes=settings.max_upload_mb * 1024 * 1024, corp_name_lookup=_corp_name)
     backend_tools = make_retrieval_tools(retriever) if retriever is not None else {}
+    if external is None and settings.external_data:
+        market = YahooMarketData(quote_ttl=settings.market_ttl, fundamentals_ttl=settings.fundamentals_ttl)
+        external = ExternalProviders(market, FredRiskFree(ttl=settings.rate_ttl), YahooComparables(market, ttl=settings.fundamentals_ttl), GoogleNews(ttl=settings.news_ttl))
+
+    def _ticker(corp_code: str) -> TickerInfo | None:
+        """corp code → 종목코드: 서버가 DART 기업 목록에서 찾는다 (모델 · frontend 가 정한 값이 아니다)."""
+        rec = next((r for r in cache.get() if r.corp_code == corp_code), None)
+        return TickerInfo(rec.corp_name, (rec.stock_code or "").strip() or None) if rec else None
+    if external is not None:
+        backend_tools.update(make_external_tools(external, _ticker))
     if ai is None and settings.has_ai:
         ai = AiGateway(OpenAiProvider(settings.openai_api_key, settings.openai_model, settings.openai_base_url),
                        derive_secret(settings.ai_state_secret, settings.openai_api_key), max_tool_calls=settings.ai_max_tool_calls, backend_tools=backend_tools)
@@ -149,7 +164,7 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
-        return {"status": "ok", "dartConfigured": settings.has_api_key, "databaseConfigured": historical.persistence_enabled, "aiConfigured": ai is not None, "disclosureSearchConfigured": retriever is not None, "knowledgeUploadConfigured": knowledge is not None, "rerankerConfigured": reranker is not None, "corpCodesFetchedAt": cache.fetched_at}
+        return {"status": "ok", "dartConfigured": settings.has_api_key, "databaseConfigured": historical.persistence_enabled, "aiConfigured": ai is not None, "disclosureSearchConfigured": retriever is not None, "knowledgeUploadConfigured": knowledge is not None, "rerankerConfigured": reranker is not None, "externalToolsConfigured": external is not None, "corpCodesFetchedAt": cache.fetched_at}
 
     @app.get("/api/companies")
     def companies(q: str = Query(..., max_length=100), limit: int = Query(20, ge=1, le=MAX_LIMIT)) -> dict[str, Any]:

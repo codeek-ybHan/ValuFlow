@@ -29,7 +29,7 @@ STATE_TTL_SECONDS = 15 * 60
 MAX_QUESTION_CHARS = 2000
 MAX_TOOL_RESULT_CHARS = 60_000
 AI_STATE_MISMATCH = "conversationId 가 대화 상태와 일치하지 않습니다."
-TOOL_RESULT_STATUSES = {"ok", "unsupported", "unavailable", "invalid-input"}
+TOOL_RESULT_STATUSES = {"ok", "unsupported", "unavailable", "invalid-input", "no-data", "rate-limit"}
 TOOL_RESULT_KEYS = ("status", "tool", "data", "reason", "message", "sources", "warnings")
 
 
@@ -41,8 +41,9 @@ def _context_message(minimal_context: dict[str, Any] | None) -> str:
 def _retrieval_audit(result: dict[str, Any]) -> dict[str, Any]:
     """검색 Tool 의 audit 정보 (문서 id · source type · 건수). 본문(chunk text) · embedding 은 담지 않는다."""
     data = result.get("data") if isinstance(result.get("data"), dict) else None
-    if not data or "results" not in data:
-        return {}
+    if not data or "results" not in data or "retrieval" not in data:   # 외부 데이터 Tool(시세 · 금리 · 비교기업 · 뉴스): 출처 종류만 기록한다
+        types = sorted({s["type"] for s in result.get("sources", []) if isinstance(s, dict) and s.get("type")})
+        return {"sourceTypes": types} if types else {}
     items = data["results"]
     ret = data.get("retrieval") or {}
     return {"documentIds": sorted({str(i.get("documentId")) for i in items if i.get("documentId")}), "sourceTypes": sorted({i["sourceType"] for i in items if i.get("sourceType")}),

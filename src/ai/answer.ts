@@ -30,6 +30,10 @@ export interface AnswerSource {
   sourceName?: string | null;
   uploadedAt?: string | null;
   documentId?: string | null;
+  asOf?: string | null;
+  publishedAt?: string | null;
+  publisher?: string | null;
+  url?: string | null;
 }
 
 export interface AiAnalystAnswer {
@@ -63,7 +67,7 @@ function missingKeys(o: unknown, key = '', out: Set<string> = new Set()): Set<st
 function collectNumbers(o: unknown, out: number[] = [], key = ''): number[] {
   if (typeof o === 'number' && Number.isFinite(o)) out.push(o);
   // 공시 문서 발췌(text)에 적힌 숫자도 문서 근거로 인정한다 (문서 숫자가 Valuation 결과를 대체하는 것은 아니다)
-  else if (typeof o === 'string' && key === 'text') for (const m of o.matchAll(/\d[\d,]*(?:\.\d+)?/g)) { const n = Number(m[0].replace(/,/g, '')); if (Number.isFinite(n)) out.push(n); }
+  else if (typeof o === 'string' && (key === 'text' || key === 'snippet' || key === 'title')) for (const m of o.matchAll(/\d[\d,]*(?:\.\d+)?/g)) { const n = Number(m[0].replace(/,/g, '')); if (Number.isFinite(n)) out.push(n); }
   else if (Array.isArray(o)) o.forEach((v) => collectNumbers(v, out, key));
   else if (o && typeof o === 'object') Object.entries(o).forEach(([k, v]) => collectNumbers(v, out, k));
   return out;
@@ -134,12 +138,12 @@ export interface GroundingOutcome {
 export function toAnswerSource(s: SourceInfo): AnswerSource {
   const out: AnswerSource = { kind: s.kind, origin: s.origin, basis: s.basis, fetchedAt: s.fetchedAt };
   if (s.type) out.type = s.type;
-  for (const k of ['corpName', 'reportName', 'filingDate', 'section', 'receiptNo', 'title', 'sourceName', 'uploadedAt', 'documentId'] as const) if (s[k] !== undefined && s[k] !== null) out[k] = s[k];
+  for (const k of ['corpName', 'reportName', 'filingDate', 'section', 'receiptNo', 'title', 'sourceName', 'uploadedAt', 'documentId', 'asOf', 'publishedAt', 'publisher', 'url'] as const) if (s[k] !== undefined && s[k] !== null) out[k] = s[k];
   if (s.page !== undefined && s.page !== null) out.page = s.page;
   return out;
 }
 
-const sourceKey = (s: AnswerSource) => `${s.kind}|${s.origin}|${s.basis ?? ''}|${s.fetchedAt ?? ''}|${s.receiptNo ?? ''}|${s.documentId ?? ''}|${s.page ?? ''}|${s.section ?? ''}`;
+const sourceKey = (s: AnswerSource) => `${s.kind}|${s.origin}|${s.basis ?? ''}|${s.fetchedAt ?? ''}|${s.receiptNo ?? ''}|${s.documentId ?? ''}|${s.page ?? ''}|${s.section ?? ''}|${s.asOf ?? ''}|${s.url ?? ''}|${s.title ?? ''}`;
 
 /**
  * 모델 답변을 Tool 결과에 맞춰 보정한다 (위반은 그대로 기록한다).

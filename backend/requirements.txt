@@ -7,3 +7,4 @@ psycopg[binary]>=3.2
 pgvector>=0.3
 python-multipart>=0.0.9
 pypdf>=5
+yfinance>=0.2.50

@@ -49,6 +49,12 @@ class Settings:
     rerank_candidates: int = 15
     rerank_min_score: float | None = None
     reranker_cache_dir: str = ""
+    # 외부 데이터 Tool (시세 · 금리 · 비교기업 · 뉴스). 키가 필요 없는 provider 를 쓰며, TTL 은 데이터 성격별로 다르다 (초).
+    external_data: bool = False
+    market_ttl: int = 300
+    fundamentals_ttl: int = 86400
+    rate_ttl: int = 86400
+    news_ttl: int = 900
     # 사용자 PDF 업로드
     max_upload_mb: int = 20
 
@@ -88,5 +94,8 @@ def load_settings(env: dict[str, str] | None = None, dotenv_path: Path | None = 
         rerank_min_score=float(source["RERANK_MIN_SCORE"]) if source.get("RERANK_MIN_SCORE") else None,
         reranker_cache_dir=source.get("RERANKER_CACHE_DIR") or dotenv.get("RERANKER_CACHE_DIR", ""),
         max_upload_mb=int(source.get("MAX_UPLOAD_MB") or 20),
+        external_data=(source.get("EXTERNAL_DATA") or dotenv.get("EXTERNAL_DATA", "") or "true").lower() not in ("0", "false", "no", "off"),
+        market_ttl=int(source.get("MARKET_TTL_SECONDS") or 300), fundamentals_ttl=int(source.get("FUNDAMENTALS_TTL_SECONDS") or 86400),
+        rate_ttl=int(source.get("RATE_TTL_SECONDS") or 86400), news_ttl=int(source.get("NEWS_TTL_SECONDS") or 900),
         db_pool_size=int(source.get("DB_POOL_SIZE") or 2), db_max_overflow=int(source.get("DB_MAX_OVERFLOW") or 0), db_pool=(source.get("DB_POOL") or "queue").lower(),
     )

@@ -10,9 +10,9 @@ export interface Missing {
 
 export const missing = (reason: string): Missing => ({ status: 'missing', value: null, reason });
 
-export type SourceKind = 'actual' | 'assumption' | 'calculated' | 'document';
+export type SourceKind = 'actual' | 'assumption' | 'calculated' | 'document' | 'external';
 /** financial-data: 숫자 Tool(재무 데이터 · 가정 · 계산) · disclosure-document: 공시 문서 인용 */
-export type SourceType = 'financial-data' | 'disclosure-document' | 'uploaded-document';
+export type SourceType = 'financial-data' | 'disclosure-document' | 'uploaded-document' | 'market-data' | 'peer-data' | 'news';
 
 export interface SourceInfo {
   /** actual: 공시 기반 실적 · assumption: 사용자 / 학습용 가정 · calculated: 엔진 계산 결과 · document: 공시 문서 인용 */
@@ -36,6 +36,11 @@ export interface SourceInfo {
   sourceName?: string | null;
   uploadedAt?: string | null;
   documentId?: string | null;
+  /** 외부 데이터(market-data · peer-data · news) 출처: 관측 시점 · 발행 시각 · 언론사 · 링크 */
+  asOf?: string | null;
+  publishedAt?: string | null;
+  publisher?: string | null;
+  url?: string | null;
 }
 
 export interface ToolWarning {
@@ -49,7 +54,11 @@ export type ToolResult<T> =
   | { status: 'ok'; tool: string; data: T; sources: SourceInfo[]; warnings: ToolWarning[] }
   | { status: 'unsupported'; tool: string; reason: string; message: string; sources: SourceInfo[]; warnings: ToolWarning[] }
   | { status: 'unavailable'; tool: string; reason: string; sources: SourceInfo[]; warnings: ToolWarning[] }
-  | { status: 'invalid-input'; tool: string; reason: string; sources: SourceInfo[]; warnings: ToolWarning[] };
+  | { status: 'invalid-input'; tool: string; reason: string; sources: SourceInfo[]; warnings: ToolWarning[] }
+  /** 외부 provider 가 해당 데이터를 갖고 있지 않음 (호출 실패 unavailable 과 구분) */
+  | { status: 'no-data'; tool: string; reason: string; sources: SourceInfo[]; warnings: ToolWarning[] }
+  /** 외부 provider 의 호출 한도 */
+  | { status: 'rate-limit'; tool: string; reason: string; sources: SourceInfo[]; warnings: ToolWarning[] };
 
 export const ok = <T,>(tool: string, data: T, sources: SourceInfo[], warnings: ToolWarning[] = []): ToolResult<T> => ({ status: 'ok', tool, data, sources, warnings });
 export const unavailable = (tool: string, reason: string, sources: SourceInfo[] = []): ToolResult<never> => ({ status: 'unavailable', tool, reason, sources, warnings: [] });

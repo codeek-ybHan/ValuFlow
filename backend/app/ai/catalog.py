@@ -30,13 +30,14 @@ ANSWER_SCHEMA: dict[str, Any] = {
             "type": "array",
             "items": {
                 "type": "object", "additionalProperties": False,
-                "required": ["kind", "type", "origin", "basis", "fetchedAt", "corpName", "reportName", "filingDate", "section", "receiptNo", "title", "page", "sourceName", "uploadedAt", "documentId"],
+                "required": ["kind", "type", "origin", "basis", "fetchedAt", "corpName", "reportName", "filingDate", "section", "receiptNo", "title", "page", "sourceName", "uploadedAt", "documentId", "asOf", "url", "publisher", "publishedAt"],
                 "properties": {
-                    "kind": {"type": "string", "enum": ["actual", "assumption", "calculated", "document"]},
-                    "type": {"type": "string", "enum": ["financial-data", "disclosure-document", "uploaded-document"]},
+                    "kind": {"type": "string", "enum": ["actual", "assumption", "calculated", "document", "external"]},
+                    "type": {"type": "string", "enum": ["financial-data", "disclosure-document", "uploaded-document", "market-data", "peer-data", "news"]},
                     "origin": {"type": "string"}, "basis": _NULLABLE_STR, "fetchedAt": _NULLABLE_STR,
                     "corpName": _NULLABLE_STR, "reportName": _NULLABLE_STR, "filingDate": _NULLABLE_STR, "section": _NULLABLE_STR, "receiptNo": _NULLABLE_STR,
                     "title": _NULLABLE_STR, "page": {"type": ["integer", "null"]}, "sourceName": _NULLABLE_STR, "uploadedAt": _NULLABLE_STR, "documentId": _NULLABLE_STR,
+                    "asOf": _NULLABLE_STR, "url": _NULLABLE_STR, "publisher": _NULLABLE_STR, "publishedAt": _NULLABLE_STR,
                 },
             },
         },

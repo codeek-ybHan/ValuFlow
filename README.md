@@ -98,6 +98,22 @@ curl -X DELETE localhost:8000/api/knowledge/documents/3               # 문서 +
 - **평가:** `docs/STEP08-3_unified_rag_eval.md` (Vector only vs Hybrid vs Hybrid + Reranker).
 - **보안 참고:** 업로드 · 수집 API 에는 인증이 없습니다 (embedding 비용이 발생하므로 공개 배포 전에 보호가 필요합니다).
 
+### 외부 데이터 Tool (STEP 08-4)
+
+backend 가 직접 실행하는 외부 데이터 Tool 4종입니다. **계산은 ValuFlow Engine, 근거는 이 Tool, 해석은 LLM** 이며 Tool 은 ValuFlow 가정 · Forecast · Relative Valuation 입력을 바꾸지 않습니다 (`applied: false`).
+
+| Tool | 내용 | provider (Key 불필요) | 기본 TTL |
+|---|---|---|---|
+| `getMarketData` | 주가 · 시가총액 · 발행주식수 · 52주 범위 (asOf · 출처 포함) | Yahoo Finance (yfinance, 비공식) | 5분 |
+| `getMarketAssumptions` | 무위험수익률(한국 국채 10Y) · 베타(raw) · 부채 지표. 시장위험프리미엄은 provider 가 없어 missing | FRED(OECD 월평균) · Yahoo Finance | 1일 |
+| `getComparableCompanies` | 같은 산업 분류의 실제 종목 후보 + 배수(PER · PBR · EV/EBITDA, 없으면 null) + selectionReasons. 평균은 계산하지 않음 | Yahoo Finance screener | 1일 |
+| `searchCompanyNews` | 제목 · 언론사 · 발행 시각 · 링크 · 짧은 요약 (본문 아님, 외부 텍스트는 데이터로만 전달) | Google News RSS | 15분 |
+
+- 종목은 모델이 지정하지 않고 서버가 DART 기업 목록의 종목코드로 찾습니다. 외부 값은 `asOf` / `publishedAt` 을 가지며 DART 회계연도 값과 시점이 다릅니다.
+- 상태: `ok` · `unavailable`(호출 실패) · `no-data`(provider 에 데이터 없음) · `rate-limit`. 없는 값은 `{status:"missing"}` 이며 추정하지 않습니다.
+- provider 는 `backend/app/external/providers.py` 의 Protocol 로 분리되어 있어(Yahoo → 다른 시세 provider · MCP server 등) 교체해도 Tool contract 는 그대로입니다. `EXTERNAL_DATA=false` 로 끌 수 있고 TTL 은 `MARKET_TTL_SECONDS` · `FUNDAMENTALS_TTL_SECONDS` · `RATE_TTL_SECONDS` · `NEWS_TTL_SECONDS`.
+- 주의: Yahoo Finance · Google News 는 비공식 / 개인용 접근이라 지연 · 차단 · 필드 오류가 있을 수 있습니다 (예: provider 의 영업이익률이 DART 기준과 크게 다를 수 있어 Tool 이 경고합니다). 상업 서비스라면 라이선스가 있는 provider 로 교체하세요. `pip install yfinance` 가 필요합니다 (requirements.txt).
+
 기업 검색과 재무제표 수집(`GET /api/companies/{corpCode}/financials?years=2023,2024,2025&basis=auto`)은 backend 가 켜져 있어야 동작합니다. 실제 응답의 계정명 조사는 `.venv/bin/python -m scripts.inspect_raw_accounts` 로 다시 실행할 수 있습니다 (dev 서버가 `/api` 를 8000 포트로 전달).
 
 ```bash

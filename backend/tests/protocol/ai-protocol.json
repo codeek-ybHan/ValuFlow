@@ -55,7 +55,11 @@
           "page": null,
           "sourceName": null,
           "uploadedAt": null,
-          "documentId": null
+          "documentId": null,
+          "asOf": null,
+          "url": null,
+          "publisher": null,
+          "publishedAt": null
         }
       ],
       "suggestedNextActions": [
@@ -151,7 +155,11 @@
         "page": null,
         "sourceName": "OpenDART",
         "uploadedAt": null,
-        "documentId": "20260310002820"
+        "documentId": "20260310002820",
+        "asOf": null,
+        "url": null,
+        "publisher": null,
+        "publishedAt": null
       }
     ],
     "warnings": [

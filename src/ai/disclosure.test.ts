@@ -37,7 +37,7 @@ const done = (answer: Partial<AiAnalystAnswer>, trace: { tool: string; runtime: 
 test('Tool catalog: searchDisclosures 는 backend Tool 이고 기업은 AI 가 지정할 수 없다', () => {
   const def = getToolDefinition('searchDisclosures')!;
   assert.equal(def.execution, 'backend');
-  assert.deepEqual(TOOL_CATALOG.filter((t) => t.execution === 'backend').map((t) => t.name), ['searchDisclosures', 'searchUploadedDocuments', 'searchKnowledge']);
+  assert.deepEqual(TOOL_CATALOG.filter((t) => t.execution === 'backend').map((t) => t.name), ['searchDisclosures', 'searchUploadedDocuments', 'searchKnowledge', 'getMarketData', 'getMarketAssumptions', 'getComparableCompanies', 'searchCompanyNews']);
   assert.equal(FRONTEND_TOOL_NAMES.length, 9);
   assert.ok(!FRONTEND_TOOL_NAMES.includes('searchDisclosures') && TOOL_NAMES.includes('searchDisclosures'));
   assert.deepEqual(Object.keys(def.inputSchema.properties!), ['query', 'topK', 'reportTypes', 'businessYears']);

@@ -71,7 +71,7 @@ def _document_id(h: Hit) -> str:
 
 def _source(h: Hit) -> dict[str, Any]:
     """출처: 어느 문서의 어느 부분인가 (OpenDART 는 section · 접수번호, 업로드 PDF 는 page · 제목). 숫자 Tool 출처(financial-data)와 type 으로 구분된다."""
-    common = {"kind": "document", "basis": None, "persisted": True, "note": None, "title": h.title, "page": h.page_number, "documentId": _document_id(h)}
+    common = {"kind": "document", "basis": None, "persisted": True, "note": None, "title": h.title, "page": h.page_number, "documentId": _document_id(h), "asOf": None, "url": None, "publisher": None, "publishedAt": None}
     if h.source_type == SOURCE_UPLOAD:
         return {**common, "type": "uploaded-document", "origin": "user-upload", "fetchedAt": h.uploaded_at, "corpName": h.corp_name, "reportName": None, "filingDate": None, "section": None,
                 "receiptNo": None, "sourceName": h.source_name, "uploadedAt": h.uploaded_at}
