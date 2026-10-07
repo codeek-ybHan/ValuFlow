@@ -55,7 +55,7 @@ button.link { border: 0; background: none; color: var(--accent); cursor: pointer
 .card > h3:first-child { margin-bottom: 12px; }
 .panel-head { min-height: 26px; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
 .panel-head h3, .list-head h3, .slot-head h3 { margin: 0; }
-.panel-head .small { text-align: right; }
+.panel-head > .small { text-align: right; }
 .step-title { font-size: 18px; font-weight: 650; letter-spacing: -.02em; margin: 2px 0 4px; }
 .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
@@ -233,3 +233,13 @@ input[type='radio'], input[type='checkbox'] { width: 16px; min-height: 0; height
 .answer-excerpt { border-left: 3px solid var(--line-strong); padding-left: 14px; margin: 12px 0; font-size: 14px; }
 .answer-excerpt p { color: var(--ink-2); white-space: pre-wrap; margin: 2px 0 0; }
 .danger-zone { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); }
+
+/* ===== Valuation status / badges ===== */
+.badge-ready { background: var(--accent-soft); color: var(--ink); box-shadow: inset 0 0 0 1px var(--accent-line); }
+.badge-calculated { background: var(--accent); color: var(--accent-ink); }
+.badge-error { background: var(--neg-soft); color: var(--neg); }
+.status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.status-grid dt { margin-bottom: 6px; }
+.valuation-panel .callout { margin-top: 4px; }
+.stage-title { margin: 0 0 6px; font-size: 20px; }
+@media (max-width: 960px) { .status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

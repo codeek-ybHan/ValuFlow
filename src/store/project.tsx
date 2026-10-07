@@ -1,55 +1,75 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { HistoricalData, ValuationAssumptions } from '../data/types';
-import { samsungHistoricalData } from '../data/samsungHistorical';
+import type { ValuationInput } from '../valuation';
+import type { HistoricalData } from '../data/types';
+import {
+  emptyProjectState, restoreProjectState, toPersisted, withAssumptions, withHistoricalData, withPracticeAssumptions,
+  withSamsungHistorical, withSensitivityRun, withValuationReset, withValuationRun, type ProjectState,
+} from './projectModel';
 
-// PROJECT 영역 상태. LEARN 상태(store/state.tsx)와 분리한다.
-// 입력의 출처가 다른 세 값을 한 객체로 합치지 않는다.
-//   historicalData       공시 기반 실제값
-//   valuationAssumptions 사용자 / 학습용 가정 (Engine 연결 전까지 null)
-//   valuationResult      Engine 계산 결과   (STEP 05 에서 ValuationResult 타입으로 교체)
+// PROJECT 영역 상태 (LEARN 상태 store/state.tsx 와 분리). 상태 전이는 projectModel.ts 의 순수 함수가 담당하고,
+// 이 파일은 React state 와 localStorage 를 연결한다.
 
-export interface ProjectState {
-  historicalData: HistoricalData | null;
-  valuationAssumptions: ValuationAssumptions | null;
-  valuationResult: null;
-}
+export type { ProjectState } from './projectModel';
 
 const KEY = 'valuflow:project';
-const empty: ProjectState = { historicalData: null, valuationAssumptions: null, valuationResult: null };
 
 function load(): ProjectState {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const p = JSON.parse(raw);
-      return { ...empty, historicalData: p.historicalData ?? null };
-    }
+    if (raw) return restoreProjectState(JSON.parse(raw)); // 저장된 입력으로 결과를 다시 계산
   } catch {
-    /* 저장소 접근 불가 시 빈 상태 */
+    /* 저장소 접근 불가 / 손상된 JSON 이면 빈 상태 */
   }
-  return empty;
+  return emptyProjectState;
 }
 
 interface Ctx {
   project: ProjectState;
+  /** historicalData 만 설정 */
+  setHistoricalData: (h: HistoricalData | null) => void;
+  /** 가정을 설정. 이전 결과는 비워진다(재계산 필요) */
+  setValuationAssumptions: (a: ValuationInput | null) => void;
+  /** valuationAssumptions 로 runValuation 실행 */
+  runCurrentValuation: () => void;
+  /** valuationAssumptions 로 runSensitivity 실행 */
+  runCurrentSensitivity: () => void;
+  /** 가정과 결과를 비움 (historicalData 는 유지) */
+  resetValuation: () => void;
+  /** 삼성전자 FY2023~FY2025 불러오기 (historicalData 만) */
   loadSamsung: () => void;
+  /** STEP 04 학습용 가정 적용 + 계산 */
+  applyPracticeAssumptions: () => void;
+  /** 모든 PROJECT 입력 초기화 */
   reset: () => void;
 }
 const ProjectCtx = createContext<Ctx | null>(null);
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const [project, setProject] = useState<ProjectState>(load);
+
+  // 입력(historicalData, valuationAssumptions)만 저장한다. 결과는 저장하지 않는다.
+  const persisted = JSON.stringify(toPersisted(project));
   useEffect(() => {
     try {
-      localStorage.setItem(KEY, JSON.stringify(project));
+      localStorage.setItem(KEY, persisted);
     } catch {
       /* ignore */
     }
-  }, [project]);
-  // 삼성전자 데이터 불러오기: Historical Data 만 채운다. 가정과 결과는 건드리지 않는다.
-  const loadSamsung = useCallback(() => setProject((p) => ({ ...p, historicalData: samsungHistoricalData })), []);
-  const reset = useCallback(() => setProject(empty), []);
-  const value = useMemo(() => ({ project, loadSamsung, reset }), [project, loadSamsung, reset]);
+  }, [persisted]);
+
+  const setHistoricalData = useCallback((h: HistoricalData | null) => setProject((p) => withHistoricalData(p, h)), []);
+  const setValuationAssumptions = useCallback((a: ValuationInput | null) => setProject((p) => withAssumptions(p, a)), []);
+  const runCurrentValuation = useCallback(() => setProject(withValuationRun), []);
+  const runCurrentSensitivity = useCallback(() => setProject(withSensitivityRun), []);
+  const resetValuation = useCallback(() => setProject(withValuationReset), []);
+  const loadSamsung = useCallback(() => setProject(withSamsungHistorical), []);
+  const applyPracticeAssumptions = useCallback(() => setProject(withPracticeAssumptions), []);
+  const reset = useCallback(() => setProject(emptyProjectState), []);
+
+  const value = useMemo(
+    () => ({ project, setHistoricalData, setValuationAssumptions, runCurrentValuation, runCurrentSensitivity, resetValuation, loadSamsung, applyPracticeAssumptions, reset }),
+    [project, setHistoricalData, setValuationAssumptions, runCurrentValuation, runCurrentSensitivity, resetValuation, loadSamsung, applyPracticeAssumptions, reset],
+  );
   return <ProjectCtx.Provider value={value}>{children}</ProjectCtx.Provider>;
 }
 

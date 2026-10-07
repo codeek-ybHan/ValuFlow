@@ -51,7 +51,6 @@
 .slot-head h3 { margin: 0; }
 .slot-empty { border: 1.5px dashed var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--muted); font-size: 13.5px; padding: 28px 18px; text-align: center; margin: 16px 0; line-height: 1.6; }
 .slot-nav { margin-top: 12px; }
-.basis-panel { margin-bottom: 24px; }
 
 /* ===== Workspace / misc ===== */
 .empty-state { text-align: center; padding: 56px 24px; border: 1.5px dashed var(--line-strong); border-radius: var(--radius); background: var(--surface-2); }

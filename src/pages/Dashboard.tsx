@@ -4,18 +4,11 @@ import { stepPath } from '../routes';
 import { projectRoadmap } from '../content/roadmap';
 import { useApp } from '../store/state';
 import { useProject } from '../store/project';
+import { isPracticeAssumptions } from '../store/projectModel';
 import { nextAction, overallProgress, stepProgress } from '../store/progress';
-import { Kpi, PageHeader, ProgressBar, StatusBadge, fmtPct } from '../components/ui';
+import { Kpi, PageHeader, ProgressBar, StatusBadge, fmtNum, fmtPct } from '../components/ui';
 import { dashboardWorkflow } from '../components/valuation/workflow';
 
-// Engine / 데이터 파이프라인 연결 전이므로 수치는 '—' 로 두고 가짜 결과를 만들지 않는다.
-const kpis: { label: string; sub: string }[] = [
-  { label: 'Enterprise Value', sub: 'KRW · Billion' },
-  { label: 'Equity Value', sub: 'KRW · Billion' },
-  { label: 'Implied Share Price', sub: 'KRW' },
-  { label: 'WACC', sub: '%' },
-];
-const assumptions = ['WACC', 'Terminal Growth', 'Forecast Period'];
 
 export function Dashboard() {
   const { state } = useApp();
@@ -23,6 +16,7 @@ export function Dashboard() {
   const h = project.historicalData;
   const learn = overallProgress(steps, state);
   const next = nextAction(steps, state);
+  const r = project.valuationResult;
 
   return (
     <>
@@ -38,9 +32,12 @@ export function Dashboard() {
       </PageHeader>
 
       <section className="kpi-row" aria-label="Valuation Snapshot">
-        {kpis.map((k) => <Kpi key={k.label} label={k.label} value="—" sub={k.sub} />)}
+        <Kpi label="Enterprise Value" value={r ? fmtNum(r.enterpriseValue, 2) : '—'} sub="억원" />
+        <Kpi label="Equity Value" value={r ? fmtNum(r.equityValue, 2) : '—'} sub="억원" />
+        <Kpi label="Implied Share Price" value={r ? fmtNum(r.perShareValue, 0) : '—'} sub="원" />
+        <Kpi label="WACC" value={r ? fmtPct(r.wacc, 4) : '—'} sub="%" />
       </section>
-      <p className="hint kpi-hint">수치는 Valuation Engine(STEP 05) 연결 후 표시됩니다. 계산되지 않은 값은 임의로 채우지 않습니다.</p>
+      <p className="hint kpi-hint">{r ? <>Valuation 화면에서 계산한 결과입니다.{isPracticeAssumptions(project.valuationAssumptions) && ' 학습용 가정(STEP 04 가상값) 기준이며 실제 기업의 가치평가가 아닙니다.'}</> : '수치는 Valuation 에서 계산한 뒤 표시됩니다. 계산되지 않은 값은 임의로 채우지 않습니다.'}</p>
 
       <div className="dash-grid">
         <div>
@@ -81,7 +78,13 @@ export function Dashboard() {
 
           <section className="panel">
             <div className="panel-head"><h3>Core Assumptions</h3><Link className="small" to="/valuation/forecast">입력하기 →</Link></div>
-            <dl className="stat-dl">{assumptions.map((k) => <div key={k}><dt>{k}</dt><dd className="num empty">—</dd></div>)}</dl>
+            <dl className="stat-dl">
+              {[
+                ['WACC', r ? fmtPct(r.wacc, 4) : null],
+                ['Terminal Growth', project.valuationAssumptions ? fmtPct(project.valuationAssumptions.terminalGrowth, 2) : null],
+                ['Forecast Period', r ? `${r.fcff.length}년` : null],
+              ].map(([k, v]) => <div key={k}><dt>{k}</dt><dd className={`num${v ? '' : ' empty'}`}>{v ?? '—'}</dd></div>)}
+            </dl>
           </section>
 
           <section className="panel">

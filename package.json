@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "npm run test:engine",
-    "test:engine": "node --test src/engine/*.test.ts src/valuation/*.test.ts"
+    "test:valuation": "node --test src/valuation/*.test.ts",
+    "test:engine": "node --test src/engine/*.test.ts src/valuation/*.test.ts src/store/*.test.ts"
   },
   "dependencies": {
     "react": "^18.3.1",
