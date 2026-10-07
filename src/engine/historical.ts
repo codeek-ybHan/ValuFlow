@@ -1,7 +1,7 @@
-// Historical Data 에서 파생지표를 계산한다. UI 에는 계산식을 두지 않고 이 함수의 결과만 렌더링한다.
-// 개별 지표 함수는 analysis.ts 를 재사용하며, 계산 불가(첫 해 성장률 등)는 null 이다.
+// Historical Data 에서 파생지표를 계산한다. 계산은 historicalAnalysis.ts(source of truth)가 하고,
+// 이 파일은 기존 호출부(Workspace 분석 탭 등)가 쓰는 형태로 결과를 넘겨주는 얇은 어댑터다. 계산식은 여기에 두지 않는다.
 import type { HistoricalData } from '../data/types';
-import { growth, operatingMargin } from './analysis.ts';
+import { analyzeHistorical } from './historicalAnalysis.ts';
 
 export interface HistoricalMetrics {
   period: string[];
@@ -18,17 +18,14 @@ export interface HistoricalMetrics {
 }
 
 export function deriveHistoricalMetrics(h: HistoricalData): HistoricalMetrics {
-  const { revenue, operatingProfit } = h.incomeStatement;
-  const { accountsReceivable: ar, inventory: inv, accountsPayable: ap } = h.balanceSheet;
-  const nwc = ar.map((v, i) => v + inv[i] - ap[i]);
-  const capex = [...h.cashFlow.ppeAcquisition];
+  const { metrics } = analyzeHistorical(h);
   return {
     period: h.company.period,
-    revenueGrowth: revenue.map((v, i) => (i === 0 ? null : growth(v, revenue[i - 1]))),
-    operatingMargin: revenue.map((v, i) => operatingMargin(operatingProfit[i], v)),
-    nwc,
-    deltaNwc: nwc.map((v, i) => (i === 0 ? null : v - nwc[i - 1])),
-    capex,
-    cfoMinusCapex: h.cashFlow.cfo.map((v, i) => v - capex[i]),
+    revenueGrowth: metrics.revenueGrowth.values,
+    operatingMargin: metrics.operatingMargin.values,
+    nwc: metrics.nwc.values as number[],
+    deltaNwc: metrics.deltaNwc.values,
+    capex: metrics.capex.values as number[],
+    cfoMinusCapex: metrics.cfoMinusCapex.values as number[],
   };
 }

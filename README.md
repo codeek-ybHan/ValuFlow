@@ -101,7 +101,7 @@ LEARN 은 STEP 01~04 만 포함합니다. STEP 05 이후는 아래 PROJECT 로�
 
 ```text
 STEP 05 Valuation Engine v1       Forecast · FCFF · CAPM · WACC · DCF · EV · Equity · 주당가치 · Sensitivity · Scenario · 상대가치   ✅
-STEP 06 Financial Data Pipeline   OpenDART → 파서 → 정규화 → PostgreSQL → Historical 테이블   (06-1 구조 · 06-2 기업 검색 · 06-3 재무제표 Raw 수집 · 06-4 계정 매핑 검증 완료 · 06-5 Historical Analysis 다음)
+STEP 06 Financial Data Pipeline   OpenDART → 파서 → 정규화 → PostgreSQL → Historical 테이블   (06-1 구조 · 06-2 기업 검색 · 06-3 재무제표 Raw 수집 · 06-4 계정 매핑 검증 · 06-5 Historical Analysis 엔진 완료 · 06-6 DB 저장 다음)
 STEP 07 Valuation Workspace       Historical → Forecast → WACC → DCF/Equity → Result → Validation   ✅
 STEP 08 AI Valuation Analyst      Agent + Tool Calling + RAG (계산은 엔진, LLM 은 해석)
 STEP 09 Report Automation         보고서 생성 · 미리보기 · PDF 내보내기

@@ -33,7 +33,7 @@ export interface HistoricalFinancialsRequest extends CompanyRef {
 
 export type HistoricalFinancialsResult =
   | { ok: true; data: HistoricalData; quality: DataQuality; fetch?: DartFetchQuality }
-  | { ok: false; reason: 'not-found' | 'incomplete' | 'unavailable' | 'not-implemented' | 'unsupported'; message: string; quality?: DataQuality; fetch?: DartFetchQuality };
+  | { ok: false; reason: 'not-found' | 'incomplete' | 'unavailable' | 'not-implemented' | 'unsupported'; message: string; quality?: DataQuality; fetch?: DartFetchQuality; /** unsupported 일 때 구분 */ code?: 'unsupported-industry' | 'unsupported-structure' };
 
 export interface FinancialRepository {
   searchCompanies(query: string): Promise<CompanyProfile[]>;

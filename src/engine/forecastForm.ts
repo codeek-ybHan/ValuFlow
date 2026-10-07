@@ -1,10 +1,11 @@
 // Forecast 입력 폼의 순수 로직: 문자열 입력 ↔ ValuationInput 변환, UI 단계 검증, Historical 참고값.
 // UI 는 % 로 입력받고 Engine 은 소수로 받는다 (8.0% ↔ 0.08). 금액은 억원 기준이다.
 // 이 파일은 historicalData 와 입력 문자열만 사용하며 Valuation 결과는 읽지 않는다.
-import { depreciationUnavailableNote, historicalDepreciation } from './depreciation.ts';
+import { depreciationUnavailableNote } from './depreciation.ts';
+import { analyzeHistorical } from './historicalAnalysis.ts';
+import type { DataQuality } from '../data/normalization/quality.ts';
 import type { ValuationInput } from '../valuation/index.ts';
 import type { HistoricalData } from '../data/types';
-import { deriveHistoricalMetrics } from './historical.ts';
 import { krwMillionToEok } from './units.ts';
 
 /** 현재 ValuationInput 구조에 맞춘 기본 예측 기간. 입력 배열 구조는 5년으로 확장해도 그대로 쓸 수 있다. */
@@ -211,34 +212,34 @@ export interface ForecastReference {
 const signed = (x: number) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`;
 const plain = (x: number) => `${(x * 100).toFixed(1)}%`;
 
-export function buildForecastReference(h: HistoricalData | null): ForecastReference | null {
+export function buildForecastReference(h: HistoricalData | null, quality: DataQuality | null = null): ForecastReference | null {
   if (!h) return null;
-  const m = deriveHistoricalMetrics(h);
+  // 과거 참고값은 Historical Analysis 의 ForecastReferenceModel 에서 읽는다 (여기서 지표를 다시 계산하지 않는다). Forecast 값은 만들지 않는다.
+  const fr = analyzeHistorical(h, quality).forecastReference;
   const eok = (arr: (number | null)[]) => arr.map((v) => (v === null ? null : krwMillionToEok(v)));
-  const periods = h.company.period;
-  const da = historicalDepreciation(h);
-  const last = periods.length - 1;
+  const periods = fr.periods;
 
-  const growth = m.revenueGrowth.filter((v): v is number => v !== null);
-  const margin = m.operatingMargin.filter((v): v is number => v !== null);
+  const growth = fr.revenueGrowthHistory.values.filter((v): v is number => v !== null);
+  const margin = fr.operatingMarginHistory.values.filter((v): v is number => v !== null);
   const hints: string[] = [];
   if (growth.length > 0) hints.push(`Historical Revenue Growth: ${growth.map(signed).join(' → ')}`);
   if (margin.length > 0) hints.push(`Historical Operating Margin: ${margin.map(plain).join(' → ')}`);
 
+  const da = fr.depreciationHistory;
   return {
     periods,
     rows: [
-      { key: 'revenueGrowth', label: 'Revenue Growth', unit: '%', helper: '매출 성장률 가정', values: m.revenueGrowth },
-      { key: 'operatingMargin', label: 'Operating Margin', unit: '%', helper: '매출 대비 영업이익 비율', values: m.operatingMargin },
+      { key: 'revenueGrowth', label: 'Revenue Growth', unit: '%', helper: '매출 성장률 가정', values: fr.revenueGrowthHistory.values },
+      { key: 'operatingMargin', label: 'Operating Margin', unit: '%', helper: '매출 대비 영업이익 비율', values: fr.operatingMarginHistory.values },
       da
-        ? { key: 'depreciation', label: 'D&A', unit: '억원', helper: '감가상각비', values: eok(da) }
+        ? { key: 'depreciation', label: 'D&A', unit: '억원', helper: '감가상각비', values: eok(da.values) }
         : { key: 'depreciation', label: 'D&A', unit: '억원', helper: '감가상각비', values: periods.map(() => null), note: `${depreciationUnavailableNote(h)} 값을 추정하거나 채우지 않습니다.` },
-      { key: 'capex', label: 'CAPEX', unit: '억원', helper: '설비 등 장기자산 투자 (과거 참고값은 유형자산 취득액 기준)', values: eok(m.capex) },
-      { key: 'deltaNwc', label: 'ΔNWC', unit: '억원', helper: '운전자본 증가분 (감소는 음수)', values: eok(m.deltaNwc) },
+      { key: 'capex', label: 'CAPEX', unit: '억원', helper: '설비 등 장기자산 투자 (과거 참고값은 유형자산 취득액 기준)', values: eok(fr.capexHistory.values) },
+      { key: 'deltaNwc', label: 'ΔNWC', unit: '억원', helper: '운전자본 증가분 (감소는 음수)', values: eok(fr.deltaNwcHistory.values) },
     ],
     hints,
-    latestRevenueEok: krwMillionToEok(h.incomeStatement.revenue[last]),
-    latestRevenuePeriod: periods[last],
+    latestRevenueEok: krwMillionToEok(fr.latestRevenue.value),
+    latestRevenuePeriod: fr.latestRevenue.period,
   };
 }
 

@@ -2,7 +2,8 @@
 // 지표는 deriveHistoricalMetrics 를 재사용하고, 추세 요약은 숫자 기반 규칙(rule-based)으로만 만든다 (AI 문장 아님).
 // 원본 historicalData 값은 변경하지 않는다. 표시용 변환(조원 환산 등)은 chart 필드에만 적용한다.
 import type { HistoricalData } from '../data/types';
-import { deriveHistoricalMetrics } from './historical.ts';
+import { analyzeHistorical, type HistoricalAnalysis } from './historicalAnalysis.ts';
+import type { DataQuality } from '../data/normalization/quality.ts';
 import { depreciationUnavailableNote, historicalDepreciation } from './depreciation.ts';
 
 export interface HistoricalHeader {
@@ -58,52 +59,43 @@ const signedPct = (x: number) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`;
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 const present = (x: number | null): x is number => x !== null && Number.isFinite(x);
 
-function buildTrends(periods: string[], h: HistoricalData, m: ReturnType<typeof deriveHistoricalMetrics>): TrendItem[] {
-  const last = periods.length - 1;
-  const first = periods[0];
-  const end = periods[last];
-
-  // Revenue Growth: 마지막 두 구간 비교
-  const growthLines = m.revenueGrowth.flatMap((g, i) => (present(g) ? [`${periods[i]}: ${signedPct(g)}`] : []));
-  const growthVals = m.revenueGrowth.filter(present);
-  let growthVerdict = '추세 판단에는 2개 이상의 성장률 구간이 필요합니다.';
-  if (growthVals.length >= 2) {
-    const cur = growthVals[growthVals.length - 1];
-    const prev = growthVals[growthVals.length - 2];
-    if (Math.abs(cur - prev) < 0.005) growthVerdict = '성장률 유지';
-    else if (cur < prev) growthVerdict = cur > 0 ? '성장률 둔화 (매출은 증가세 유지)' : '매출 감소';
-    else growthVerdict = '성장률 가속';
-  }
-
-  // Operating Margin: 처음 → 마지막
-  const marginLines = m.operatingMargin.flatMap((v, i) => (present(v) ? [`${periods[i]}: ${pct(v)}`] : []));
-  let marginVerdict = '비교할 기간이 부족합니다.';
-  const m0 = m.operatingMargin[0];
-  const m1 = m.operatingMargin[last];
-  if (last >= 1 && present(m0) && present(m1)) {
-    const pp = (m1 - m0) * 100;
-    marginVerdict = Math.abs(pp) < 0.5 ? '유지' : pp > 0 ? `개선 (${first} → ${end}: +${pp.toFixed(1)}%p)` : `악화 (${first} → ${end}: ${pp.toFixed(1)}%p)`;
-  }
-
-  // NWC: 처음 → 마지막
-  const nwcLines = m.nwc.map((v, i) => `${periods[i]}: ${v.toLocaleString('ko-KR')}`);
-  let nwcVerdict = '비교할 기간이 부족합니다.';
-  if (last >= 1 && m.nwc[0] !== 0) {
-    const chg = m.nwc[last] / m.nwc[0] - 1;
-    nwcVerdict = `${first} → ${end} ${chg >= 0 ? '증가' : '감소'} (${signedPct(chg)})`;
-  }
-
-  // Cash generation: CFO − CAPEX 와 CFO / CAPEX
-  const cfo = h.cashFlow.cfo;
-  const cashLines = m.cfoMinusCapex.map((v, i) => {
-    const ratio = m.capex[i] > 0 ? ` · CFO/CAPEX ${(cfo[i] / m.capex[i]).toFixed(2)}x` : '';
-    return `${periods[i]}: ${v.toLocaleString('ko-KR')}${ratio}`;
+function noteText(a: HistoricalAnalysis, ...keys: (keyof HistoricalAnalysis['metrics'])[]): string | undefined {
+  const notes = keys.flatMap((k) => {
+    const q = a.metrics[k].quality;
+    return q.status === 'available' ? [] : q.notes.length > 0 ? q.notes : [`${a.metrics[k].label}: ${q.status}`];
   });
-  let cashVerdict = '비교할 기간이 부족합니다.';
-  if (last >= 1) {
-    const d = m.cfoMinusCapex[last] - m.cfoMinusCapex[0];
-    cashVerdict = d > 0 ? '개선 (CFO − CAPEX 증가)' : d < 0 ? '악화 (CFO − CAPEX 감소)' : '유지';
-  }
+  return notes.length > 0 ? [...new Set(notes)].join(' ') : undefined;
+}
+
+// 추세 방향은 historicalAnalysis 의 Trend engine 이 판정하고, 여기서는 화면 문구로만 바꾼다.
+function buildTrends(a: HistoricalAnalysis): TrendItem[] {
+  const { periods, metrics: m, trends: t } = a;
+  const growthLines = m.revenueGrowth.values.flatMap((g, i) => (present(g) ? [`${periods[i]}: ${signedPct(g)}`] : []));
+  const g = t.revenueGrowth;
+  const growthVerdict = g.direction === 'insufficient-data' ? '추세 판단에는 2개 이상의 성장률 구간이 필요합니다.'
+    : g.direction === 'stable' ? '성장률 유지'
+    : g.direction === 'accelerating' ? '성장률 가속'
+    : g.to!.value > 0 ? '성장률 둔화 (매출은 증가세 유지)' : '매출 감소';
+
+  const marginLines = m.operatingMargin.values.flatMap((v, i) => (present(v) ? [`${periods[i]}: ${pct(v)}`] : []));
+  const mg = t.operatingMargin;
+  const marginVerdict = mg.direction === 'insufficient-data' ? '비교할 기간이 부족합니다.'
+    : mg.direction === 'stable' ? '유지'
+    : mg.direction === 'improving' ? `개선 (${mg.from!.period} → ${mg.to!.period}: +${mg.change!.toFixed(1)}%p)`
+    : `악화 (${mg.from!.period} → ${mg.to!.period}: ${mg.change!.toFixed(1)}%p)`;
+
+  const nwcLines = m.nwc.values.map((v, i) => `${periods[i]}: ${present(v) ? v.toLocaleString('ko-KR') : '—'}`);
+  const n = t.nwc;
+  const nwcVerdict = n.direction === 'insufficient-data' ? '비교할 기간이 부족합니다.'
+    : `${n.from!.period} → ${n.to!.period} ${n.direction === 'increasing' ? '증가' : n.direction === 'decreasing' ? '감소' : '유지'} (${signedPct(n.change!)})`;
+
+  const cashLines = m.cfoMinusCapex.values.map((v, i) => {
+    const ratio = m.cfoToCapex.values[i];
+    return `${periods[i]}: ${present(v) ? v.toLocaleString('ko-KR') : '—'}${present(ratio) ? ` · CFO/CAPEX ${ratio.toFixed(2)}x` : ''}`;
+  });
+  const c = t.cashGeneration;
+  const cashVerdict = c.direction === 'insufficient-data' ? '비교할 기간이 부족합니다.'
+    : c.direction === 'improving' ? '개선 (CFO − CAPEX 증가)' : c.direction === 'deteriorating' ? '악화 (CFO − CAPEX 감소)' : '유지';
 
   return [
     { key: 'revenueGrowth', title: 'Revenue Growth', lines: growthLines, verdict: growthVerdict },
@@ -114,9 +106,10 @@ function buildTrends(periods: string[], h: HistoricalData, m: ReturnType<typeof 
 }
 
 /** historicalData 가 없으면 null (Empty State). 그 외 값은 사용하지 않는다. */
-export function buildHistoricalView(h: HistoricalData | null): HistoricalView | null {
+export function buildHistoricalView(h: HistoricalData | null, quality: DataQuality | null = null): HistoricalView | null {
   if (!h) return null;
-  const m = deriveHistoricalMetrics(h);
+  const a = analyzeHistorical(h, quality);
+  const m = a.metrics;
   const periods = h.company.period;
   const { incomeStatement: is, cashFlow: cf } = h;
   const da = historicalDepreciation(h);
@@ -139,22 +132,25 @@ export function buildHistoricalView(h: HistoricalData | null): HistoricalView | 
       da
         ? { key: 'depreciationAmortization', label: 'D&A', values: da, kind: 'amount' }
         : { key: 'depreciationAmortization', label: 'D&A', values: periods.map(() => null), kind: 'amount', note: depreciationUnavailableNote(h) },
-      { key: 'capex', label: 'CAPEX (PPE acquisition basis)', values: m.capex, kind: 'amount', note: '유형자산 취득액 기준의 학습용 CAPEX 입니다. 무형자산 취득 등을 반영한 실무 조정치가 아닙니다.' },
+      { key: 'capex', label: 'CAPEX (PPE acquisition basis)', values: m.capex.values, kind: 'amount', note: '유형자산 취득액 기준의 학습용 CAPEX 입니다. 무형자산 취득 등을 반영한 실무 조정치가 아닙니다.' },
     ],
     metrics: [
-      { key: 'revenueGrowth', label: 'Revenue Growth (YoY)', values: m.revenueGrowth, kind: 'percent' },
-      { key: 'operatingMargin', label: 'Operating Margin', values: m.operatingMargin, kind: 'percent' },
-      { key: 'nwc', label: 'NWC (AR + Inventory − AP)', values: m.nwc, kind: 'amount' },
-      { key: 'deltaNwc', label: 'ΔNWC', values: m.deltaNwc, kind: 'amount' },
-      { key: 'cfoMinusCapex', label: 'CFO − CAPEX (Reference)', values: m.cfoMinusCapex, kind: 'amount', note: '현금창출력을 가늠하는 참고지표이며 FCFF 가 아닙니다.' },
+      { key: 'revenueGrowth', label: 'Revenue Growth (YoY)', values: m.revenueGrowth.values, kind: 'percent', note: noteText(a, 'revenueGrowth') },
+      { key: 'operatingMargin', label: 'Operating Margin', values: m.operatingMargin.values, kind: 'percent', note: noteText(a, 'operatingMargin') },
+      { key: 'netMargin', label: 'Net Margin', values: m.netMargin.values, kind: 'percent', note: noteText(a, 'netMargin') },
+      { key: 'nwc', label: 'NWC (AR + Inventory − AP)', values: m.nwc.values, kind: 'amount', note: noteText(a, 'nwc') },
+      { key: 'deltaNwc', label: 'ΔNWC', values: m.deltaNwc.values, kind: 'amount', note: noteText(a, 'deltaNwc') },
+      { key: 'nwcToRevenue', label: 'NWC / Revenue', values: m.nwcToRevenue.values, kind: 'percent', note: noteText(a, 'nwcToRevenue') },
+      { key: 'cfoMinusCapex', label: 'CFO − CAPEX (Reference)', values: m.cfoMinusCapex.values, kind: 'amount', note: ['현금창출력을 가늠하는 참고지표이며 FCFF 가 아닙니다.', noteText(a, 'cfoMinusCapex')].filter(Boolean).join(' ') },
+      ...(m.netDebtExLease.quality.status === 'missing' ? [] : [{ key: 'netDebtExLease', label: m.netDebtExLease.label, values: m.netDebtExLease.values, kind: 'amount' as const, note: noteText(a, 'netDebtExLease') }]),
     ],
-    trends: buildTrends(periods, h, m),
+    trends: buildTrends(a),
     chart: {
       labels: periods,
       revenueTrillion: is.revenue.map((v) => v / MILLION_PER_TRILLION),
       operatingProfitTrillion: is.operatingProfit.map((v) => v / MILLION_PER_TRILLION),
-      operatingMarginPct: m.operatingMargin.map((v) => (v === null ? null : v * 100)),
-      revenueGrowthPct: m.revenueGrowth.map((v) => (v === null ? null : v * 100)),
+      operatingMarginPct: m.operatingMargin.values.map((v) => (v === null ? null : v * 100)),
+      revenueGrowthPct: m.revenueGrowth.values.map((v) => (v === null ? null : v * 100)),
     },
   };
 }

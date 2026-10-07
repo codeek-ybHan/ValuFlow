@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { PageHeader, StatusBadge, fmtNum, fmtPct } from '../components/ui';
 import { useProject } from '../store/project';
-import { deriveHistoricalMetrics } from '../engine/historical';
+import { analyzeHistorical, type MetricSeries } from '../engine/historicalAnalysis';
 import type { HistoricalData } from '../data/types';
 import { CompanySearch } from '../components/CompanySearch';
 import { historicalSourceView } from '../store/companySelection';
@@ -53,21 +53,31 @@ function Statements({ tab, h }: { tab: Tab; h: HistoricalData }) {
 }
 
 function Analysis({ h }: { h: HistoricalData }) {
-  const m = useMemo(() => deriveHistoricalMetrics(h), [h]);
+  const a = useMemo(() => analyzeHistorical(h), [h]);
+  const m = a.metrics;
+  const ratio = (s: MetricSeries) => s.values.map((v, i) => <td key={i} className="num">{fmtPct(v)}</td>);
+  const amount = (s: MetricSeries) => s.values.map((v, i) => <td key={i} className="num">{fmtNum(v)}</td>);
+  const unavailable = a.forecastReference.unavailable;
   return (
     <>
       <div className="table-wrap"><table className="fin-table">
-        <thead><tr><th>Metric</th>{m.period.map((p) => <th key={p} className="num">{p}</th>)}</tr></thead>
+        <thead><tr><th>Metric</th>{a.periods.map((p) => <th key={p} className="num">{p}</th>)}</tr></thead>
         <tbody>
-          <tr><th>Revenue Growth (YoY)</th>{m.revenueGrowth.map((v, i) => <td key={i} className="num">{fmtPct(v)}</td>)}</tr>
-          <tr><th>Operating Margin</th>{m.operatingMargin.map((v, i) => <td key={i} className="num">{fmtPct(v)}</td>)}</tr>
-          <tr><th>NWC (AR + Inventory − AP), KRW million</th>{m.nwc.map((v, i) => <td key={i} className="num">{fmtNum(v)}</td>)}</tr>
-          <tr><th>ΔNWC, KRW million</th>{m.deltaNwc.map((v, i) => <td key={i} className="num">{fmtNum(v)}</td>)}</tr>
-          <tr><th>CAPEX (Learning Basis), KRW million</th>{m.capex.map((v, i) => <td key={i} className="num">{fmtNum(v)}</td>)}</tr>
-          <tr><th>CFO − CAPEX (Reference), KRW million</th>{m.cfoMinusCapex.map((v, i) => <td key={i} className="num">{fmtNum(v)}</td>)}</tr>
+          <tr><th>Revenue Growth (YoY)</th>{ratio(m.revenueGrowth)}</tr>
+          <tr><th>Operating Margin</th>{ratio(m.operatingMargin)}</tr>
+          <tr><th>Net Margin</th>{ratio(m.netMargin)}</tr>
+          <tr><th>NWC (AR + Inventory − AP), {a.unitLabel}</th>{amount(m.nwc)}</tr>
+          <tr><th>ΔNWC, {a.unitLabel}</th>{amount(m.deltaNwc)}</tr>
+          <tr><th>NWC / Revenue</th>{ratio(m.nwcToRevenue)}</tr>
+          <tr><th>{a.capexBasisLabel}, {a.unitLabel}</th>{amount(m.capex)}</tr>
+          <tr><th>CFO − CAPEX (Reference), {a.unitLabel}</th>{amount(m.cfoMinusCapex)}</tr>
+          <tr><th>D&A, {a.unitLabel}</th>{amount(m.depreciation)}</tr>
+          {m.netDebtExLease.quality.status !== 'missing' && <tr><th>{m.netDebtExLease.label}, {a.unitLabel}</th>{amount(m.netDebtExLease)}</tr>}
         </tbody>
       </table></div>
       <p className="small muted">CFO − CAPEX 는 현금창출력을 가늠하는 참고지표이며 FCFF 가 아닙니다. 첫 해의 성장률과 ΔNWC 는 비교 연도가 없어 계산하지 않습니다.</p>
+      {a.revenueCagr !== null && <p className="small muted">Revenue CAGR ({a.periods[0]} → {a.periods[a.periods.length - 1]}): {fmtPct(a.revenueCagr)}</p>}
+      {unavailable.length > 0 && <p className="small muted">{unavailable.join(' · ')}. 값을 추정하거나 채우지 않습니다.</p>}
     </>
   );
 }
