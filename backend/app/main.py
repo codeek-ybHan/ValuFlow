@@ -5,7 +5,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, File, Form, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -21,7 +21,10 @@ from app.services.historical import HistoricalService
 from app.ai.errors import AiGatewayError, MESSAGES as AI_MESSAGES
 from app.ai.gateway import AiGateway
 from app.ai.provider import OpenAiProvider
-from app.ai.runtime import make_search_disclosures
+from app.ai.runtime import make_retrieval_tools
+from app.knowledge.loaders.pdf_loader import PdfError
+from app.knowledge.service import KnowledgeService, parse_meta
+from app.rag.rerank import Reranker, build_reranker
 from app.dart.filings import DartDisclosureSource, FilingsSource
 from app.rag.embeddings import EmbeddingProvider, OpenAiEmbeddings
 from app.rag.ingestion import DisclosureIngestionService
@@ -95,7 +98,7 @@ def _error(code: str, message: str) -> JSONResponse:
 
 def create_app(settings: Settings | None = None, dart: DartHttpClient | None = None, cache: CorpCodeCache | None = None, financials: FinancialsService | None = None,
                store: FinancialStore | None = None, historical: HistoricalService | None = None, ai: AiGateway | None = None,
-               embedder: EmbeddingProvider | None = None, disclosure_source: FilingsSource | None = None) -> FastAPI:
+               embedder: EmbeddingProvider | None = None, disclosure_source: FilingsSource | None = None, reranker: Reranker | None = None) -> FastAPI:
     settings = settings or load_settings()
     dart = dart or DartHttpClient(settings)
     cache = cache or CorpCodeCache(dart.fetch_corp_code_zip)
@@ -106,12 +109,19 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
     # 공시 Retrieval: DB(pgvector)와 embedding provider 가 모두 있을 때만 켜진다 (embedding 호출은 backend 에서만)
     if embedder is None and settings.has_ai:
         embedder = OpenAiEmbeddings(settings.openai_api_key, settings.embedding_model, settings.openai_base_url)
-    retriever = ingestion = disclosure_store = None
+    retriever = ingestion = disclosure_store = knowledge = None
     if store is not None and embedder is not None:
         disclosure_store = DisclosureStore(store.session_factory)
-        retriever = DisclosureRetriever(store.session_factory, embedder, min_score=settings.retrieval_min_score)
+        if reranker is None:
+            reranker = build_reranker(settings.reranker, settings.reranker_model, settings.cohere_api_key, settings.reranker_cache_dir or None)
+        retriever = DisclosureRetriever(store.session_factory, embedder, min_score=settings.retrieval_min_score, reranker=reranker, rerank_candidates=settings.rerank_candidates, rerank_min_score=settings.rerank_min_score)
         ingestion = DisclosureIngestionService(disclosure_source or DartDisclosureSource(dart), embedder, disclosure_store)
-    backend_tools = {"searchDisclosures": make_search_disclosures(retriever)} if retriever is not None else {}
+
+        def _corp_name(code: str) -> str | None:
+            return next((r.corp_name for r in cache.get() if r.corp_code == code), None)
+
+        knowledge = KnowledgeService(embedder, disclosure_store, max_bytes=settings.max_upload_mb * 1024 * 1024, corp_name_lookup=_corp_name)
+    backend_tools = make_retrieval_tools(retriever) if retriever is not None else {}
     if ai is None and settings.has_ai:
         ai = AiGateway(OpenAiProvider(settings.openai_api_key, settings.openai_model, settings.openai_base_url),
                        derive_secret(settings.ai_state_secret, settings.openai_api_key), max_tool_calls=settings.ai_max_tool_calls, backend_tools=backend_tools)
@@ -125,6 +135,10 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
     async def _ai_error(_: Request, exc: AiGatewayError) -> JSONResponse:
         return JSONResponse({"error": {"code": exc.code, "message": exc.message}}, status_code=exc.status)
 
+    @app.exception_handler(PdfError)
+    async def _pdf_error(_: Request, exc: PdfError) -> JSONResponse:
+        return JSONResponse({"error": {"code": exc.code, "message": exc.message}}, status_code=exc.status)
+
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_: Request, __: RequestValidationError) -> JSONResponse:
         return _error("invalid-request", ERROR_MESSAGES["invalid-request"])
@@ -135,7 +149,7 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
-        return {"status": "ok", "dartConfigured": settings.has_api_key, "databaseConfigured": historical.persistence_enabled, "aiConfigured": ai is not None, "disclosureSearchConfigured": retriever is not None, "corpCodesFetchedAt": cache.fetched_at}
+        return {"status": "ok", "dartConfigured": settings.has_api_key, "databaseConfigured": historical.persistence_enabled, "aiConfigured": ai is not None, "disclosureSearchConfigured": retriever is not None, "knowledgeUploadConfigured": knowledge is not None, "rerankerConfigured": reranker is not None, "corpCodesFetchedAt": cache.fetched_at}
 
     @app.get("/api/companies")
     def companies(q: str = Query(..., max_length=100), limit: int = Query(20, ge=1, le=MAX_LIMIT)) -> dict[str, Any]:
@@ -219,6 +233,42 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
         if not CORP_CODE_PATTERN.match(corp_code):
             raise DartApiError("invalid-request", "corpCode 는 8자리 숫자여야 합니다.")
         return {"corpCode": corp_code, "items": disclosure_store.list_documents(corp_code) if disclosure_store is not None else []}
+
+    def _require_knowledge() -> KnowledgeService:
+        if knowledge is None:
+            raise AiGatewayError("ai-not-configured", "문서 검색이 설정되어 있지 않습니다 (DATABASE_URL 과 OPENAI_API_KEY 가 필요합니다).", 503)
+        return knowledge
+
+    @app.post("/api/knowledge/documents")
+    def upload_knowledge_document(
+        file: UploadFile = File(...), title: str | None = Form(None), corpCode: str | None = Form(None), corpName: str | None = Form(None), documentType: str | None = Form(None),
+        businessYear: str | None = Form(None), sourceName: str | None = Form(None), notes: str | None = Form(None),
+    ) -> JSONResponse:
+        """사용자 PDF 를 업로드한다 (backend 가 추출 · chunking · embedding). 같은 파일(SHA-256)을 다시 올리면 already-exists 로 기존 문서를 돌려준다."""
+        svc = _require_knowledge()
+        data = file.file.read(settings.max_upload_mb * 1024 * 1024 + 1)  # 한도를 넘는 본문은 끝까지 읽지 않는다
+        meta = parse_meta(title, corpCode, corpName, documentType, businessYear, sourceName, notes)
+        out = svc.upload_pdf(data, file.content_type, file.filename, meta)
+        return JSONResponse(out, status_code=201 if out["status"] == "ingested" else 200)
+
+    @app.get("/api/knowledge/documents")
+    def list_knowledge_documents(sourceType: str | None = Query(None, pattern="^(opendart|user-upload)$"), corpCode: str | None = Query(None, pattern=r"^\d{8}$")) -> dict[str, Any]:
+        return {"items": disclosure_store.list_knowledge(sourceType, corpCode) if disclosure_store is not None else []}
+
+    @app.delete("/api/knowledge/documents/{document_id}")
+    def delete_knowledge_document(document_id: int) -> dict[str, Any]:
+        """문서와 chunk · embedding 을 함께 삭제한다."""
+        if not _require_knowledge().delete(document_id):
+            raise PdfError("document-not-found", "문서를 찾을 수 없습니다.", 404)
+        return {"deleted": document_id}
+
+    @app.post("/api/knowledge/documents/{document_id}/reindex")
+    def reindex_knowledge_document(document_id: int) -> dict[str, Any]:
+        """저장된 chunk 를 현재 embedding model 로 다시 embedding 한다."""
+        doc = _require_knowledge().reindex(document_id)
+        if doc is None:
+            raise PdfError("document-not-found", "문서를 찾을 수 없습니다.", 404)
+        return {"document": doc}
 
     @app.get("/api/companies/{corp_code}/fetches")
     def company_fetches(corp_code: str, limit: int = Query(20, ge=1, le=100)) -> dict[str, Any]:

@@ -33,10 +33,14 @@ export interface AiQueryAuditEvent extends AiAuditEvent {
   toolsExecuted: { tool: string; status: string }[];
   /** Tool 별 실행 위치 (frontend: deterministic ValuFlow Tool · backend: 공시 검색 등 외부 Retrieval Tool) */
   toolRuntimes: { tool: string; runtime: string }[];
-  /** 공시 문서 출처: `접수번호 | section` (본문은 기록하지 않는다) */
+  /** 문서 출처: `문서 id | section 또는 p.N` (본문은 기록하지 않는다) */
   documentSources: string[];
-  /** 검색된 공시 문서의 접수번호 */
+  /** 검색된 문서의 id (공시: 접수번호 · 업로드: 문서 id) */
   retrievedDocumentIds: string[];
+  /** 검색에 쓰인 source 종류 (opendart · user-upload) 와 건수 (rerank 전 후보를 rerank 한 수 포함) */
+  retrievalSourceTypes: string[];
+  retrievalCount: number;
+  rerankedCount: number;
   finalStatus: AiFinalStatus;
   /** 모델 답변에서 감지한 가드레일 위반 코드 */
   violations: AnswerViolation['code'][];

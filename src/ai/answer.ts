@@ -13,7 +13,7 @@ export interface AnswerEvidence {
   tool: string;
 }
 
-/** 답변의 출처. 숫자 Tool 출처(financial-data)와 공시 문서 출처(disclosure-document)를 구분한다. */
+/** 답변의 출처. 숫자 Tool 출처(financial-data) · 공시 문서(disclosure-document) · 사용자 업로드 문서(uploaded-document)를 구분한다. */
 export interface AnswerSource {
   kind: SourceInfo['kind'];
   type?: SourceType;
@@ -25,6 +25,11 @@ export interface AnswerSource {
   filingDate?: string | null;
   section?: string | null;
   receiptNo?: string | null;
+  title?: string | null;
+  page?: number | null;
+  sourceName?: string | null;
+  uploadedAt?: string | null;
+  documentId?: string | null;
 }
 
 export interface AiAnalystAnswer {
@@ -129,11 +134,12 @@ export interface GroundingOutcome {
 export function toAnswerSource(s: SourceInfo): AnswerSource {
   const out: AnswerSource = { kind: s.kind, origin: s.origin, basis: s.basis, fetchedAt: s.fetchedAt };
   if (s.type) out.type = s.type;
-  for (const k of ['corpName', 'reportName', 'filingDate', 'section', 'receiptNo'] as const) if (s[k] !== undefined && s[k] !== null) out[k] = s[k];
+  for (const k of ['corpName', 'reportName', 'filingDate', 'section', 'receiptNo', 'title', 'sourceName', 'uploadedAt', 'documentId'] as const) if (s[k] !== undefined && s[k] !== null) out[k] = s[k];
+  if (s.page !== undefined && s.page !== null) out.page = s.page;
   return out;
 }
 
-const sourceKey = (s: AnswerSource) => `${s.kind}|${s.origin}|${s.basis ?? ''}|${s.fetchedAt ?? ''}|${s.receiptNo ?? ''}|${s.section ?? ''}`;
+const sourceKey = (s: AnswerSource) => `${s.kind}|${s.origin}|${s.basis ?? ''}|${s.fetchedAt ?? ''}|${s.receiptNo ?? ''}|${s.documentId ?? ''}|${s.page ?? ''}|${s.section ?? ''}`;
 
 /**
  * 모델 답변을 Tool 결과에 맞춰 보정한다 (위반은 그대로 기록한다).

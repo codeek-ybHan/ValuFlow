@@ -160,17 +160,30 @@ EMBEDDING_DIM = 1536  # text-embedding-3-small. 다른 차원의 모델을 쓰�
 
 
 class DisclosureDocument(Base):
-    """수집된 공시 문서 한 건. receipt_no(접수번호)가 문서 버전의 식별자이며 재수집 시 중복 ingestion 을 막는 기준이다."""
+    """RAG 문서 한 건 (OpenDART 공시 또는 사용자 PDF). 같은 테이블을 공유하고 source_type 으로 구분한다.
+
+    OpenDART: receipt_no(접수번호)가 문서 버전의 식별자이며 재수집 시 중복 ingestion 을 막는 기준이다.
+    user-upload: file_hash(SHA-256)가 같은 파일의 중복 업로드를 막는 기준이다. corp_code 는 선택(산업 리포트처럼 기업과 무관한 문서는 NULL).
+    report_type 은 문서 종류(document type)다: annual | half | quarterly (OpenDART) · industry-report | ir | ... (업로드).
+    """
     __tablename__ = "disclosure_documents"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    receipt_no: Mapped[str] = mapped_column(String(14), unique=True, nullable=False)
-    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), nullable=False)
-    corp_code: Mapped[str] = mapped_column(String(8), nullable=False)
-    corp_name: Mapped[str] = mapped_column(Text, nullable=False)
+    receipt_no: Mapped[str | None] = mapped_column(String(14), unique=True, nullable=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), nullable=True)
+    corp_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    corp_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     report_name: Mapped[str] = mapped_column(Text, nullable=False)
-    report_type: Mapped[str] = mapped_column(String(16), nullable=False)   # annual | half | quarterly | other
+    report_type: Mapped[str] = mapped_column(String(32), nullable=False)
     is_correction: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
-    filing_date: Mapped[date] = mapped_column(Date, nullable=False)
+    filing_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    source_type: Mapped[str] = mapped_column(String(16), nullable=False, server_default="opendart")  # opendart | user-upload
+    title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    original_filename: Mapped[str | None] = mapped_column(Text, nullable=True)   # 표시용. 저장 경로에는 쓰지 않는다
+    file_hash: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    uploaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="ready")
     business_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source: Mapped[str] = mapped_column(String(32), nullable=False, server_default="OpenDART")
     url: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -179,7 +192,7 @@ class DisclosureDocument(Base):
     char_count: Mapped[int] = mapped_column(Integer, nullable=False)
     embedding_model: Mapped[str] = mapped_column(String(64), nullable=False)
     ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    __table_args__ = (Index("ix_disclosure_doc_lookup", "corp_code", "report_type", "business_year"),)
+    __table_args__ = (Index("ix_disclosure_doc_lookup", "corp_code", "report_type", "business_year"), Index("ix_disclosure_doc_source", "source_type"))
 
 
 class DisclosureChunk(Base):
@@ -190,6 +203,7 @@ class DisclosureChunk(Base):
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     section: Mapped[str] = mapped_column(Text, nullable=False)
     section_path: Mapped[list[str]] = mapped_column(JsonType, nullable=False)
+    page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)   # PDF 의 page (1부터)
     kind: Mapped[str] = mapped_column(String(8), nullable=False, server_default="text")  # text | table
     text: Mapped[str] = mapped_column(Text, nullable=False)
     char_count: Mapped[int] = mapped_column(Integer, nullable=False)

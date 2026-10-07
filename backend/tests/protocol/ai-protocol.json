@@ -50,7 +50,12 @@
           "reportName": null,
           "filingDate": null,
           "section": null,
-          "receiptNo": null
+          "receiptNo": null,
+          "title": null,
+          "page": null,
+          "sourceName": null,
+          "uploadedAt": null,
+          "documentId": null
         }
       ],
       "suggestedNextActions": [
@@ -91,6 +96,8 @@
       },
       "filters": {
         "reportTypes": null,
+        "sourceTypes": null,
+        "documentTypes": null,
         "businessYears": null
       },
       "contentType": "untrusted-document-excerpts",
@@ -98,20 +105,33 @@
       "results": [
         {
           "text": "시설투자는 ... 53.6조원",
+          "title": "사업보고서 (2025.12)",
+          "sourceType": "opendart",
           "reportName": "사업보고서 (2025.12)",
-          "reportType": "annual",
+          "documentType": "annual",
           "filingDate": "2026-03-10",
           "businessYear": 2025,
+          "pageNumber": null,
           "section": "II. 사업의 내용 > 3. 원재료 및 생산설비",
-          "score": 0.5,
+          "retrievalScore": 0.5,
+          "rerankScore": 0.9,
+          "finalRank": 1,
+          "documentId": "20260310002820",
           "receiptNo": "20260310002820",
-          "source": "OpenDART",
+          "sourceName": "OpenDART",
+          "uploadedAt": null,
           "matchedBy": [
             "vector",
             "keyword"
           ]
         }
-      ]
+      ],
+      "retrieval": {
+        "mode": "hybrid+rerank",
+        "candidates": 15,
+        "reranked": 15,
+        "reranker": "jina-reranker"
+      }
     },
     "sources": [
       {
@@ -126,7 +146,12 @@
         "reportName": "사업보고서 (2025.12)",
         "filingDate": "2026-03-10",
         "section": "II. 사업의 내용 > 3. 원재료 및 생산설비",
-        "receiptNo": "20260310002820"
+        "receiptNo": "20260310002820",
+        "title": "사업보고서 (2025.12)",
+        "page": null,
+        "sourceName": "OpenDART",
+        "uploadedAt": null,
+        "documentId": "20260310002820"
       }
     ],
     "warnings": [

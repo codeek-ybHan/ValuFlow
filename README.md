@@ -75,6 +75,29 @@ cd backend && .venv/bin/python -m scripts.eval_disclosure_retrieval 5     # 실�
 - 같은 접수번호(receiptNo)는 다시 수집 · embedding 하지 않습니다 (`force=true` 로만 교체).
 - 숫자(과거 실적 · 가치평가)는 deterministic Tool 이 근거이고, 이유 · 맥락 · 위험은 공시 검색이 근거입니다. 문서 속 숫자가 Valuation 결과를 대체하지 않습니다.
 
+### 통합 RAG: 공시 + 사용자 PDF (STEP 08-3 확장)
+
+```
+DART Loader ─┐
+             ├─> NormalizedDocument → Chunking → Embedding → pgvector → Hybrid(Vector + BM25, RRF) → Reranker → Grounded Answer
+PDF Loader ──┘
+```
+Loader 만 source 별로 다르고(`backend/app/knowledge/loaders/`) 이후 chunking · 저장 · 검색은 공유합니다. OpenDART 의 위치는 section, PDF 의 위치는 page 로 보존됩니다.
+
+```bash
+# PDF 업로드 (backend 가 추출 · embedding; 같은 파일(SHA-256)은 already-exists)
+curl -X POST localhost:8000/api/knowledge/documents -F "file=@outlook.pdf;type=application/pdf" -F "title=2026 Semiconductor Outlook" -F documentType=industry-report -F businessYear=2026 -F sourceName="PwC Insight"
+curl localhost:8000/api/knowledge/documents                           # 목록 (?sourceType=user-upload&corpCode=...)
+curl -X POST localhost:8000/api/knowledge/documents/3/reindex         # 저장된 chunk 를 현재 embedding model 로 다시 embedding
+curl -X DELETE localhost:8000/api/knowledge/documents/3               # 문서 + chunk + embedding 삭제
+```
+- **검증:** PDF Content-Type + `%PDF-` 확인, 크기(`MAX_UPLOAD_MB`, 기본 20), 빈 파일 · 손상 · 암호 PDF 거부, 파일 이름은 신뢰하지 않음(표시용으로만 정리해 저장, 파일 자체는 저장하지 않음). 스캔 PDF(OCR)는 `text-unavailable`.
+- **기업 연결은 선택:** `corpCode` 를 주면 그 기업 질문에서만, 주지 않으면(산업 리포트 등) 기업과 무관한 문서로 모든 기업 질문에서 검색됩니다. 다른 기업에 연결된 문서는 검색되지 않습니다.
+- **검색 Tool(backend):** `searchDisclosures`(공시) · `searchUploadedDocuments`(업로드 PDF) · `searchKnowledge`(둘 다). 모두 같은 파이프라인을 쓰고, 답변 출처에는 공시는 보고서 · section · 접수번호, 업로드는 문서 제목 · page 가 들어갑니다.
+- **Reranker:** 후보 15개를 (질문, chunk) cross-encoder 로 다시 정렬합니다. `pip install -r backend/requirements-rerank.txt` 후 `RERANKER=auto`(기본)면 로컬 모델(`jina-reranker-v2-base-multilingual`, 첫 호출 때 ~1.1GB 다운로드, CC-BY-NC)을 쓰고, 설치하지 않으면 Hybrid 만 씁니다. API 방식은 `RERANKER=cohere` + `COHERE_API_KEY`. 지연은 CPU 에서 후보 15개에 약 2초입니다.
+- **평가:** `docs/STEP08-3_unified_rag_eval.md` (Vector only vs Hybrid vs Hybrid + Reranker).
+- **보안 참고:** 업로드 · 수집 API 에는 인증이 없습니다 (embedding 비용이 발생하므로 공개 배포 전에 보호가 필요합니다).
+
 기업 검색과 재무제표 수집(`GET /api/companies/{corpCode}/financials?years=2023,2024,2025&basis=auto`)은 backend 가 켜져 있어야 동작합니다. 실제 응답의 계정명 조사는 `.venv/bin/python -m scripts.inspect_raw_accounts` 로 다시 실행할 수 있습니다 (dev 서버가 `/api` 를 8000 포트로 전달).
 
 ```bash

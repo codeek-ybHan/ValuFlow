@@ -37,7 +37,7 @@ const done = (answer: Partial<AiAnalystAnswer>, trace: { tool: string; runtime: 
 test('Tool catalog: searchDisclosures 는 backend Tool 이고 기업은 AI 가 지정할 수 없다', () => {
   const def = getToolDefinition('searchDisclosures')!;
   assert.equal(def.execution, 'backend');
-  assert.deepEqual(TOOL_CATALOG.filter((t) => t.execution === 'backend').map((t) => t.name), ['searchDisclosures']);
+  assert.deepEqual(TOOL_CATALOG.filter((t) => t.execution === 'backend').map((t) => t.name), ['searchDisclosures', 'searchUploadedDocuments', 'searchKnowledge']);
   assert.equal(FRONTEND_TOOL_NAMES.length, 9);
   assert.ok(!FRONTEND_TOOL_NAMES.includes('searchDisclosures') && TOOL_NAMES.includes('searchDisclosures'));
   assert.deepEqual(Object.keys(def.inputSchema.properties!), ['query', 'topK', 'reportTypes', 'businessYears']);
@@ -70,7 +70,7 @@ test('backend 가 실행한 공시 검색 결과가 답변 · 출처 · audit �
     () => done({
       summary: '회사는 사업보고서에서 시설투자를 설명했습니다.',
       evidence: [{ label: '2025 시설투자', value: '53.6조원', period: '2025A', tool: 'searchDisclosures' }],
-      warnings: [], sources: [{ kind: 'document', type: 'disclosure-document', origin: 'opendart', basis: null, fetchedAt: '2026-10-07T00:00:00+00:00', corpName: '삼성전자', reportName: '사업보고서 (2025.12)', filingDate: '2026-03-10', section: 'II. 사업의 내용 > 3. 원재료 및 생산설비', receiptNo: '20260310002820' }],
+      warnings: [], sources: [{ kind: 'document', type: 'disclosure-document', origin: 'opendart', basis: null, fetchedAt: '2026-10-07T00:00:00+00:00', corpName: '삼성전자', reportName: '사업보고서 (2025.12)', filingDate: '2026-03-10', section: 'II. 사업의 내용 > 3. 원재료 및 생산설비', receiptNo: '20260310002820', title: '사업보고서 (2025.12)', page: null, sourceName: 'OpenDART', uploadedAt: null, documentId: '20260310002820' }],
     }, [{ tool: 'searchDisclosures', runtime: 'backend', status: 'ok' }], [DOC_RESULT]),
   ]);
   const out = await runAiQuery({ question: '회사가 설비투자와 관련해 어떤 내용을 공시했어?', project: live(), client });

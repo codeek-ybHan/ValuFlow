@@ -1,0 +1,3 @@
+-r requirements.txt
+# 로컬 cross-encoder reranker (선택). 설치하면 RERANKER=auto 가 cross-encoder 를 켠다. 첫 호출 때 모델(~1.1GB)을 내려받는다.
+fastembed>=0.7

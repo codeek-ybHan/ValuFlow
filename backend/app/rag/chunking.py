@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from app.dart.documents import ParsedDocument
+from app.dart.documents import ParsedDocument  # OpenDART · PDF 공통: .sections 를 가진 NormalizedDocument 도 그대로 받는다
 
 TARGET_CHARS = 900
 MAX_CHARS = 1400
@@ -28,11 +28,13 @@ class Chunk:
     section_path: tuple[str, ...]
     text: str
     kind: str = "text"   # text | table (표 위주 chunk 는 검색에서 가중치를 낮춘다)
+    page_number: int | None = None
+    context: str = ""    # embedding 앞에 붙일 문맥 (PDF 는 문서 제목). 비어 있으면 section 을 쓴다
 
     @property
     def embed_text(self) -> str:
-        """임베딩에 쓰는 문장: section 제목을 앞에 붙여 짧은 chunk 도 맥락을 갖게 한다 (저장 text 는 원문 그대로)."""
-        return f"[{self.section}] {self.text}"
+        """임베딩에 쓰는 문장: section(또는 문서 제목)을 앞에 붙여 짧은 chunk 도 맥락을 갖게 한다 (저장 text 는 원문 그대로)."""
+        return f"[{self.context or self.section}] {self.text}"
 
 
 def _split_long(text: str, max_chars: int, overlap: int) -> list[str]:
@@ -83,11 +85,11 @@ def _split_table(text: str, max_chars: int) -> list[str]:
 def chunk_document(doc: ParsedDocument, target: int = TARGET_CHARS, max_chars: int = MAX_CHARS, overlap: int = OVERLAP_CHARS) -> list[Chunk]:
     chunks: list[Chunk] = []
 
-    def emit(path: list[str], text: str, kind: str) -> None:
+    def emit(path: list[str], text: str, kind: str, page: int | None = None) -> None:
         text = text.strip()
         if len(_LETTER.findall(text)) < MIN_LETTERS:
             return
-        chunks.append(Chunk(index=len(chunks), section=" > ".join(path), section_path=tuple(path), text=text, kind=kind))
+        chunks.append(Chunk(index=len(chunks), section=" > ".join(path), section_path=tuple(path), text=text, kind=kind, page_number=page))
 
     for sec in doc.sections:
         buf: list[str] = []
@@ -98,7 +100,7 @@ def chunk_document(doc: ParsedDocument, target: int = TARGET_CHARS, max_chars: i
             nonlocal buf, buf_kinds, size
             if buf:
                 # 문단이 절반 이상이면 text, 표가 절반을 넘으면 table
-                emit(sec.path, "\n".join(buf), "table" if buf_kinds.count("table") * 2 > len(buf_kinds) else "text")
+                emit(sec.path, "\n".join(buf), "table" if buf_kinds.count("table") * 2 > len(buf_kinds) else "text", sec.page_number)
             buf, buf_kinds, size = [], [], 0
 
         for block in sec.blocks:

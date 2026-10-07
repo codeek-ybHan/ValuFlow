@@ -32,6 +32,7 @@ class Block:
 class Section:
     path: list[str]
     blocks: list[Block] = field(default_factory=list)
+    page_number: int | None = None   # PDF 는 page 단위 Section 이고, OpenDART 는 section 경로로 위치를 나타낸다
 
 
 @dataclass

@@ -12,7 +12,7 @@ export const missing = (reason: string): Missing => ({ status: 'missing', value:
 
 export type SourceKind = 'actual' | 'assumption' | 'calculated' | 'document';
 /** financial-data: 숫자 Tool(재무 데이터 · 가정 · 계산) · disclosure-document: 공시 문서 인용 */
-export type SourceType = 'financial-data' | 'disclosure-document';
+export type SourceType = 'financial-data' | 'disclosure-document' | 'uploaded-document';
 
 export interface SourceInfo {
   /** actual: 공시 기반 실적 · assumption: 사용자 / 학습용 가정 · calculated: 엔진 계산 결과 · document: 공시 문서 인용 */
@@ -30,6 +30,12 @@ export interface SourceInfo {
   filingDate?: string | null;
   section?: string | null;
   receiptNo?: string | null;
+  /** uploaded-document 출처: 문서 제목 · page · 출처 이름 · 업로드 시각 (documentId 는 두 문서 출처 모두에 쓴다) */
+  title?: string | null;
+  page?: number | null;
+  sourceName?: string | null;
+  uploadedAt?: string | null;
+  documentId?: string | null;
 }
 
 export interface ToolWarning {

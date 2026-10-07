@@ -42,6 +42,15 @@ class Settings:
     # 공시 Retrieval (embedding 도 backend 에서만 호출한다)
     embedding_model: str = "text-embedding-3-small"
     retrieval_min_score: float = 0.3
+    # Reranker: none | cross-encoder (로컬 fastembed) | cohere | auto (fastembed 가 설치되어 있으면 cross-encoder)
+    reranker: str = "none"
+    reranker_model: str = ""
+    cohere_api_key: str = field(default="", repr=False)
+    rerank_candidates: int = 15
+    rerank_min_score: float | None = None
+    reranker_cache_dir: str = ""
+    # 사용자 PDF 업로드
+    max_upload_mb: int = 20
 
     @property
     def has_api_key(self) -> bool:
@@ -72,5 +81,12 @@ def load_settings(env: dict[str, str] | None = None, dotenv_path: Path | None = 
         ai_max_tool_calls=int(source.get("AI_MAX_TOOL_CALLS") or 5),
         embedding_model=source.get("OPENAI_EMBEDDING_MODEL") or dotenv.get("OPENAI_EMBEDDING_MODEL", "") or "text-embedding-3-small",
         retrieval_min_score=float(source.get("RETRIEVAL_MIN_SCORE") or 0.3),
+        reranker=(source.get("RERANKER") or dotenv.get("RERANKER", "") or "auto").lower(),
+        reranker_model=source.get("RERANKER_MODEL") or dotenv.get("RERANKER_MODEL", ""),
+        cohere_api_key=(source.get("COHERE_API_KEY") or dotenv.get("COHERE_API_KEY", "")).strip(),
+        rerank_candidates=int(source.get("RERANK_CANDIDATES") or 15),
+        rerank_min_score=float(source["RERANK_MIN_SCORE"]) if source.get("RERANK_MIN_SCORE") else None,
+        reranker_cache_dir=source.get("RERANKER_CACHE_DIR") or dotenv.get("RERANKER_CACHE_DIR", ""),
+        max_upload_mb=int(source.get("MAX_UPLOAD_MB") or 20),
         db_pool_size=int(source.get("DB_POOL_SIZE") or 2), db_max_overflow=int(source.get("DB_MAX_OVERFLOW") or 0), db_pool=(source.get("DB_POOL") or "queue").lower(),
     )

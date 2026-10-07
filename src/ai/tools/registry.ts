@@ -1,14 +1,14 @@
 // Tool 실행기. 이름으로 Tool 을 찾아 입력을 검증하고, 지원하지 않는 기업이면 호출을 제한한다.
 // 실제 LLM Tool Calling(STEP 08-2)은 이 실행기를 그대로 호출하면 된다.
 import type { AiValuationContext } from '../context.ts';
-import { getToolDefinition, type JsonSchema, type ToolName } from './definitions.ts';
+import { getToolDefinition, type BackendToolName, type JsonSchema, type ToolName } from './definitions.ts';
 import { getCompanyOverview, getHistoricalAnalysis } from './historical.ts';
 import { getHistoricalQuality, getMappingTrace } from './quality.ts';
 import { getForecastAssumptions, getRelativeValuation, getScenarioAnalysis, getSensitivityAnalysis, getValuationResult } from './modelTools.ts';
 import type { ToolResult } from './result.ts';
 
 type Impl = (ctx: AiValuationContext, input?: never) => ToolResult<unknown>;
-const IMPLS: Record<Exclude<ToolName, 'searchDisclosures'>, Impl> = {
+const IMPLS: Record<Exclude<ToolName, BackendToolName>, Impl> = {
   getCompanyOverview: getCompanyOverview as Impl,
   getHistoricalAnalysis: getHistoricalAnalysis as Impl,
   getHistoricalQuality: getHistoricalQuality as Impl,
@@ -65,5 +65,5 @@ export function executeTool(name: string, ctx: AiValuationContext, input?: unkno
       warnings: [{ code: 'unsupported-company', text: ctx.support.message, level: 'review' }],
     };
   }
-  return (IMPLS[def.name as Exclude<ToolName, 'searchDisclosures'>] as (c: AiValuationContext, i?: unknown) => ToolResult<unknown>)(ctx, input ?? {});
+  return (IMPLS[def.name as Exclude<ToolName, BackendToolName>] as (c: AiValuationContext, i?: unknown) => ToolResult<unknown>)(ctx, input ?? {});
 }

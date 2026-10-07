@@ -358,15 +358,15 @@ test('context 생성과 Tool 실행은 원본 Project State 를 변경하지 않
 });
 
 // Tool catalog / 실행기
-test('Tool catalog: 10개 Tool(frontend 9 + backend 1)이 이름 · 설명 · 입력/출력 schema 를 갖고, frontend Tool 은 모두 실행된다', () => {
-  assert.deepEqual([...TOOL_NAMES], ['getCompanyOverview', 'getHistoricalAnalysis', 'getHistoricalQuality', 'getMappingTrace', 'getForecastAssumptions', 'getValuationResult', 'getSensitivityAnalysis', 'getScenarioAnalysis', 'getRelativeValuation', 'searchDisclosures']);
-  assert.equal(new Set(TOOL_NAMES).size, 10);
-  assert.deepEqual(TOOL_CATALOG.filter((t) => t.execution === 'backend').map((t) => t.name), ['searchDisclosures']);
+test('Tool catalog: 12개 Tool(frontend 9 + backend 3)이 이름 · 설명 · 입력/출력 schema 를 갖고, frontend Tool 은 모두 실행된다', () => {
+  assert.deepEqual([...TOOL_NAMES], ['getCompanyOverview', 'getHistoricalAnalysis', 'getHistoricalQuality', 'getMappingTrace', 'getForecastAssumptions', 'getValuationResult', 'getSensitivityAnalysis', 'getScenarioAnalysis', 'getRelativeValuation', 'searchDisclosures', 'searchUploadedDocuments', 'searchKnowledge']);
+  assert.equal(new Set(TOOL_NAMES).size, 12);
+  assert.deepEqual(TOOL_CATALOG.filter((t) => t.execution === 'backend').map((t) => t.name), ['searchDisclosures', 'searchUploadedDocuments', 'searchKnowledge']);
   const ctx = ctxOf(withValuation(live()));
   for (const t of TOOL_CATALOG) {
     assert.ok(t.description.length > 20 && t.inputSchema.type === 'object' && t.outputSchema.type === 'object', t.name);
     assert.ok(Object.keys(t.outputSchema.properties ?? {}).length > 0, `${t.name} outputSchema`);
-    const r = executeTool(t.name, ctx, t.name === 'getMappingTrace' ? { field: 'revenue' } : t.name === 'searchDisclosures' ? { query: '설비투자' } : undefined);
+    const r = executeTool(t.name, ctx, t.name === 'getMappingTrace' ? { field: 'revenue' } : t.execution === 'backend' ? { query: '설비투자' } : undefined);
     // backend Tool 은 frontend 에서 실행하지 않는다 (값을 만들지 않고 안내)
     assert.equal(r.status, t.execution === 'backend' ? 'unavailable' : 'ok', t.name);
     assert.equal(r.tool, t.name);
@@ -386,7 +386,7 @@ test('Tool catalog: 10개 Tool(frontend 9 + backend 1)이 이름 · 설명 · �
 });
 
 test('Capability 정의와 규칙 기반 질문 분류', () => {
-  assert.deepEqual(CAPABILITIES.map((c) => c.id), ['historical', 'data-quality', 'forecast', 'valuation', 'sensitivity', 'scenario', 'relative', 'disclosure']);
+  assert.deepEqual(CAPABILITIES.map((c) => c.id), ['historical', 'data-quality', 'forecast', 'valuation', 'sensitivity', 'scenario', 'relative', 'disclosure', 'knowledge']);
   for (const c of CAPABILITIES) { assert.ok(c.exampleQuestions.length > 0 && c.never.length > 0); for (const t of c.tools) assert.ok(TOOL_NAMES.includes(t), t); }
   const cls = (q: string) => classifyQuestion(q);
   assert.deepEqual([cls('최근 매출 성장률은?').capabilities, cls('최근 매출 성장률은?').mode], [['historical'], 'explain']);

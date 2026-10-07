@@ -4,20 +4,24 @@
 frontend Tool Runtime 은 TS 라서 getHistoricalAnalysis 는 삼성전자 golden 값의 stub 결과를 쓴다.
 """
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import sessionmaker
 
 from app.ai.gateway import AiGateway
 from app.ai.provider import OpenAiProvider
-from app.ai.runtime import make_search_disclosures
+from app.ai.runtime import make_retrieval_tools
 from app.ai.state import derive_secret
 from app.config import load_settings
+from app.db.models import DisclosureChunk, DisclosureDocument
+from scripts.eval_knowledge_retrieval import build_pdf
 from app.dart.client import DartHttpClient
 from app.dart.filings import DartDisclosureSource
 from app.rag.embeddings import OpenAiEmbeddings
 from app.rag.ingestion import DisclosureIngestionService
 from app.rag.retrieval import DisclosureRetriever
 from app.rag.store import DisclosureStore
+from app.rag.rerank import build_reranker
+from app.knowledge.service import KnowledgeService, parse_meta
 from tests.smoke.test_live_ai import historical_result
 
 settings = load_settings()
@@ -39,8 +43,23 @@ def runtime(request):
     store = DisclosureStore(sf)
     report = DisclosureIngestionService(DartDisclosureSource(DartHttpClient(settings)), embedder, store).ingest(SAMSUNG, ["annual"], None, limit=1)
     assert report.failed == [] and (report.ingested or report.skipped), report
+    # 실제 PDF 업로드: 같은 보고서의 '사업의 내용' 발췌를 PDF 로 만들어 올린다 (기업과 무관한 산업 문서처럼 corpCode 없이)
+    with sf() as s:
+        rows = s.execute(select(DisclosureChunk.section, DisclosureChunk.text).join(DisclosureDocument, DisclosureDocument.id == DisclosureChunk.document_id)
+                         .where(DisclosureChunk.section.like("II. 사업의 내용%")).order_by(DisclosureChunk.chunk_index)).all()
+    pages, cur = [], ""
+    for sec, body in rows:
+        for part in (sec + ". " + body).split("\n"):
+            if cur and len(cur) + len(part) > 1500:
+                pages.append(cur)
+                cur = ""
+            cur += " " + part
+    pages.append(cur)
+    up = KnowledgeService(embedder, store).upload_pdf(build_pdf(pages[:24]), "application/pdf", "outlook.pdf", parse_meta("2026 Semiconductor Outlook", None, None, "industry-report", 2026, "PwC Insight", None))
+    assert up["document"]["chunkCount"] > 5
+    reranker = build_reranker("cross-encoder", settings.reranker_model, "", settings.reranker_cache_dir or None)
     gateway = AiGateway(OpenAiProvider(settings.openai_api_key, settings.openai_model, settings.openai_base_url), derive_secret(settings.ai_state_secret, settings.openai_api_key),
-                        backend_tools={"searchDisclosures": make_search_disclosures(DisclosureRetriever(sf, embedder, min_score=settings.retrieval_min_score))})
+                        backend_tools=make_retrieval_tools(DisclosureRetriever(sf, embedder, min_score=settings.retrieval_min_score, reranker=reranker)))
     yield gateway
     engine.dispose()
 
@@ -80,3 +99,23 @@ def test_margin_and_reason_question_combines_numeric_and_document_tools(runtime)
     assert "getHistoricalAnalysis" in used and "searchDisclosures" in used, used
     assert {t["runtime"] for t in resp["toolTrace"] if t["tool"] == "getHistoricalAnalysis"} == {"frontend"}
     assert {t["runtime"] for t in resp["toolTrace"] if t["tool"] == "searchDisclosures"} == {"backend"}
+
+
+def test_uploaded_pdf_question_cites_title_and_page(runtime):
+    frontend, resp = drive(runtime, "업로드한 문서에서 반도체 수요 전망과 관련된 내용을 찾아줘.")
+    assert resp["status"] == "final", (frontend, resp)
+    used = [t["tool"] for t in resp["toolTrace"]]
+    assert any(n in used for n in ("searchUploadedDocuments", "searchKnowledge")), used
+    res = [r for r in resp["backendToolResults"] if r["tool"] in ("searchUploadedDocuments", "searchKnowledge") and r["status"] == "ok"]
+    assert res and res[0]["data"]["retrieval"]["reranked"] > 0 and res[0]["data"]["retrieval"]["reranker"], "reranker 가 실제로 쓰였다"
+    ups = [r for r in res[0]["data"]["results"] if r["sourceType"] == "user-upload"]
+    assert ups and ups[0]["pageNumber"] and ups[0]["title"] == "2026 Semiconductor Outlook" and ups[0]["rerankScore"] is not None and ups[0]["finalRank"] == 1
+    answer_sources = [s for s in resp["answer"]["sources"] if s["type"] == "uploaded-document"]
+    assert answer_sources and answer_sources[0]["title"] == "2026 Semiconductor Outlook" and answer_sources[0]["page"], resp["answer"]["sources"]
+
+
+def test_margin_and_uploaded_outlook_combine_numeric_and_pdf_tools(runtime):
+    frontend, resp = drive(runtime, "삼성전자 최근 영업이익률 변화와 업로드한 산업 전망을 같이 설명해줘.")
+    assert resp["status"] == "final", (frontend, resp)
+    used = [t["tool"] for t in resp["toolTrace"]]
+    assert "getHistoricalAnalysis" in used and any(n in used for n in ("searchUploadedDocuments", "searchKnowledge")), used

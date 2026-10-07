@@ -261,7 +261,7 @@ test('audit event 에는 Tool 이름 · 출처 라벨 · 경고만 남고 Tool �
   const out = await runAiQuery({ question: '매출 출처는?', project: live(), client, now: () => new Date('2026-10-07T00:00:00Z') });
   const a = out.audit;
   assert.equal(a.timestamp, '2026-10-07T00:00:00.000Z');
-  assert.deepEqual(Object.keys(a).sort(), ['classification', 'conversationId', 'corrections', 'documentSources', 'errorCode', 'finalStatus', 'question', 'retrievedDocumentIds', 'sourceUsed', 'timestamp', 'toolRuntimes', 'toolUsed', 'toolsExecuted', 'toolsRequested', 'violations', 'warningsIncluded'].sort());
+  assert.deepEqual(Object.keys(a).sort(), ['classification', 'conversationId', 'corrections', 'documentSources', 'errorCode', 'finalStatus', 'question', 'rerankedCount', 'retrievalCount', 'retrievalSourceTypes', 'retrievedDocumentIds', 'sourceUsed', 'timestamp', 'toolRuntimes', 'toolUsed', 'toolsExecuted', 'toolsRequested', 'violations', 'warningsIncluded'].sort());
   const json = JSON.stringify(a);
   for (const leak of ['ifrs-full_Revenue', '333605938', 'state1', 'sk-']) assert.ok(!json.includes(leak), leak);
 });

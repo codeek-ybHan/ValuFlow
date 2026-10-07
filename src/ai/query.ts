@@ -64,7 +64,8 @@ export async function runAiQuery(options: RunAiQueryOptions): Promise<AiQueryOut
     const runtimes = trace ? trace.map((t) => ({ tool: t.tool, runtime: t.runtime })) : executed.map((e) => ({ tool: e.tool, runtime: 'frontend' }));
     let fi = 0;
     const toolsExecuted = trace ? trace.map((t) => ({ tool: t.tool, status: t.runtime === 'frontend' ? (executed[fi++]?.status ?? t.status) : t.status })) : executed.map((e) => ({ ...e }));
-    const docSources = results.flatMap((r) => r.sources).filter((s) => s.type === 'disclosure-document');
+    const docSources = results.flatMap((r) => r.sources).filter((s) => s.type === 'disclosure-document' || s.type === 'uploaded-document');
+    const searches = (trace ?? []).filter((t) => t.runtime === 'backend');
     const audit: AiQueryAuditEvent = {
       timestamp: now().toISOString(),
       question,
@@ -76,8 +77,11 @@ export async function runAiQuery(options: RunAiQueryOptions): Promise<AiQueryOut
       toolsRequested: trace ? trace.map((t) => t.tool) : [...requested],
       toolsExecuted,
       toolRuntimes: runtimes,
-      documentSources: [...new Set(docSources.map((s) => `${s.receiptNo ?? ''} | ${s.section ?? ''}`))],
-      retrievedDocumentIds: [...new Set(docSources.map((s) => s.receiptNo).filter((x): x is string => !!x))],
+      documentSources: [...new Set(docSources.map((s) => `${s.documentId ?? s.receiptNo ?? ''} | ${s.page != null ? `p.${s.page}` : (s.section ?? '')}`))],
+      retrievedDocumentIds: [...new Set(docSources.map((s) => s.documentId ?? s.receiptNo).filter((x): x is string => !!x))],
+      retrievalSourceTypes: [...new Set(searches.flatMap((t) => t.sourceTypes ?? []))],
+      retrievalCount: searches.reduce((n, t) => n + (t.retrievalCount ?? 0), 0),
+      rerankedCount: searches.reduce((n, t) => n + (t.rerankedCount ?? 0), 0),
       finalStatus: status,
       violations: (extra.violations ?? []).map((v) => v.code),
       corrections: extra.corrections ?? [],

@@ -7,9 +7,9 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from app.ai.errors import AiGatewayError
-from app.dart.documents import parse_document_xml
 from app.dart.filings import Filing, FilingsSource, REPORT_PRIORITY
 from app.dart.models import DartApiError
+from app.knowledge.loaders.dart_loader import load_dart_document
 from app.rag.chunking import chunk_document
 from app.rag.embeddings import EmbeddingProvider
 from app.rag.store import DisclosureStore
@@ -54,7 +54,7 @@ class DisclosureIngestionService:
                 report.skipped.append(f.receipt_no)  # 같은 접수번호 · 같은 embedding model 이면 다시 ingestion 하지 않는다
                 continue
             try:
-                parsed = parse_document_xml(self._source.fetch_document(f.receipt_no))
+                parsed = load_dart_document(f, self._source.fetch_document(f.receipt_no))   # DART Loader → NormalizedDocument
                 chunks = chunk_document(parsed)
                 if not chunks:
                     raise ValueError("no chunks produced")

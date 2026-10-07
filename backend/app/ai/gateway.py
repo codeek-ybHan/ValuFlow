@@ -38,6 +38,17 @@ def _context_message(minimal_context: dict[str, Any] | None) -> str:
     return "Current context summary (no financial figures; use tools for any numbers):\n" + json.dumps(minimal_context or {}, ensure_ascii=False, sort_keys=True)
 
 
+def _retrieval_audit(result: dict[str, Any]) -> dict[str, Any]:
+    """검색 Tool 의 audit 정보 (문서 id · source type · 건수). 본문(chunk text) · embedding 은 담지 않는다."""
+    data = result.get("data") if isinstance(result.get("data"), dict) else None
+    if not data or "results" not in data:
+        return {}
+    items = data["results"]
+    ret = data.get("retrieval") or {}
+    return {"documentIds": sorted({str(i.get("documentId")) for i in items if i.get("documentId")}), "sourceTypes": sorted({i["sourceType"] for i in items if i.get("sourceType")}),
+            "retrievalCount": len(items), "rerankedCount": int(ret.get("reranked") or 0)}
+
+
 class AiGateway:
     def __init__(self, provider: AiModelProvider, secret: bytes, max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS, ttl: int = STATE_TTL_SECONDS, clock: Callable[[], float] = time.time,
                  backend_tools: dict[str, BackendTool] | None = None):
@@ -135,7 +146,7 @@ class AiGateway:
                 # backend Tool: gateway 가 직접 실행하고 결과를 모델에 바로 전달한다 (호출 횟수 한도에는 똑같이 포함된다)
                 result = self._run_backend_tool(turn.name, state["ctx"], args)
                 state["backendResults"].append(result)
-                state["trace"].append({"tool": turn.name, "runtime": "backend", "status": result["status"]})
+                state["trace"].append({"tool": turn.name, "runtime": "backend", "status": result["status"], **_retrieval_audit(result)})
                 state["messages"].append({"role": "tool_result", "callId": turn.call_id, "content": json.dumps(result, ensure_ascii=False, separators=(",", ":"))})
                 log.info("ai conversation %s backend-tool %s -> %s", state["cid"], turn.name, result["status"])
                 continue
