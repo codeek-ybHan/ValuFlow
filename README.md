@@ -88,7 +88,7 @@ LEARN 은 STEP 01~04 만 포함합니다. STEP 05 이후는 아래 PROJECT 로�
 
 ```text
 STEP 05 Valuation Engine v1       Forecast · FCFF · CAPM · WACC · DCF · EV · Equity · 주당가치 · Sensitivity · Scenario · 상대가치   ✅
-STEP 06 Financial Data Pipeline   OpenDART → 파서 → 정규화 → PostgreSQL → Historical 테이블   (다음)
+STEP 06 Financial Data Pipeline   OpenDART → 파서 → 정규화 → PostgreSQL → Historical 테이블   (06-1 구조 완료 · 06-2 OpenDART 연결 다음)
 STEP 07 Valuation Workspace       Historical → Forecast → WACC → DCF/Equity → Result → Validation   ✅
 STEP 08 AI Valuation Analyst      Agent + Tool Calling + RAG (계산은 엔진, LLM 은 해석)
 STEP 09 Report Automation         보고서 생성 · 미리보기 · PDF 내보내기
@@ -103,6 +103,9 @@ MVP 순서: ① Dashboard + Valuation + Learn → ② Sensitivity · Comparable 
 src/
 ├── content/      STEP / Lesson / Quiz / Practice / Build 데이터 (bodiesNN.ts = Lesson 해설)
 ├── data/         fixture: 삼성전자 Historical(공시 기반), STEP 04 학습용 가정(가상값)
+│   ├── dart/           External API 경계 + Raw Model (DartRawAccount …). HTTP 구현은 STEP 06-2
+│   ├── normalization/  계정 매핑 · 단위(→KRW million) · 기간(2023A) · 연결/별도 · 품질(warnings) → HistoricalData
+│   └── repository/     FinancialRepository interface + Fixture 구현(삼성전자 adapter)
 ├── valuation/    Valuation Engine v1 (결정적 계산, 공개 API: valuation/index.ts) — 자세한 사용법은 valuation/README.md
 ├── store/        LEARN 상태(state.tsx) / PROJECT 상태(project.tsx + projectModel.ts: historicalData · valuationAssumptions · valuationResult · sensitivityResult · relativeInputs), 가정 완성도(assumptions.ts), 워크플로 상태(workflowStatus.ts)
 ├── engine/       LEARN 학습용 계산기 + Workspace 화면의 순수 로직(입력 폼 검증, 표시 모델: forecastForm · waccForm · dcfForm · relativeForm · validationView …)
