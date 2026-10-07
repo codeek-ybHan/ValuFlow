@@ -229,3 +229,12 @@ def db_client(dbfake: DbFake, store: FinancialStore) -> TestClient:
     settings = Settings(dart_api_key=SECRET)
     http = httpx.Client(transport=httpx.MockTransport(dbfake))
     return TestClient(create_app(settings, DartHttpClient(settings, http), store=store), raise_server_exceptions=False)
+
+
+@pytest.fixture(autouse=True)
+def _generous_rate_limits(monkeypatch, request):
+    """기존 테스트가 한 process 에서 같은 client 로 많이 호출하므로 rate limit 은 넉넉하게 둔다 (보호 동작은 test_security.py 가 따로 검증)."""
+    if request.node.get_closest_marker("real_limits"):
+        return
+    from app import security
+    monkeypatch.setattr(security, "LIMITS", {k: (100_000, v[1]) for k, v in security.LIMITS.items()})

@@ -1,11 +1,13 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { PERSIST_NOTE, PersistenceClient, type PersistFailure, type SavedReportSummary, type SavedAnalysisSummary } from '../data/persist/client.ts';
 import { buildAiContext } from '../ai/context.ts';
 import { snapshotId } from '../ai/agent/run.ts';
 import { buildReportInput } from '../report/input.ts';
-import { generateReport } from '../report/pipeline.ts';
+import { generateReport, reopenReport } from '../report/pipeline.ts';
+import { valuationStandardV1 } from '../report/templates/standardTemplate.ts';
 import { requestPdf } from '../report/export/pdfClient.ts';
 import { renderReportHtml } from '../report/render/html.ts';
-import { analysisChoices, defaultAnalysisId, downloadNames, isReportStale, type AnalysisChoice, type PdfStatus, type ReportView } from '../report/ui/model.ts';
+import { analysisChoices, defaultAnalysisId, downloadNames, isReportStale, withSavedAnalyses, type AnalysisChoice, type PdfStatus, type ReportView } from '../report/ui/model.ts';
 import type { SectionId } from '../report/templates/types.ts';
 import type { ReportValidation } from '../report/validation/validate.ts';
 import { useAnalyst } from './analyst';
@@ -13,7 +15,7 @@ import { useProject } from './project';
 
 // Report Workspace 상태: Project 상태와 분리되어 있고 Project 를 바꾸지 않는다 (읽기 전용). 생성한 Report 는 그 시점의 snapshot 이다.
 
-export interface ReportInitial { generated?: ReportView | null; blocked?: ReportValidation | null; pdf?: PdfStatus; selectedAnalysisId?: string | null; touched?: boolean; hideOptional?: SectionId[] }
+export interface ReportInitial { saved?: { analyses?: SavedAnalysisSummary[]; reports?: SavedReportSummary[]; note?: string | null }; generated?: ReportView | null; blocked?: ReportValidation | null; pdf?: PdfStatus; selectedAnalysisId?: string | null; touched?: boolean; hideOptional?: SectionId[] }
 
 interface Ctx {
   generated: ReportView | null;
@@ -25,9 +27,14 @@ interface Ctx {
   currentSnapshotId: string;
   stale: boolean;
   pdf: PdfStatus;
+  /** 저장된 과거 Report 목록 · 저장소 상태 안내 (저장소가 없으면 이 세션에서만 유지) */
+  savedReports: SavedReportSummary[];
+  persistNote: string | null;
+  opening: boolean;
+  openSaved: (reportId: string) => Promise<void>;
   select: (id: string | null) => void;
   toggleSection: (id: SectionId) => void;
-  generate: () => void;
+  generate: () => Promise<void>;
   downloadPdf: () => Promise<void>;
   downloadHtml: () => void;
   downloadJson: () => void;
@@ -41,7 +48,7 @@ function saveBlob(blob: Blob, name: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function ReportProvider({ children, initial = {}, pdfBaseUrl }: { children: ReactNode; initial?: ReportInitial; pdfBaseUrl?: string }) {
+export function ReportProvider({ children, initial = {}, pdfBaseUrl, persistence }: { children: ReactNode; initial?: ReportInitial; pdfBaseUrl?: string; persistence?: PersistenceClient | null }) {
   const { project, historicalStatus } = useProject();
   const { session } = useAnalyst();
   const [generated, setGenerated] = useState<ReportView | null>(initial.generated ?? null);
@@ -49,20 +56,57 @@ export function ReportProvider({ children, initial = {}, pdfBaseUrl }: { childre
   const [pdf, setPdf] = useState<PdfStatus>(initial.pdf ?? { status: 'idle' });
   const [picked, setPicked] = useState<{ touched: boolean; id: string | null }>({ touched: initial.touched ?? false, id: initial.selectedAnalysisId ?? null });
   const [hideOptional, setHide] = useState<SectionId[]>(initial.hideOptional ?? []);
+  const store = useMemo(() => (persistence === undefined ? new PersistenceClient() : persistence), [persistence]);
+  const [savedAnalyses, setSavedAnalyses] = useState<SavedAnalysisSummary[]>(initial.saved?.analyses ?? []);
+  const [savedReports, setSavedReports] = useState<SavedReportSummary[]>(initial.saved?.reports ?? []);
+  const [persistNote, setPersistNote] = useState<string | null>(initial.saved?.note ?? null);
+  const [opening, setOpening] = useState(false);
+  const corpCode = project.selectedCompany?.corpCode ?? project.historicalProvenance?.corpCode ?? null;
+  const note = (reason: PersistFailure) => setPersistNote(PERSIST_NOTE[reason]);
+
+  // 새로고침 뒤에도 저장된 분석 · Report 를 불러온다 (저장소가 없으면 조용히 이 세션 메모리만 쓴다)
+  const reload = useCallback(async () => {
+    if (!store || !corpCode) return;
+    const [a, r] = await Promise.all([store.listAnalyses(corpCode), store.listReports(corpCode)]);
+    if (a.ok) setSavedAnalyses(a.value); else note(a.reason);
+    if (r.ok) setSavedReports(r.value);
+    if (a.ok && r.ok) setPersistNote(null);
+  }, [store, corpCode]);
+  useEffect(() => { void reload(); }, [reload]);
 
   const currentSnapshotId = useMemo(() => snapshotId(buildAiContext(project, { historicalStatus })), [project, historicalStatus]);
-  const choices = useMemo(() => analysisChoices(session.turns, currentSnapshotId), [session.turns, currentSnapshotId]);
+  const choices = useMemo(() => withSavedAnalyses(analysisChoices(session.turns, currentSnapshotId), savedAnalyses, currentSnapshotId), [session.turns, currentSnapshotId, savedAnalyses]);
   const selectedAnalysisId = picked.touched ? picked.id : defaultAnalysisId(choices);
 
-  const generate = useCallback(() => {
+  const generate = useCallback(async () => {
     const choice = choices.find((c) => c.id === selectedAnalysisId) ?? null;
-    const input = buildReportInput(project, { historicalStatus, aiAnalysis: choice?.analysis ?? null });   // 현재 Project 상태 그대로 (fixture 로 채우지 않는다)
+    let analysis = choice?.analysis ?? null;
+    if (choice && !analysis && store) {   // 저장된 분석은 선택해서 생성할 때 불러온다
+      const got = await store.getAnalysis(choice.id);
+      if (got.ok) analysis = got.value; else note(got.reason);
+    }
+    const input = buildReportInput(project, { historicalStatus, aiAnalysis: analysis });   // 현재 Project 상태 그대로 (fixture 로 채우지 않는다)
     const r = generateReport(input, { hideOptional });
     setPdf({ status: 'idle' });
     if (r.status === 'blocked') { setBlocked(r.validation); setGenerated(null); return; }
     setBlocked(null);
-    setGenerated({ result: r, analysisId: choice?.id ?? null, hideOptional: [...hideOptional], generatedAt: new Date().toISOString() });
-  }, [project, historicalStatus, choices, selectedAnalysisId, hideOptional]);
+    setGenerated({ result: r, analysisId: analysis ? choice?.id ?? null : null, hideOptional: [...hideOptional], generatedAt: new Date().toISOString() });
+    if (store) {   // 생성한 Report 의 snapshot 을 저장해 과거 Report 를 다시 열 수 있게 한다 (실패해도 Preview · Export 는 그대로)
+      const saved = await store.saveReport(r.model, `${valuationStandardV1.id}@${valuationStandardV1.version}`);
+      if (saved.ok) void reload(); else note(saved.reason);
+    }
+  }, [project, historicalStatus, choices, selectedAnalysisId, hideOptional, store, reload]);
+
+  const openSaved = useCallback(async (reportId: string) => {
+    if (!store) return;
+    setOpening(true);
+    const got = await store.getReport(reportId);
+    setOpening(false);
+    if (!got.ok) { note(got.reason); return; }
+    setBlocked(null);
+    setPdf({ status: 'idle' });
+    setGenerated({ result: reopenReport(got.value), analysisId: null, hideOptional: [], generatedAt: got.value.metadata.createdAt });   // 저장된 값 그대로 (Project 를 읽지 않는다)
+  }, [store]);
 
   const downloadPdf = useCallback(async () => {
     if (!generated) return;
@@ -85,8 +129,9 @@ export function ReportProvider({ children, initial = {}, pdfBaseUrl }: { childre
 
   const value = useMemo<Ctx>(() => ({
     generated, blocked, choices, selectedAnalysisId, hideOptional, currentSnapshotId, stale: isReportStale(generated?.result.model.metadata.snapshot.contextSnapshotId ?? null, currentSnapshotId), pdf,
+    savedReports, persistNote, opening, openSaved,
     select: (id) => setPicked({ touched: true, id }), toggleSection: (id) => setHide((h) => (h.includes(id) ? h.filter((x) => x !== id) : [...h, id])), generate, downloadPdf, downloadHtml, downloadJson,
-  }), [generated, blocked, choices, selectedAnalysisId, hideOptional, currentSnapshotId, pdf, generate, downloadPdf, downloadHtml, downloadJson]);
+  }), [generated, blocked, choices, selectedAnalysisId, hideOptional, currentSnapshotId, pdf, savedReports, persistNote, opening, openSaved, generate, downloadPdf, downloadHtml, downloadJson]);
   return <ReportCtx.Provider value={value}>{children}</ReportCtx.Provider>;
 }
 

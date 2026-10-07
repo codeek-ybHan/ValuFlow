@@ -4,6 +4,7 @@ import { askAnalyst, cancelledTurn, resolveMode, type Progress } from '../ai/ana
 import { activeTurn, addTurn, decideCheckpoint, emptySession, selectTurn, type AnalystSession } from '../ai/analyst/session.ts';
 import type { AnalystTurn, CheckpointDecision, ModePreference } from '../ai/analyst/view.ts';
 import { buildAiContext } from '../ai/context.ts';
+import { PersistenceClient } from '../data/persist/client.ts';
 import { useProject } from './project';
 
 // AI Analyst 의 대화 state. Project(valuation) state 와 분리되어 있고, 여기서 Project 를 바꾸는 함수는 하나도 쓰지 않는다 (읽기 전용).
@@ -21,12 +22,13 @@ interface Ctx {
 }
 const AnalystCtx = createContext<Ctx | null>(null);
 
-export function AnalystProvider({ children, client, initial }: { children: ReactNode; client?: AiGatewayClient; initial?: AnalystSession }) {
+export function AnalystProvider({ children, client, initial, persistence }: { children: ReactNode; client?: AiGatewayClient; initial?: AnalystSession; persistence?: PersistenceClient | null }) {
   const { project, historicalStatus } = useProject();
   const [session, setSession] = useState<AnalystSession>(initial ?? emptySession);
   const [running, setRunning] = useState<Progress | null>(null);
   const [preference, setPreference] = useState<ModePreference>('auto');
   const gateway = useMemo(() => client ?? new BackendAiClient(), [client]);
+  const store = useMemo(() => (persistence === undefined ? new PersistenceClient() : persistence), [persistence]);   // null 이면 저장하지 않는다 (테스트 · 화면 렌더링)
   const seq = useRef(0);                                  // 취소했거나 늦게 도착한 결과는 버린다
   const abort = useRef<{ aborted: boolean } | null>(null);
   const pending = useRef<{ question: string } | null>(null);
@@ -48,7 +50,11 @@ export function AnalystProvider({ children, client, initial }: { children: React
     pending.current = null;
     setRunning(null);
     setSession((s) => addTurn(s, turn));
-  }, [gateway, preference]);
+    if (turn.analysis && store) {   // 검증된 Deep Analysis 만 best-effort 로 저장한다 (실패해도 화면은 이 세션 메모리로 계속 동작)
+      const c = p.selectedCompany;
+      void store.saveAnalysis(turn.analysis, { corpCode: c?.corpCode ?? p.historicalProvenance?.corpCode ?? null, name: c?.corpName ?? p.historicalData?.company.name ?? null });
+    }
+  }, [gateway, preference, store]);
 
   const cancel = useCallback(() => {
     const q = pending.current?.question;

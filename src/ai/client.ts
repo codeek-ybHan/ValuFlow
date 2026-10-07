@@ -1,6 +1,7 @@
 // backend AI Gateway(FastAPI) 호출 client. LLM API Key 는 backend 에만 있고, 이 파일은 /api/ai 만 부른다.
 import type { AiAnalystAnswer } from './answer.ts';
 import type { ToolResult } from './tools/result.ts';
+import { apiFetch } from '../data/http.ts';
 
 export interface AiQueryRequest {
   question: string;
@@ -65,7 +66,7 @@ export class BackendAiClient implements AiGatewayClient {
   private readonly fetchFn: FetchFn;
   private readonly baseUrl: string;
   constructor(options: { fetch?: FetchFn; baseUrl?: string } = {}) {
-    this.fetchFn = options.fetch ?? ((input, init) => fetch(input, init));
+    this.fetchFn = options.fetch ?? ((input, init) => apiFetch(input, init));
     this.baseUrl = options.baseUrl ?? '';
   }
 

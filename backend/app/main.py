@@ -1,11 +1,12 @@
 """ValuFlow backend. React 는 이 서버만 호출하고, OpenDART 와 API Key 는 이 서버 안에만 있다."""
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import Body, FastAPI, File, Form, Query, Request, UploadFile
+from fastapi import Body, FastAPI, File, Form, Path, Query, Request, UploadFile
 from urllib.parse import quote
 from pydantic import BaseModel, Field
 from fastapi.exceptions import RequestValidationError
@@ -32,6 +33,9 @@ from app.external.errors import ProviderError
 from app.external.providers import provider_info
 from app.external.registry import build_external
 from app.secrets import install_redaction
+from app.security import access_state, install_security
+from app.services.snapshot_store import SnapshotError, SnapshotStore
+from sqlalchemy import text as sql_text
 from app.dart.filings import DartDisclosureSource, FilingsSource
 from app.rag.embeddings import EmbeddingProvider, OpenAiEmbeddings
 from app.rag.ingestion import DisclosureIngestionService
@@ -162,7 +166,9 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
     if ai is None and settings.has_ai:
         ai = AiGateway(OpenAiProvider(settings.openai_api_key, settings.openai_model, settings.openai_base_url),
                        derive_secret(settings.ai_state_secret, settings.openai_api_key), max_tool_calls=settings.ai_max_tool_calls, backend_tools=backend_tools, agent_max_tool_calls=settings.ai_agent_max_tool_calls)
-    app = FastAPI(title="ValuFlow Backend")
+    snapshots = SnapshotStore(store.session_factory, settings.secrets()) if store is not None else None
+    app = FastAPI(title="ValuFlow Backend", docs_url=None if settings.is_production else "/docs", redoc_url=None, openapi_url=None if settings.is_production else "/openapi.json")   # production 은 API 문서를 열지 않는다
+    install_security(app, settings)
 
     @app.exception_handler(DartApiError)
     async def _dart_error(_: Request, exc: DartApiError) -> JSONResponse:
@@ -180,17 +186,40 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
     async def _report_error(_: Request, exc: ReportError) -> JSONResponse:
         return JSONResponse({"error": {"code": exc.code, "message": exc.message}}, status_code=exc.status)
 
+    @app.exception_handler(SnapshotError)
+    async def _snapshot_error(_: Request, exc: SnapshotError) -> JSONResponse:
+        return JSONResponse({"error": {"code": exc.code, "message": exc.message}}, status_code=exc.status)
+
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_: Request, __: RequestValidationError) -> JSONResponse:
         return _error("invalid-request", ERROR_MESSAGES["invalid-request"])
 
     @app.exception_handler(Exception)
-    async def _unexpected(_: Request, __: Exception) -> JSONResponse:
+    async def _unexpected(request: Request, exc: Exception) -> JSONResponse:
+        logging.getLogger("valuflow.error").error("unhandled %s request_id=%s", type(exc).__name__, getattr(request.state, "request_id", "-"))   # 예외 종류만 남긴다 (본문 · traceback 에는 secret · 사용자 데이터가 섞일 수 있다)
         return _error("unknown", ERROR_MESSAGES["unknown"])  # 내부 오류 내용은 노출하지 않는다
+
+    def _db_status() -> str:
+        if store is None:
+            return "not-configured"
+        try:
+            with store.session_factory() as s:
+                s.execute(sql_text("SELECT 1"))
+            return "ok"
+        except Exception:  # noqa: BLE001
+            return "unavailable"   # 연결 오류 내용(주소 · 계정)은 노출하지 않는다
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
-        return {"status": "ok", "dartConfigured": settings.has_api_key, "databaseConfigured": historical.persistence_enabled, "aiConfigured": ai is not None, "disclosureSearchConfigured": retriever is not None, "knowledgeUploadConfigured": knowledge is not None, "rerankerConfigured": reranker is not None, "externalToolsConfigured": external is not None, "externalProviders": _provider_report(external), "appEnv": settings.app_env, "corpCodesFetchedAt": cache.fetched_at}
+        """운영 상태. 설정 여부(bool) · 상태 · 버전만 알려주고 credential 값 · 연결 문자열은 절대 싣지 않는다."""
+        db = _db_status()
+        from app.report.fonts import load_fonts
+        return {"status": "ok" if db != "unavailable" else "degraded", "version": settings.app_version, "appEnv": settings.app_env, "database": db,
+                "dartConfigured": settings.has_api_key, "databaseConfigured": historical.persistence_enabled, "aiConfigured": ai is not None,
+                "disclosureSearchConfigured": retriever is not None, "ragAvailable": retriever is not None, "knowledgeUploadConfigured": knowledge is not None,
+                "rerankerConfigured": reranker is not None, "persistenceAvailable": snapshots is not None and db == "ok",
+                "reportService": {"available": True, "font": load_fonts().kind}, "accessProtection": access_state(settings),
+                "externalToolsConfigured": external is not None, "externalProviders": _provider_report(external), "corpCodesFetchedAt": cache.fetched_at}
 
     @app.get("/api/companies")
     def companies(q: str = Query(..., max_length=100), limit: int = Query(20, ge=1, le=MAX_LIMIT)) -> dict[str, Any]:
@@ -338,6 +367,43 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
     def ai_regenerate(body: AiRegenerateRequest) -> dict[str, Any]:
         """Grounding 검증에 실패한 workflow 답변을 위반 목록과 허용 근거만으로 1회 교정 재생성한다 (Tool 결과 원문 전체는 보내지 않는다)."""
         return _require_ai().regenerate(body.question, body.answer, body.issues, body.evidence)
+
+    def _snapshots() -> SnapshotStore:
+        if snapshots is None:
+            raise SnapshotError("persistence-unavailable", "저장소(DATABASE_URL)가 설정되어 있지 않습니다.", 503)
+        return snapshots
+
+    @app.post("/api/analyses")
+    def save_analysis(body: dict[str, Any] = Body(...)) -> dict[str, Any]:
+        """검증된 AI 분석(claim · evidence 요약)을 저장한다. Tool 원문 · 문서 발췌는 저장하지 않는다."""
+        return _snapshots().save_analysis(body)
+
+    @app.get("/api/analyses")
+    def list_analyses(corpCode: str | None = Query(None, pattern=r"^\d{8}$"), limit: int = Query(20, ge=1, le=50)) -> dict[str, Any]:
+        return {"items": _snapshots().list_analyses(corpCode, limit)}
+
+    @app.get("/api/analyses/{analysis_id}")
+    def get_analysis(analysis_id: str = Path(..., pattern=r"^[A-Za-z0-9_.:-]{1,64}$")) -> dict[str, Any]:
+        found = _snapshots().get_analysis(analysis_id)
+        if found is None:
+            raise SnapshotError("not-found", "저장된 분석을 찾을 수 없습니다.", 404)
+        return found
+
+    @app.post("/api/report-snapshots")
+    def save_report_snapshot(body: dict[str, Any] = Body(...)) -> dict[str, Any]:
+        """생성한 Report 의 ReportModel snapshot 을 저장한다 (과거 Report 를 같은 값으로 다시 열 수 있다)."""
+        return _snapshots().save_report(body)
+
+    @app.get("/api/report-snapshots")
+    def list_report_snapshots(corpCode: str | None = Query(None, pattern=r"^\d{8}$"), limit: int = Query(20, ge=1, le=50)) -> dict[str, Any]:
+        return {"items": _snapshots().list_reports(corpCode, limit)}
+
+    @app.get("/api/report-snapshots/{report_id}")
+    def get_report_snapshot(report_id: str = Path(..., pattern=r"^[A-Za-z0-9_.:-]{1,64}$")) -> dict[str, Any]:
+        found = _snapshots().get_report(report_id)
+        if found is None:
+            raise SnapshotError("not-found", "저장된 Report 를 찾을 수 없습니다.", 404)
+        return found
 
     @app.post("/api/report/pdf")
     def report_pdf(request: Request, render_model: dict[str, Any] = Body(...)) -> Response:

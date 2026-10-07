@@ -11,13 +11,13 @@ import { restoreProjectState } from '../../store/projectModel.ts';
 import type { AnalystSession } from '../../ai/analyst/session';
 import type { PdfStatus } from './model.ts';
 
-export type HarnessOptions = { session?: AnalystSession; ai?: AiAnalysisInput | null; generated?: boolean; blocked?: boolean; pdf?: PdfStatus; selected?: string | null; touched?: boolean; hideOptional?: string[]; staleSnapshot?: boolean };
+export type HarnessOptions = { session?: AnalystSession; ai?: AiAnalysisInput | null; generated?: boolean; blocked?: boolean; pdf?: PdfStatus; selected?: string | null; touched?: boolean; hideOptional?: string[]; staleSnapshot?: boolean; saved?: ReportInitial['saved'] };
 
 export function renderReport(persistedProject: string | null, o: HarnessOptions = {}): string {
   const store = { getItem: () => persistedProject, setItem: () => undefined, removeItem: () => undefined };
   (globalThis as { localStorage?: unknown }).localStorage = store;
   try {
-    const initial: ReportInitial = { pdf: o.pdf, selectedAnalysisId: o.selected ?? null, touched: o.touched, hideOptional: (o.hideOptional ?? []) as never };
+    const initial: ReportInitial = { pdf: o.pdf, selectedAnalysisId: o.selected ?? null, touched: o.touched, saved: o.saved, hideOptional: (o.hideOptional ?? []) as never };
     if (o.generated || o.blocked) {
       const project = persistedProject ? restoreProjectState(JSON.parse(persistedProject)) : restoreProjectState({});
       const r = generateReport(buildReportInput(project, { aiAnalysis: o.ai ?? null, now: () => new Date('2026-10-08T01:02:03Z') }), { hideOptional: (o.hideOptional ?? []) as never });
@@ -27,7 +27,7 @@ export function renderReport(persistedProject: string | null, o: HarnessOptions 
       } else initial.blocked = r.validation;
     }
     return renderToStaticMarkup(
-      <MemoryRouter initialEntries={['/report']}><ProjectProvider><AnalystProvider initial={o.session}><ReportProvider initial={initial}><ReportPage /></ReportProvider></AnalystProvider></ProjectProvider></MemoryRouter>,
+      <MemoryRouter initialEntries={['/report']}><ProjectProvider><AnalystProvider initial={o.session} persistence={null}><ReportProvider initial={initial} persistence={null}><ReportPage /></ReportProvider></AnalystProvider></ProjectProvider></MemoryRouter>,
     );
   } finally { delete (globalThis as { localStorage?: unknown }).localStorage; }
 }

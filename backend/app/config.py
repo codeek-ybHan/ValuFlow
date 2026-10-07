@@ -65,10 +65,22 @@ class Settings:
     news_ttl: int = 900
     # 사용자 PDF 업로드
     max_upload_mb: int = 20
+    # 공개 배포 보호: 비용이 드는 · 쓰기 API(AI · 업로드 · 수집 · Report PDF · 저장)는 access token 이 있어야 한다.
+    # production 에서 ACCESS_TOKEN 이 없으면 그 API 들은 잠긴다(열어 두지 않는다). development 는 token 이 없으면 열려 있다.
+    access_token: str = field(default="", repr=False)
+    # production frontend origin (쉼표 구분). production 에서 비어 있으면 CORS 를 열지 않는다 (same-origin 만). development 는 localhost 를 허용한다.
+    cors_origins: tuple[str, ...] = ()
+    trust_proxy: bool = False            # True 면 X-Forwarded-For 첫 값을 client 로 본다 (신뢰하는 reverse proxy 뒤에서만)
+    rate_limit_disabled: bool = False
+    app_version: str = "1.0.0"
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env == "production"
 
     def secrets(self) -> list[str]:
         """로그에서 가릴 모든 credential 값 (DB URL 은 비밀번호를 포함한다)."""
-        return [v for v in (self.dart_api_key, self.openai_api_key, self.ai_state_secret, self.database_url, self.reranker_api_key, self.market_data_api_key, self.news_api_key) if v]
+        return [v for v in (self.dart_api_key, self.openai_api_key, self.ai_state_secret, self.database_url, self.reranker_api_key, self.market_data_api_key, self.news_api_key, self.access_token) if v]
 
     @property
     def has_api_key(self) -> bool:
@@ -89,7 +101,12 @@ def load_settings(env: dict[str, str] | None = None, dotenv_path: Path | None = 
     dotenv = _read_dotenv(dotenv_path or Path(__file__).resolve().parent.parent / ".env") if env is None else {}
     key = source.get("DART_API_KEY") or dotenv.get("DART_API_KEY", "")
     db_url = source.get("DATABASE_URL") or dotenv.get("DATABASE_URL", "")
+    app_env = (source.get("APP_ENV") or dotenv.get("APP_ENV", "") or "development").lower()
+    origins = tuple(o.strip().rstrip("/") for o in (source.get("CORS_ORIGINS") or dotenv.get("CORS_ORIGINS", "")).split(",") if o.strip())
     return Settings(
+        access_token=(source.get("ACCESS_TOKEN") or dotenv.get("ACCESS_TOKEN", "")).strip(), cors_origins=origins,
+        trust_proxy=(source.get("TRUST_PROXY") or "").lower() in ("1", "true", "yes"), rate_limit_disabled=(source.get("RATE_LIMIT_DISABLED") or "").lower() in ("1", "true", "yes"),
+        app_version=source.get("APP_VERSION") or "1.0.0",
         dart_api_key=key.strip(), dart_base_url=source.get("DART_BASE_URL") or DEFAULT_DART_BASE_URL,
         database_url=db_url.strip(),
         openai_api_key=(source.get("OPENAI_API_KEY") or dotenv.get("OPENAI_API_KEY", "")).strip(),
@@ -100,7 +117,7 @@ def load_settings(env: dict[str, str] | None = None, dotenv_path: Path | None = 
         ai_agent_max_tool_calls=int(source.get("AI_AGENT_MAX_TOOL_CALLS") or 10),
         embedding_model=source.get("OPENAI_EMBEDDING_MODEL") or dotenv.get("OPENAI_EMBEDDING_MODEL", "") or "text-embedding-3-small",
         retrieval_min_score=float(source.get("RETRIEVAL_MIN_SCORE") or 0.3),
-        reranker=(source.get("RERANKER") or dotenv.get("RERANKER", "") or "auto").lower(),
+        reranker=(source.get("RERANKER") or dotenv.get("RERANKER", "") or ("none" if app_env == "production" else "auto")).lower(),   # production 기본은 Hybrid(reranker 없음): 로컬 모델(~1.1GB)은 배포에 부적합하고 STEP 08 평가에서도 Hybrid 가 충분했다
         reranker_model=source.get("RERANKER_MODEL") or dotenv.get("RERANKER_MODEL", ""),
         reranker_api_key=(source.get("RERANKER_API_KEY") or source.get("COHERE_API_KEY") or dotenv.get("RERANKER_API_KEY", "") or dotenv.get("COHERE_API_KEY", "")).strip(),
         market_data_provider=(source.get("MARKET_DATA_PROVIDER") or dotenv.get("MARKET_DATA_PROVIDER", "") or "yahoo").lower(),
@@ -111,7 +128,7 @@ def load_settings(env: dict[str, str] | None = None, dotenv_path: Path | None = 
         rerank_min_score=float(source["RERANK_MIN_SCORE"]) if source.get("RERANK_MIN_SCORE") else None,
         reranker_cache_dir=source.get("RERANKER_CACHE_DIR") or dotenv.get("RERANKER_CACHE_DIR", ""),
         max_upload_mb=int(source.get("MAX_UPLOAD_MB") or 20),
-        app_env=(source.get("APP_ENV") or dotenv.get("APP_ENV", "") or "development").lower(),
+        app_env=app_env,
         external_data=(source.get("EXTERNAL_DATA") or dotenv.get("EXTERNAL_DATA", "") or "true").lower() not in ("0", "false", "no", "off"),
         market_ttl=int(source.get("MARKET_TTL_SECONDS") or 300), fundamentals_ttl=int(source.get("FUNDAMENTALS_TTL_SECONDS") or 86400),
         rate_ttl=int(source.get("RATE_TTL_SECONDS") or 86400), news_ttl=int(source.get("NEWS_TTL_SECONDS") or 900),

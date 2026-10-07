@@ -18,7 +18,7 @@ export function AnalysisPicker({ choices, selected, onSelect }: { choices: Analy
           <input type="radio" name="analysis" checked={selected === c.id} onChange={() => onSelect(c.id)} />
           <span>
             <strong>{c.question}</strong>
-            <small>{c.workflowLabel} · {fmtTime(c.askedAt)} · claim {c.supported}/{c.claims} supported</small>
+            <small>{c.workflowLabel} · {fmtTime(c.askedAt)} · claim {c.supported}/{c.claims} supported{c.source === 'saved' ? ' · 저장됨' : ''}</small>
             <small className={`rp-fresh rp-${c.freshness}`}>{c.freshness === 'current' ? 'Current project snapshot' : 'Stale: 이전 Project 상태 기준 — Report 서술에서 제외됩니다'}</small>
           </span>
         </label>

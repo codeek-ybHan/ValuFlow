@@ -1,5 +1,7 @@
 // STEP 08-7: 사용자 PDF(Knowledge Documents) 관리 repository. AI 폴더 밖의 데이터 계층에 둔다 (네트워크 호출은 data repository 와 ai/client.ts 에만 있다).
 // Knowledge Documents(사용자 PDF) 관리 client: 업로드 · 목록 · 삭제 · 재인덱싱. backend(/api/knowledge/documents)만 부른다.
+import { apiFetch } from '../http.ts';
+
 export type DocumentState = 'ready' | 'indexing' | 'failed' | 'already-exists';
 
 export interface KnowledgeDocument {
@@ -26,6 +28,10 @@ export class KnowledgeError extends Error {
 /** 오류 코드 → 사용자 문구 (원문 오류를 그대로 보이지 않는다). */
 export const KNOWLEDGE_ERROR_TEXT: Record<string, string> = {
   'backend-unreachable': 'ValuFlow 서버에 연결할 수 없습니다.',
+  'access-required': 'Access key 가 필요합니다. 상단의 Access key 에서 입력하세요.',
+  'access-not-configured': '이 서버는 업로드 기능이 잠겨 있습니다 (access key 미설정).',
+  'rate-limited': '요청이 너무 많습니다. 잠시 후 다시 시도하세요.',
+  'payload-too-large': '파일이 너무 큽니다.',
   'ai-not-configured': '문서 검색이 설정되어 있지 않습니다. 서버의 데이터베이스와 AI 서비스 설정이 필요합니다.',
   'empty-file': '빈 파일입니다.',
   'file-too-large': '파일이 너무 큽니다.',
@@ -58,7 +64,7 @@ export class KnowledgeClient {
   private readonly fetchFn: FetchFn;
   private readonly baseUrl: string;
   constructor(options: { fetch?: FetchFn; baseUrl?: string } = {}) {
-    this.fetchFn = options.fetch ?? ((input, init) => fetch(input, init as RequestInit));
+    this.fetchFn = options.fetch ?? ((input, init) => apiFetch(input, init));
     this.baseUrl = options.baseUrl ?? '';
   }
 

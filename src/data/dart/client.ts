@@ -34,6 +34,12 @@ function isRawAccount(v: unknown): v is DartRawAccount {
     && typeof a.fiscalYear === 'number' && (a.amount === null || (typeof a.amount === 'number' && Number.isFinite(a.amount))) && typeof a.raw === 'object' && a.raw !== null;
 }
 
+/** 배포 환경의 API 주소 (data/http.ts 와 같은 규칙. dart/ 는 상위 계층을 import 하지 않으므로 여기에 둔다). 공개 조회만 하므로 access key 는 보내지 않는다. */
+function deployedApiBase(): string {
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+  return (env?.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '');
+}
+
 const CODES: readonly DartErrorCode[] = ['invalid-key', 'no-data', 'rate-limit', 'dart-unavailable', 'invalid-request', 'unknown'];
 
 /** backend 를 호출하는 구현. fetch 와 baseUrl 은 테스트에서 바꿔 끼울 수 있다. */
@@ -42,7 +48,7 @@ export class BackendDartClient implements DartClient {
   private readonly baseUrl: string;
 
   constructor(options: { fetch?: FetchFn; baseUrl?: string } = {}) {
-    this.fetchFn = options.fetch ?? ((input, init) => fetch(input, init));
+    this.fetchFn = options.fetch ?? ((input, init) => fetch(`${deployedApiBase()}${input}`, init));
     this.baseUrl = options.baseUrl ?? '';
   }
 

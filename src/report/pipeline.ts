@@ -36,14 +36,12 @@ export type GenerateResult =
 
 export type GenerateOk = Extract<GenerateResult, { status: 'ok' }>;
 
-export function generateReport(input: ReportInput, options: GenerateOptions = {}): GenerateResult {
-  const clock = options.now ?? (() => performance.now());
-  const t0 = clock();
-  const built = buildReport(input, { reportId: options.reportId });
-  const t1 = clock();
-  if (built.status === 'blocked') return { status: 'blocked', validation: built.validation };
+/** Preview / Export 가 필요로 하는 부분. 저장된 snapshot 에서 다시 연 Report 는 입력(ReportInput)이 없다. */
+export type ViewableReport = Omit<GenerateOk, 'input'> & { input?: ReportInput };
+
+function assemble(model: ReportModel, validation: ReportValidation, options: GenerateOptions, clock: () => number, t0: number, t1: number): Omit<GenerateOk, 'input'> {
   const { template, ignored } = withHiddenOptionalSections(options.template ?? valuationStandardV1, options.hideOptional ?? []);
-  const document = buildReportDocument(built.model, template);
+  const document = buildReportDocument(model, template);
   const t2 = clock();
   const presentation = buildPresentation(document);
   const t3 = clock();
@@ -52,7 +50,24 @@ export function generateReport(input: ReportInput, options: GenerateOptions = {}
   const html = renderReportHtml(renderModel, { mode: 'fragment' });
   const t5 = clock();
   return {
-    status: 'ok', validation: built.validation, input, model: built.model, document, presentation, renderModel, html, bundle: buildBundle(built.model, document, presentation, renderModel), ignoredHide: ignored,
+    status: 'ok', validation, model, document, presentation, renderModel, html, bundle: buildBundle(model, document, presentation, renderModel), ignoredHide: ignored,
     timings: { buildModel: t1 - t0, document: t2 - t1, presentation: t3 - t2, renderModel: t4 - t3, html: t5 - t4, total: t5 - t0 },
   };
+}
+
+export function generateReport(input: ReportInput, options: GenerateOptions = {}): GenerateResult {
+  const clock = options.now ?? (() => performance.now());
+  const t0 = clock();
+  const built = buildReport(input, { reportId: options.reportId });
+  const t1 = clock();
+  if (built.status === 'blocked') return { status: 'blocked', validation: built.validation };
+  return { ...assemble(built.model, built.validation, options, clock, t0, t1), input };
+}
+
+/** 저장된 ReportModel 로 같은 Report 를 다시 만든다 (과거 Report 재현). 값은 저장된 model 그대로이고 Project 를 읽지 않는다. */
+export function reopenReport(model: ReportModel, options: GenerateOptions = {}): ViewableReport {
+  const clock = options.now ?? (() => performance.now());
+  const t0 = clock();
+  const v = model.appendix.validation;
+  return assemble(model, { ok: v.errors.length === 0, errors: v.errors, warnings: v.warnings }, options, clock, t0, t0);
 }

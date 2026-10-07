@@ -17,7 +17,7 @@ export function ReportPage() {
   return (
     <div className="rp-page">
       <PageHeader eyebrow="Report" title="Report"
-        actions={<button type="button" className="btn primary" onClick={r.generate}>{g ? 'Regenerate Report' : 'Generate Report'}</button>}>
+        actions={<button type="button" className="btn primary" onClick={() => void r.generate()}>{g ? 'Regenerate Report' : 'Generate Report'}</button>}>
         <p className="muted">현재 Project 상태의 snapshot 으로 Valuation Report 를 만듭니다. 숫자는 ValuFlow Engine · 분석 결과를 그대로 옮기고, AI 서술은 검증된 Grounded Claim 만 사용합니다. Report 를 만들어도 Project 가정 · 결과는 바뀌지 않습니다.</p>
       </PageHeader>
 
@@ -25,7 +25,7 @@ export function ReportPage() {
         <div className="rp-banner" role="status">
           <strong>Report preview is based on an older project snapshot.</strong>
           <span>생성 이후 Project 상태가 바뀌었습니다. Preview 와 Export 는 생성 당시의 snapshot({g?.result.model.metadata.snapshot.contextSnapshotId})입니다.</span>
-          <button type="button" className="btn small" onClick={r.generate}>Regenerate</button>
+          <button type="button" className="btn small" onClick={() => void r.generate()}>Regenerate</button>
         </div>
       ) : null}
 
@@ -38,6 +38,20 @@ export function ReportPage() {
           </section>
           <section className="ai-card"><AnalysisPicker choices={r.choices} selected={r.selectedAnalysisId} onSelect={r.select} /></section>
           <section className="ai-card"><SectionToggles hidden={r.hideOptional} onToggle={r.toggleSection} /></section>
+          <section className="ai-card" aria-label="Saved reports">
+            <div className="panel-head"><h4>Saved reports</h4></div>
+            {r.savedReports.length === 0 ? <p className="small muted">저장된 Report 가 없습니다. 생성한 Report 는 서버 저장소가 있으면 자동으로 저장됩니다.</p> : (
+              <ul className="plain-list rp-saved">
+                {r.savedReports.map((s) => (
+                  <li key={s.reportId}>
+                    <span><strong>{s.companyName ?? s.reportId}</strong><small className="muted"> {s.createdAt.slice(0, 16).replace('T', ' ')}</small></span>
+                    <button type="button" className="btn small" disabled={r.opening} onClick={() => void r.openSaved(s.reportId)}>열기</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {r.persistNote ? <p className="small muted" role="status">{r.persistNote}</p> : null}
+          </section>
         </aside>
 
         <section className="rp-center" aria-label="Preview">

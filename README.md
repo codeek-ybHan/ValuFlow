@@ -2,6 +2,72 @@
 
 *From Financial Statements to AI-powered Valuation.*
 
+OpenDART 재무제표에서 DCF 가치평가, 근거 있는 AI 분석, PDF 보고서까지 이어지는 **기업가치평가 업무지원 Workspace** 입니다.
+
+> **Demo:** _배포 URL 은 운영자가 배포한 뒤 여기에 기재합니다_ (배포 절차: [`docs/STEP10_production.md`](docs/STEP10_production.md)). 데모 데이터는 학습용 가정을 포함하며 **실제 투자 · 가치평가 보고서가 아닙니다.**
+
+## Problem
+
+기업가치평가는 반복적이고 근거 추적이 어렵습니다: 재무 수집 → 분석 → DCF/WACC → 근거 조사 → 보고서. 가정 하나가 결과를 크게 바꾸므로 계산은 재현 가능해야 하고, AI 가 개입할 때는 "어디서 나온 숫자인가"가 반드시 확인되어야 합니다.
+
+## Solution
+
+```text
+OpenDART → Financial Pipeline → PostgreSQL → Historical Analysis
+        → Valuation Engine (deterministic) → Validation (Sensitivity / Scenario / Relative)
+        → AI Tool Layer ─┬ RAG (공시 + 사용자 PDF, pgvector)
+                         ├ Market / Peer / News (provider 등급 표시)
+                         └ Engine 결과
+        → Agent Workflow → Grounded Analysis (Claim ↔ Evidence) → AI Analyst
+        → Report Automation → HTML / PDF
+```
+
+## Architecture
+
+```text
+Browser ── Vercel (React/Vite, 정적) ── HTTPS ──▶ FastAPI (컨테이너 호스트)
+                                                   ├─ OpenDART          (재무 · 공시, source of truth)
+                                                   ├─ OpenAI            (AI Analyst · embedding)
+                                                   ├─ RAG / pgvector    (Hybrid 검색)
+                                                   ├─ Report PDF        (reportlab + 한글 폰트)
+                                                   ├─ External providers (production 에서는 공식 provider 만)
+                                                   └─ PostgreSQL + pgvector (재무 · 공시 chunk · AI 분석 · Report snapshot)
+```
+Frontend 는 정적 번들이고 모든 secret 은 FastAPI 쪽 환경변수에만 있습니다. 왜 Vercel 단독이 아닌지는 [`docs/STEP10_production.md`](docs/STEP10_production.md) §2 에 있습니다.
+
+## Key Features
+
+- OpenDART 재무제표 정규화 (연결/별도, 단위, 미지원 구조 명시) 와 DB 영속화
+- **deterministic 가치평가 엔진**: Forecast · FCFF · WACC · DCF · Equity Bridge, Sensitivity / Scenario / Relative
+- 공시 + 사용자 PDF **RAG** (Hybrid: Vector + BM25 + 공시 동의어/표 가중치)
+- **Tool Calling · Agent Workflow** (업무별 계획, 예산, 사람 확인 지점)
+- **Claim-Evidence grounding**: 숫자 · 단위 · 출처 · 시점 검증, 실패 시 교정 재생성 1회 후 safe fallback
+- **Report 자동화**: Preview(HTML) / PDF(A4, 한글) / JSON snapshot — 같은 RenderModel, 숫자 재계산 없음
+- 검증된 AI 분석 · Report snapshot 의 서버 저장 (새로고침 · 재시작 후에도 열기)
+
+## Reliability
+
+- **Tool / Engine 책임 분리**: 계산은 엔진, 해석은 LLM. 단위 환산도 Tool 이 표시값을 제공 (모델은 100~1000배 단위 착오를 냈다)
+- **Provider 신뢰 등급**: 비공식(Yahoo · Google News)은 development 로 표시하고 `APP_ENV=production` 에서 차단. 기업 재무 Actual 은 항상 OpenDART/ValuFlow
+- **Human checkpoint**: 변경 제안은 사람이 판단, AI 가 Project 를 바꾸지 않음
+- **Grounding · Guardrail · Evaluation**: 고정 질문 40개 · Guardrail 17종 · Report QA(718개 검사) 를 `npm test` / 스크립트로 반복 실행
+- **공개 배포 보호**: access key · rate limit · 요청 크기 제한 · CORS 제한 · 오류/로그 정제
+
+## Evaluation (STEP 08, 이 환경 · 이 데이터셋에서의 관찰)
+
+질문 40개 · 실행 84회에서 required Tool Hit 100%, unsupported 숫자 claim · hallucinated source · 단위 오류 · WACC 의미 오류 · injection 성공 0, Guardrail 17/17, fallback 9.5%. RAG(OpenDART nDCG@5): Vector 0.38 → Hybrid 0.82 → +Reranker 0.79 (지연 225 → 263 → 1996ms). **질의 수가 적고 라벨이 충분히 검수되지 않은 소규모 평가이므로 일반 성능으로 해석하면 안 됩니다.** 자세히: [`docs/STEP08_summary.md`](docs/STEP08_summary.md), [`docs/STEP08-8_evaluation.md`](docs/STEP08-8_evaluation.md).
+
+## Limitations (숨기지 않는 한계)
+
+- **시장 · Peer · 뉴스 provider 는 production 에서 unavailable** 입니다. Current market reference provider is unavailable in production until an approved provider is configured. (개발 환경의 Yahoo/FRED/Google News 는 비공식 데모 fallback)
+- 무위험수익률의 한국 공식 출처(한국은행 ECOS)는 통계표 · 항목 코드와 이용 조건을 확인하지 못해 구현하지 않았습니다.
+- 인증은 **공유 demo access key** 뿐이고 사용자별 분리(multi-user isolation)가 없습니다. rate limit 은 서버 프로세스 메모리 기준입니다.
+- 학습용 fixture/가정 기반 Report 이며 실제 가치평가 의견이 아닙니다 (모든 출력에 고지).
+- Reranker 는 production 기본 off (로컬 모델 ~1.1GB, 지연 · 라이선스). Hybrid 로 동작합니다.
+- 큰 Report 의 비동기 생성, production observability(메트릭 · 알림), 더 큰 평가 데이터셋은 범위 밖입니다. 전체 목록: [`docs/STEP10_production.md`](docs/STEP10_production.md) §13.
+
+---
+
 재무제표에서 출발해 DCF 가치평가까지의 업무 흐름을 직접 학습하고, 그 로직을 계산 엔진·데이터 파이프라인·AI 분석으로 구현해 가는 **가치평가 업무지원 Workspace** 프로젝트입니다.
 
 ```text
@@ -16,6 +82,7 @@
 |---|---|
 | **PROJECT** | 실제 가치평가 업무 화면: Dashboard · Workspace · Valuation · Analysis · AI Analyst · Report |
 | **LEARN** | 가치평가 원리 학습: STEP 01~04 (Lesson · Quiz · Practice · Project Build · Reflection) |
+
 
 ## 실행
 

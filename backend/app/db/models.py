@@ -209,3 +209,34 @@ class DisclosureChunk(Base):
     char_count: Mapped[int] = mapped_column(Integer, nullable=False)
     embedding: Mapped[Any] = mapped_column(Vector(EMBEDDING_DIM), nullable=False)
     __table_args__ = (UniqueConstraint("document_id", "chunk_index", name="ux_chunk_doc_index"),)
+
+
+class AiAnalysisRun(Base):
+    """검증된 AI 분석(Deep Analysis) 결과. Report 에 쓸 claim · evidence 요약만 저장한다.
+    저장하지 않는 것: Tool 결과 원문(raw ToolResult) · 문서 본문/발췌 · credential. 새로고침 뒤에도 Report 에 포함할 분석을 고를 수 있게 하는 최소 영속화다."""
+    __tablename__ = "ai_analysis_runs"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)                 # client 의 analysisId (같은 id 를 다시 저장하면 갱신)
+    corp_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    company_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    context_snapshot_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    workflow_type: Mapped[str] = mapped_column(String(48), nullable=False)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    grounding_summary: Mapped[dict[str, Any]] = mapped_column(JsonType, nullable=False)   # claim 수 · supported · 근거 수 (목록 표시용)
+    payload: Mapped[dict[str, Any]] = mapped_column(JsonType, nullable=False)             # AiAnalysisInput (excerpt 제거)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    __table_args__ = (Index("ix_ai_analysis_corp", "corp_code", "created_at"),)
+
+
+class ReportSnapshot(Base):
+    """생성한 Report 의 ReportModel snapshot: 같은 snapshot 으로 Preview · PDF 를 다시 만들 수 있다 (과거 Report 재현)."""
+    __tablename__ = "report_snapshots"
+    report_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    corp_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    company_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    context_snapshot_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    schema_version: Mapped[str] = mapped_column(String(16), nullable=False)
+    template_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    input_hash: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    model: Mapped[dict[str, Any]] = mapped_column(JsonType, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    __table_args__ = (Index("ix_report_snapshot_corp", "corp_code", "created_at"),)

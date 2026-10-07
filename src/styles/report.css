@@ -28,3 +28,8 @@
 .rp-export .btn.block { margin-bottom: 8px; }
 @media (max-width: 1180px) { .rp-grid { grid-template-columns: 260px minmax(0, 1fr); } .rp-right { grid-column: 1 / -1; position: static; max-height: none; flex-direction: row; flex-wrap: wrap; } .rp-right > * { flex: 1 1 280px; } }
 @media (max-width: 860px) { .rp-grid { grid-template-columns: minmax(0, 1fr); } .rp-left { position: static; max-height: none; } .rp-paper { padding: 20px 16px; } }
+.rp-saved li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; font-size: 13px; }
+.access-key { position: relative; }
+.access-key .btn.on { border-color: var(--pos); }
+.access-pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: 280px; display: flex; flex-direction: column; gap: 8px; padding: 14px; }
+.access-pop input { width: 100%; }

@@ -230,12 +230,15 @@ def test_refresh_failure_keeps_existing_data(db_client, dbfake, store):
 def test_derived_results_are_not_stored(db_client, engine):
     body = get(db_client)
     assert not {"metrics", "trends", "forecastReference", "valuationResult", "sensitivityResult", "analysis"} & set(body)
-    names = {t for t in inspect(engine).get_table_names()} - {"alembic_version"}
+    all_names = {t for t in inspect(engine).get_table_names()} - {"alembic_version"}
+    snapshot_tables = {"ai_analysis_runs", "report_snapshots"}   # STEP 10: 검증된 AI 분석 · Report snapshot (재무 · 평가 결과 테이블이 아니다)
+    assert snapshot_tables <= all_names
+    names = all_names - snapshot_tables
     columns = {c["name"] for t in names for c in inspect(engine).get_columns(t)}
     forbidden = ("analysis", "forecast", "valuation", "sensitivity", "trend", "metric")
     assert not [n for n in names | columns if any(w in n for w in forbidden)], "분석 / 평가 결과 테이블 · 컬럼이 없다"
     assert names == {"companies", "financial_fetches", "raw_financial_accounts", "normalized_financials", "data_quality", "unsupported_results", "disclosure_documents", "disclosure_chunks"}
-    assert set(Base.metadata.tables) == names
+    assert set(Base.metadata.tables) == names | snapshot_tables
 
 
 # 16. transaction
