@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { step04PracticeAssumptions as a } from '../data/step04PracticeAssumptions.ts';
-import { calculateEbit, forecastRevenue } from './forecast.ts';
+import { calculateEbit, calculateFcff, calculateNopat, forecastRevenue } from './forecast.ts';
 import { ValuationError } from './models.ts';
 
 const close = (x: number, y: number, e = 1e-9) => assert.ok(Math.abs(x - y) < e, `${x} !≈ ${y}`);
@@ -42,4 +42,34 @@ test('잘못된 입력은 ValuationError', () => {
   assert.throws(() => forecastRevenue(1000, [-1]), ValuationError);
   assert.throws(() => calculateEbit([100, 200], [0.1]), ValuationError);
   assert.throws(() => calculateEbit([], []), ValuationError);
+});
+
+const ebit = () => calculateEbit(forecastRevenue(a.currentRevenue, a.revenueGrowth), a.operatingMargin);
+
+test('NOPAT = EBIT × (1 − 25%) = 170.1 / 180.306 / 187.51824', () => {
+  const nopat = calculateNopat(ebit(), a.taxRate);
+  close(nopat[0], 170.1);
+  close(nopat[1], 180.306);
+  close(nopat[2], 187.51824);
+});
+
+test('FCFF = NOPAT + D&A − CAPEX − ΔNWC = 135.1 / 144.306 / 150.51824', () => {
+  const fcff = calculateFcff(calculateNopat(ebit(), a.taxRate), a.depreciation, a.capex, a.deltaNwc);
+  close(fcff[0], 135.1);
+  close(fcff[1], 144.306);
+  close(fcff[2], 150.51824);
+});
+
+test('FCFF: CAPEX 와 ΔNWC 는 양수로 입력해 차감한다 (부호 중복 적용 없음)', () => {
+  const fcff = calculateFcff([100], [10], [30], [5]);
+  close(fcff[0], 75);
+});
+
+test('NOPAT / FCFF 입력 검증', () => {
+  assert.throws(() => calculateNopat([100], 1), ValuationError);
+  assert.throws(() => calculateNopat([100], -0.1), ValuationError);
+  assert.throws(() => calculateNopat([100], NaN), ValuationError);
+  assert.throws(() => calculateNopat([], 0.25), ValuationError);
+  assert.throws(() => calculateFcff([100, 100], [10], [10, 10], [1, 1]), ValuationError);
+  assert.throws(() => calculateFcff([100], [10], [10], [Infinity]), ValuationError);
 });

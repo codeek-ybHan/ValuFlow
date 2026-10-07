@@ -1,5 +1,5 @@
 // Forecast: 매출 → EBIT → NOPAT → FCFF.
-import { ValuationError, notImplemented } from './models.ts';
+import { ValuationError } from './models.ts';
 
 const finite = (n: number) => typeof n === 'number' && Number.isFinite(n);
 
@@ -34,12 +34,20 @@ export function calculateEbit(revenue: number[], operatingMargin: number[]): num
   return revenue.map((r, i) => r * operatingMargin[i]);
 }
 
-/** NOPAT = EBIT × (1 − 세율). [05-2 구현 예정] */
-export function calculateNopat(_ebit: number[], _taxRate: number): number[] {
-  return notImplemented('calculateNopat');
+/** NOPAT = EBIT × (1 − 세율). 세율은 0 이상 1 미만. */
+export function calculateNopat(ebit: number[], taxRate: number): number[] {
+  assertSeries('ebit', ebit);
+  if (!finite(taxRate) || taxRate < 0 || taxRate >= 1) throw new ValuationError('taxRate: 0 이상 1 미만의 소수여야 합니다 (25% → 0.25).');
+  return ebit.map((e) => e * (1 - taxRate));
 }
 
-/** FCFF = NOPAT + D&A − CAPEX − ΔNWC (D&A, CAPEX, ΔNWC 는 양수 입력). [05-2 구현 예정] */
-export function calculateFcff(_nopat: number[], _depreciation: number[], _capex: number[], _deltaNwc: number[]): number[] {
-  return notImplemented('calculateFcff');
+/** FCFF = NOPAT + D&A − CAPEX − ΔNWC (D&A, CAPEX, ΔNWC 는 양수 입력, 부호는 여기서 적용). 모든 배열의 길이는 같아야 한다. */
+export function calculateFcff(nopat: number[], depreciation: number[], capex: number[], deltaNwc: number[]): number[] {
+  assertSeries('nopat', nopat);
+  const others: [string, number[]][] = [['depreciation', depreciation], ['capex', capex], ['deltaNwc', deltaNwc]];
+  for (const [name, values] of others) {
+    assertSeries(name, values);
+    if (values.length !== nopat.length) throw new ValuationError(`${name}: 예측 기간(${nopat.length}년)과 길이가 다릅니다(${values.length}).`);
+  }
+  return nopat.map((n, i) => n + depreciation[i] - capex[i] - deltaNwc[i]);
 }

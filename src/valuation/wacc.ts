@@ -1,6 +1,6 @@
-// WACC: CAPM 자기자본비용, 세후 타인자본비용, 자본구조 가중치. [05-2 구현 예정]
+// WACC: CAPM 자기자본비용, 세후 타인자본비용, 자본구조 가중치.
 import type { ValuationInput } from './models.ts';
-import { notImplemented } from './models.ts';
+import { ValuationError } from './models.ts';
 
 export interface WaccResult {
   costOfEquity: number;
@@ -10,22 +10,41 @@ export interface WaccResult {
   wacc: number;
 }
 
+const finite = (n: number) => typeof n === 'number' && Number.isFinite(n);
+function assertFinite(name: string, n: number): void {
+  if (!finite(n)) throw new ValuationError(`${name}: 숫자가 아닙니다.`);
+}
+
 /** Re = Rf + β × MRP */
-export function calculateCostOfEquity(_riskFreeRate: number, _beta: number, _marketRiskPremium: number): number {
-  return notImplemented('calculateCostOfEquity');
+export function calculateCostOfEquity(riskFreeRate: number, beta: number, marketRiskPremium: number): number {
+  assertFinite('riskFreeRate', riskFreeRate);
+  assertFinite('beta', beta);
+  assertFinite('marketRiskPremium', marketRiskPremium);
+  return riskFreeRate + beta * marketRiskPremium;
 }
 
-/** Rd × (1 − T) */
-export function calculateAfterTaxCostOfDebt(_preTaxCostOfDebt: number, _taxRate: number): number {
-  return notImplemented('calculateAfterTaxCostOfDebt');
+/** Rd × (1 − T). 세율은 0 이상 1 미만. */
+export function calculateAfterTaxCostOfDebt(preTaxCostOfDebt: number, taxRate: number): number {
+  assertFinite('preTaxCostOfDebt', preTaxCostOfDebt);
+  if (!finite(taxRate) || taxRate < 0 || taxRate >= 1) throw new ValuationError('taxRate: 0 이상 1 미만의 소수여야 합니다 (25% → 0.25).');
+  return preTaxCostOfDebt * (1 - taxRate);
 }
 
-/** wE = E / (D + E), wD = D / (D + E) */
-export function calculateCapitalWeights(_equityMarketValue: number, _debtMarketValue: number): { equityWeight: number; debtWeight: number } {
-  return notImplemented('calculateCapitalWeights');
+/** wE = E / (D + E), wD = D / (D + E). E, D 는 0 이상이고 합이 0 보다 커야 한다. */
+export function calculateCapitalWeights(equityMarketValue: number, debtMarketValue: number): { equityWeight: number; debtWeight: number } {
+  assertFinite('equityMarketValue', equityMarketValue);
+  assertFinite('debtMarketValue', debtMarketValue);
+  if (equityMarketValue < 0 || debtMarketValue < 0) throw new ValuationError('equityMarketValue / debtMarketValue: 음수일 수 없습니다.');
+  const total = equityMarketValue + debtMarketValue;
+  if (total <= 0) throw new ValuationError('equityMarketValue + debtMarketValue: 0 보다 커야 합니다.');
+  return { equityWeight: equityMarketValue / total, debtWeight: debtMarketValue / total };
 }
 
 /** WACC = wE × Re + wD × Rd × (1 − T) */
-export function calculateWacc(_input: ValuationInput): WaccResult {
-  return notImplemented('calculateWacc');
+export function calculateWacc(input: ValuationInput): WaccResult {
+  const costOfEquity = calculateCostOfEquity(input.riskFreeRate, input.beta, input.marketRiskPremium);
+  const afterTaxCostOfDebt = calculateAfterTaxCostOfDebt(input.preTaxCostOfDebt, input.taxRate);
+  const { equityWeight, debtWeight } = calculateCapitalWeights(input.equityMarketValue, input.debtMarketValue);
+  const wacc = equityWeight * costOfEquity + debtWeight * afterTaxCostOfDebt;
+  return { costOfEquity, afterTaxCostOfDebt, equityWeight, debtWeight, wacc };
 }
