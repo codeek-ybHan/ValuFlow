@@ -12,6 +12,7 @@
 import { runSensitivity, runValuation, ValuationError } from '../valuation/index.ts';
 import type { SensitivityResult, ValuationInput, ValuationResult } from '../valuation/index.ts';
 import type { HistoricalData } from '../data/types.ts';
+import type { ForecastInputs } from '../engine/forecastForm.ts';
 import { samsungHistoricalData } from '../data/samsungHistorical.ts';
 import { step04PracticeAssumptions } from '../data/step04PracticeAssumptions.ts';
 
@@ -51,6 +52,24 @@ function toMessage(e: unknown): string {
   return '계산 중 예기치 않은 오류가 발생했습니다.';
 }
 
+/**
+ * Forecast 입력 폼이 다루지 않는 가정(WACC · Terminal Growth · Net Debt · 주식 수)의 기본값.
+ * WACC / DCF 입력 화면(07-4 이후)이 생기기 전까지 사용하며, STEP 04 학습용 가상값이다.
+ * 이 값으로 Forecast 만 직접 입력해 계산하는 경우에도 UI 에 "학습용 기본값" 임을 밝혀야 한다.
+ */
+export const LEARNING_NON_FORECAST_DEFAULTS = {
+  riskFreeRate: step04PracticeAssumptions.riskFreeRate,
+  beta: step04PracticeAssumptions.beta,
+  marketRiskPremium: step04PracticeAssumptions.marketRiskPremium,
+  preTaxCostOfDebt: step04PracticeAssumptions.preTaxCostOfDebt,
+  equityMarketValue: step04PracticeAssumptions.equityMarketValue,
+  debtMarketValue: step04PracticeAssumptions.debtMarketValue,
+  terminalGrowth: step04PracticeAssumptions.terminalGrowth,
+  interestBearingDebt: step04PracticeAssumptions.interestBearingDebt,
+  cash: step04PracticeAssumptions.cash,
+  sharesOutstanding: step04PracticeAssumptions.sharesOutstanding,
+} satisfies Omit<ValuationInput, keyof ForecastInputs>;
+
 // ---- 상태 전이 (모두 새 상태를 반환하며 입력 상태를 변경하지 않는다) ----
 
 /** Historical Data 만 설정한다. 가정과 결과는 건드리지 않는다. */
@@ -66,6 +85,27 @@ export function withSamsungHistorical(state: ProjectState): ProjectState {
 /** 가정을 바꾸면 이전 결과는 더 이상 유효하지 않으므로 비운다 (stale 방지). */
 export function withAssumptions(state: ProjectState, valuationAssumptions: ValuationInput | null): ProjectState {
   return { ...state, valuationAssumptions, valuationResult: null, sensitivityResult: null, valuationError: null, sensitivityError: null };
+}
+
+/**
+ * Forecast 입력(매출·마진·세율·D&A·CAPEX·ΔNWC)을 가정에 반영한다. 나머지 가정은 기존 값을 유지하고,
+ * 가정이 아직 없으면 학습용 기본값으로 채운다. 이전 결과는 stale 이므로 비운다.
+ */
+export function withForecastInputs(state: ProjectState, forecast: ForecastInputs): ProjectState {
+  const base = state.valuationAssumptions ?? { ...LEARNING_NON_FORECAST_DEFAULTS, ...forecast };
+  return withAssumptions(state, { ...base, ...forecast });
+}
+
+/** 입력이 유효하지 않은 상태로 바뀌었을 때: 가정은 그대로 두고 어긋난(stale) 결과와 오류만 비운다. */
+export function withResultsCleared(state: ProjectState): ProjectState {
+  if (!state.valuationResult && !state.sensitivityResult && !state.valuationError && !state.sensitivityError) return state;
+  return { ...state, valuationResult: null, sensitivityResult: null, valuationError: null, sensitivityError: null };
+}
+
+/** WACC · Terminal Growth · Net Debt · 주식 수 입력이 아직 학습용 기본값 그대로인지 */
+export function usesLearningNonForecastInputs(a: ValuationInput | null): boolean {
+  if (!a) return false;
+  return (Object.keys(LEARNING_NON_FORECAST_DEFAULTS) as (keyof typeof LEARNING_NON_FORECAST_DEFAULTS)[]).every((k) => a[k] === LEARNING_NON_FORECAST_DEFAULTS[k]);
 }
 
 /** valuationAssumptions 로 runValuation 을 실행해 결과(또는 오류 메시지)를 저장한다. 가정이 없으면 변화 없음. */
@@ -120,7 +160,12 @@ export function restoreProjectState(raw: unknown): ProjectState {
   return withSensitivityRun(withValuationRun(base));
 }
 
-/** 현재 가정이 STEP 04 학습용 가정과 같은지 (같을 때만 "학습용 가정" 배지를 표시) */
+/**
+ * 현재 가정이 STEP 04 학습용 가정과 값이 모두 같은지 (같을 때만 "학습용 가정" 배지를 표시).
+ * 객체를 만든 순서(키 순서)와 무관하게 필드별 값으로 비교한다.
+ */
 export function isPracticeAssumptions(a: ValuationInput | null): boolean {
-  return a !== null && JSON.stringify(a) === JSON.stringify(step04PracticeAssumptions);
+  if (a === null) return false;
+  const keys = Object.keys(step04PracticeAssumptions) as (keyof ValuationInput)[];
+  return Object.keys(a).length === keys.length && keys.every((k) => JSON.stringify(a[k]) === JSON.stringify(step04PracticeAssumptions[k]));
 }

@@ -5,8 +5,10 @@ import { samsungHistoricalData } from '../data/samsungHistorical.ts';
 import {
   emptyProjectState, isPracticeAssumptions, restoreProjectState, toPersisted, withAssumptions, withHistoricalData,
   withPracticeAssumptions, withSamsungHistorical, withSensitivityRun, withValuationReset, withValuationRun,
+  withForecastInputs, withResultsCleared, usesLearningNonForecastInputs, LEARNING_NON_FORECAST_DEFAULTS,
   DEFAULT_TERMINAL_GROWTH_VALUES, DEFAULT_WACC_VALUES, type ProjectState,
 } from './projectModel.ts';
+import { forecastInputsToForm, parseForecastForm } from '../engine/forecastForm.ts';
 
 const approx = (x: number, y: number, e = 0.006) => assert.ok(Math.abs(x - y) < e, `${x} !≈ ${y}`);
 
@@ -146,4 +148,75 @@ test('isPracticeAssumptions: 값이 달라지면 학습용 배지 대상이 아�
   assert.equal(isPracticeAssumptions(null), false);
   assert.equal(isPracticeAssumptions(practice), true);
   assert.equal(isPracticeAssumptions({ ...practice, beta: 1.2 }), false);
+});
+
+// ---- STEP 07-3: Forecast 입력 반영 ----
+
+const forecastOf = (changes: Partial<typeof practice> = {}) => {
+  const r = parseForecastForm(forecastInputsToForm({ ...practice, ...changes }));
+  assert.ok(r.ok);
+  return r.value;
+};
+
+test('Forecast 입력 변경은 valuationAssumptions 의 forecast 필드만 갱신하고 나머지 가정은 유지한다', () => {
+  const s = withPracticeAssumptions(emptyProjectState);
+  const next = withForecastInputs(s, forecastOf({ revenueGrowth: [0.1, 0.06, 0.04] }));
+  assert.deepEqual(next.valuationAssumptions!.revenueGrowth, [0.1, 0.06, 0.04]);
+  assert.equal(next.valuationAssumptions!.beta, practice.beta);
+  assert.equal(next.valuationAssumptions!.terminalGrowth, practice.terminalGrowth);
+  assert.equal(next.valuationAssumptions!.cash, practice.cash);
+});
+
+test('stale 초기화: Forecast 입력이 바뀌면 이전 결과와 Sensitivity 가 지워진다', () => {
+  const calculated = withPracticeAssumptions(emptyProjectState);
+  assert.ok(calculated.valuationResult && calculated.sensitivityResult);
+  const changed = withForecastInputs(calculated, forecastOf({ taxRate: 0.22 }));
+  assert.equal(changed.valuationResult, null);
+  assert.equal(changed.sensitivityResult, null);
+  assert.equal(changed.valuationError, null);
+});
+
+test('입력이 유효하지 않은 상태: 가정은 유지하고 어긋난 결과만 비운다', () => {
+  const calculated = withPracticeAssumptions(emptyProjectState);
+  const cleared = withResultsCleared(calculated);
+  assert.equal(cleared.valuationResult, null);
+  assert.equal(cleared.sensitivityResult, null);
+  assert.deepEqual(cleared.valuationAssumptions, calculated.valuationAssumptions);
+  assert.equal(withResultsCleared(emptyProjectState), emptyProjectState);
+});
+
+test('가정이 없을 때 Forecast 를 직접 입력하면 학습용 기본값으로 나머지 가정을 채운다', () => {
+  const s = withForecastInputs(emptyProjectState, forecastOf({ currentRevenue: 3336059.38 }));
+  assert.equal(s.valuationAssumptions!.currentRevenue, 3336059.38);
+  assert.equal(s.valuationAssumptions!.beta, LEARNING_NON_FORECAST_DEFAULTS.beta);
+  assert.ok(usesLearningNonForecastInputs(s.valuationAssumptions));
+  assert.equal(usesLearningNonForecastInputs(null), false);
+  assert.equal(usesLearningNonForecastInputs({ ...practice, beta: 1.5 }), false);
+});
+
+test('Run Valuation: 폼 입력(학습용 fixture 값)으로 실행하면 STEP 04 기준 EV 가 나온다', () => {
+  const s = withForecastInputs(emptyProjectState, forecastOf());
+  assert.equal(s.valuationResult, null); // 입력만으로는 계산되지 않는다 (Run 버튼 방식)
+  const ran = withSensitivityRun(withValuationRun(s));
+  approx(ran.valuationResult!.enterpriseValue, 2345.56);
+  assert.ok(ran.sensitivityResult);
+  assert.ok(isPracticeAssumptions(ran.valuationAssumptions)); // 값이 같으므로 학습용 가정 배지 유지
+});
+
+test('Forecast 입력을 바꾼 가정은 학습용 가정이 아니다 (배지 해제)', () => {
+  const s = withForecastInputs(withPracticeAssumptions(emptyProjectState), forecastOf({ revenueGrowth: [0.09, 0.06, 0.04] }));
+  assert.equal(isPracticeAssumptions(s.valuationAssumptions), false);
+});
+
+test('Forecast 입력은 historicalData 를 건드리지 않는다', () => {
+  const s = withSamsungHistorical(emptyProjectState);
+  const next = withForecastInputs(s, forecastOf());
+  assert.equal(next.historicalData, s.historicalData);
+});
+
+test('isPracticeAssumptions 는 키 순서와 무관하게 값으로 비교한다', () => {
+  const reordered = Object.fromEntries(Object.entries(practice).reverse()) as typeof practice;
+  assert.equal(isPracticeAssumptions(reordered), true);
+  assert.equal(isPracticeAssumptions({ ...reordered, cash: 99 }), false);
+  assert.equal(isPracticeAssumptions({ ...practice, extra: 1 } as typeof practice), false);
 });

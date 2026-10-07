@@ -116,3 +116,24 @@
 .cta-panel h3 { margin-bottom: 4px; }
 .cta-panel p { margin: 0; max-width: 60ch; }
 @media (max-width: 960px) { .trend-grid { grid-template-columns: minmax(0, 1fr); } .cta-panel { flex-direction: column; align-items: stretch; } }
+
+/* ===== Forecast Stage ===== */
+.fc-base-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 24px; }
+.fc-years { min-height: 38px; display: flex; align-items: center; gap: 8px; font-weight: 650; }
+.fc-latest { gap: 12px; padding-top: 4px; }
+.fc-wrap { overflow-x: auto; }
+.fc-table { min-width: 860px; }
+.fc-table thead tr.fc-group th { text-align: center; }
+.fc-table thead tr th.num { text-align: right; }
+.fc-table thead th:first-child { text-align: left; min-width: 220px; }
+.fc-group-actual { background: var(--sunken); color: var(--muted); border-right: 1px solid var(--line-strong); }
+.fc-group-estimate { background: var(--accent); color: var(--accent-ink); }
+.fc-table th.fc-actual { background: var(--sunken); color: var(--muted); }
+.fc-table th.fc-estimate { background: var(--accent-soft); color: var(--ink); }
+.fc-table td.fc-actual { background: var(--surface-2); color: var(--muted); }
+.fc-table td.fc-actual:last-of-type, .fc-table th.fc-actual:last-of-type { border-right: 1px solid var(--line-strong); }
+.fc-input-cell { min-width: 118px; vertical-align: top; }
+.fc-hints { margin-top: 4px; }
+.fc-run { margin-top: 20px; }
+.fc-run h3 { margin-bottom: 2px; }
+@media (max-width: 960px) { .fc-base-grid { grid-template-columns: minmax(0, 1fr); } }

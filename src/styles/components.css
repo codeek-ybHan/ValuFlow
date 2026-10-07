@@ -243,3 +243,12 @@ input[type='radio'], input[type='checkbox'] { width: 16px; min-height: 0; height
 .valuation-panel .callout { margin-top: 4px; }
 .stage-title { margin: 0 0 6px; font-size: 20px; }
 @media (max-width: 960px) { .status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ===== Forecast 입력 ===== */
+.input-unit { position: relative; display: flex; align-items: center; }
+.input-unit input { padding-right: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+.input-unit span { position: absolute; right: 12px; font-size: 12.5px; color: var(--muted); pointer-events: none; }
+.input-unit.invalid input { border-color: var(--neg); background: var(--neg-soft); }
+.input-unit.invalid input:focus { box-shadow: 0 0 0 3px var(--neg-soft); }
+.field-error { margin-top: 4px; font-size: 12.5px; font-weight: 600; color: var(--neg); text-align: right; }
+.helper { display: block; margin-top: 3px; font-size: 12.5px; font-weight: 400; color: var(--muted); line-height: 1.5; }

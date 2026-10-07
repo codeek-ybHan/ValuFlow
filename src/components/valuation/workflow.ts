@@ -30,7 +30,7 @@ export const stages: WorkflowStage[] = [
     id: 'forecast', no: 2, label: 'Forecast',
     summary: '미래 가정을 입력하고 FCFF 를 추정합니다.',
     inputs: ['Revenue Growth (Y1–Y3)', 'Operating Margin (Y1–Y3)', 'D&A', 'CAPEX', 'ΔNWC', 'Tax Rate'],
-    outputs: ['Forecast Table (Revenue → EBIT → NOPAT → FCFF)'],
+    outputs: ['Forecast Table (Revenue → EBIT → NOPAT → FCFF) — 결과 표는 07-5 예정'],
     resultFields: ['revenue', 'ebit', 'nopat', 'fcff'],
   },
   {
