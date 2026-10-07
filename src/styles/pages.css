@@ -137,3 +137,15 @@
 .fc-run { margin-top: 20px; }
 .fc-run h3 { margin-bottom: 2px; }
 @media (max-width: 960px) { .fc-base-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ===== WACC Stage ===== */
+.wacc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.wacc-grid .panel { margin: 0; }
+.calc-box { margin: 8px 0 0; padding-top: 14px; border-top: 1px dashed var(--line-strong); }
+.calc-row { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; padding: 4px 0; align-items: baseline; }
+.calc-row dt { font-weight: 600; color: var(--ink-2); }
+.calc-row dd { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+.calc-row .helper { grid-column: 1 / -1; margin-top: 0; }
+.wacc-result { background: var(--accent-soft); border-color: var(--accent-line); }
+.wacc-value { font-size: 44px; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; margin: 6px 0 8px; }
+@media (max-width: 960px) { .wacc-grid { grid-template-columns: minmax(0, 1fr); } }

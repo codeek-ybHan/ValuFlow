@@ -6,6 +6,7 @@ import { ValuationControls } from '../components/valuation/ValuationControls';
 import { StageSlot } from '../components/valuation/StageSlot';
 import { HistoricalStage } from '../components/valuation/HistoricalStage';
 import { ForecastStage } from '../components/valuation/ForecastStage';
+import { WaccStage } from '../components/valuation/WaccStage';
 import { ResultStage } from '../components/valuation/ResultStage';
 import { DEFAULT_STAGE, stageIndex, stages, type StageId } from '../components/valuation/workflow';
 
@@ -23,7 +24,7 @@ export function Valuation() {
       <ValuationControls />
       <ValuationStepper current={id} />
       <h2 className="stage-title">{cur.no}. {cur.label}</h2>
-      {id === 'historical' ? <HistoricalStage /> : id === 'forecast' ? <ForecastStage /> : id === 'result' ? <ResultStage /> : <StageSlot stage={cur} calculated={!!project.valuationResult} />}
+      {id === 'historical' ? <HistoricalStage /> : id === 'forecast' ? <ForecastStage /> : id === 'wacc' ? <WaccStage /> : id === 'result' ? <ResultStage /> : <StageSlot stage={cur} calculated={!!project.valuationResult} />}
     </>
   );
 }

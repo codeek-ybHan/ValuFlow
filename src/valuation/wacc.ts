@@ -3,6 +3,12 @@ import type { ValuationInput } from './models.ts';
 import { ValuationError } from './models.ts';
 import { assertFinite, assertTaxRate } from './validate.ts';
 
+/** WACC 계산에 필요한 입력만 (ValuationInput 의 부분집합). 세율은 Forecast 입력을 재사용한다. */
+export type WaccInput = Pick<
+  ValuationInput,
+  'riskFreeRate' | 'beta' | 'marketRiskPremium' | 'preTaxCostOfDebt' | 'taxRate' | 'equityMarketValue' | 'debtMarketValue'
+>;
+
 export interface WaccResult {
   costOfEquity: number;
   afterTaxCostOfDebt: number;
@@ -37,7 +43,7 @@ export function calculateCapitalWeights(equityMarketValue: number, debtMarketVal
 }
 
 /** WACC = wE × Re + wD × Rd × (1 − T) */
-export function calculateWacc(input: ValuationInput): WaccResult {
+export function calculateWacc(input: WaccInput): WaccResult {
   const costOfEquity = calculateCostOfEquity(input.riskFreeRate, input.beta, input.marketRiskPremium);
   const afterTaxCostOfDebt = calculateAfterTaxCostOfDebt(input.preTaxCostOfDebt, input.taxRate);
   const { equityWeight, debtWeight } = calculateCapitalWeights(input.equityMarketValue, input.debtMarketValue);

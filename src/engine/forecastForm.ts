@@ -66,16 +66,22 @@ export function emptyForecastForm(years: number = FORECAST_YEARS): ForecastFormV
   return { currentRevenue: '', taxRate: '', revenueGrowth: blanks(), operatingMargin: blanks(), depreciation: blanks(), capex: blanks(), deltaNwc: blanks() };
 }
 
-export function forecastInputsToForm(a: ForecastInputs): ForecastFormValues {
+/** 일부만 채워진 가정(입력 도중)도 폼 문자열로 바꾼다. 없는 값은 '' 로 두며 기본값으로 채우지 않는다. */
+export function forecastDraftToForm(a: Partial<ForecastInputs> | null): ForecastFormValues {
+  const arr = (v: number[] | undefined, fmt: (n: number) => string) => (v && v.length > 0 ? v.map(fmt) : emptyForecastForm().revenueGrowth);
   return {
-    currentRevenue: amountText(a.currentRevenue),
-    taxRate: decimalToPercentText(a.taxRate),
-    revenueGrowth: a.revenueGrowth.map(decimalToPercentText),
-    operatingMargin: a.operatingMargin.map(decimalToPercentText),
-    depreciation: a.depreciation.map(amountText),
-    capex: a.capex.map(amountText),
-    deltaNwc: a.deltaNwc.map(amountText),
+    currentRevenue: a?.currentRevenue === undefined ? '' : amountText(a.currentRevenue),
+    taxRate: a?.taxRate === undefined ? '' : decimalToPercentText(a.taxRate),
+    revenueGrowth: arr(a?.revenueGrowth, decimalToPercentText),
+    operatingMargin: arr(a?.operatingMargin, decimalToPercentText),
+    depreciation: arr(a?.depreciation, amountText),
+    capex: arr(a?.capex, amountText),
+    deltaNwc: arr(a?.deltaNwc, amountText),
   };
+}
+
+export function forecastInputsToForm(a: ForecastInputs): ForecastFormValues {
+  return forecastDraftToForm(a);
 }
 
 export function extractForecastInputs(a: ForecastInputs): ForecastInputs {
@@ -90,8 +96,10 @@ export function extractForecastInputs(a: ForecastInputs): ForecastInputs {
   };
 }
 
-export function sameForecastInputs(a: ForecastInputs, b: ForecastInputs): boolean {
-  return JSON.stringify(extractForecastInputs(a)) === JSON.stringify(extractForecastInputs(b));
+/** 일부만 채워진 가정과 Forecast 입력의 forecast 필드가 같은지 (없는 값은 같지 않은 것으로 본다) */
+export function sameForecastInputs(a: Partial<ForecastInputs>, b: ForecastInputs): boolean {
+  const pick = (x: Partial<ForecastInputs>) => JSON.stringify([x.currentRevenue ?? null, x.revenueGrowth ?? null, x.operatingMargin ?? null, x.taxRate ?? null, x.depreciation ?? null, x.capex ?? null, x.deltaNwc ?? null]);
+  return pick(a) === pick(b);
 }
 
 /** drafts(편집 중인 문자열)를 기준 폼 위에 덮어 현재 폼 값을 만든다. */

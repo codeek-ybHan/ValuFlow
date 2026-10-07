@@ -25,6 +25,15 @@ sensitivity.cells[i][j].enterpriseValue; // waccValues[i] × terminalGrowthValue
 sensitivity.cells.flat().find((c) => c.isBaseCase); // Base Case 칸
 ```
 
+WACC 입력 화면의 Live Preview 처럼 Valuation 결과 없이 WACC 구성요소만 필요할 때는 공개된 WACC 함수를 씁니다
+(`calculateWacc`, `calculateCostOfEquity`, `calculateAfterTaxCostOfDebt`, `calculateCapitalWeights`, 타입 `WaccInput` / `WaccResult`).
+계산식을 UI 에서 다시 구현하지 않습니다.
+
+```ts
+import { calculateWacc } from '../valuation';
+const { wacc, costOfEquity } = calculateWacc({ riskFreeRate: 0.03, beta: 1.1, marketRiskPremium: 0.06, preTaxCostOfDebt: 0.05, taxRate: 0.25, equityMarketValue: 900, debtMarketValue: 300 });
+```
+
 잘못된 입력은 `ValuationError` 를 던집니다 (임의의 값으로 대체하지 않음).
 
 ```ts

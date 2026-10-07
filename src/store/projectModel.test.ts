@@ -5,10 +5,12 @@ import { samsungHistoricalData } from '../data/samsungHistorical.ts';
 import {
   emptyProjectState, isPracticeAssumptions, restoreProjectState, toPersisted, withAssumptions, withHistoricalData,
   withPracticeAssumptions, withSamsungHistorical, withSensitivityRun, withValuationReset, withValuationRun,
-  withForecastInputs, withResultsCleared, usesLearningNonForecastInputs, LEARNING_NON_FORECAST_DEFAULTS,
+  withForecastInputs, withResultsCleared, withWaccInputs,
   DEFAULT_TERMINAL_GROWTH_VALUES, DEFAULT_WACC_VALUES, type ProjectState,
 } from './projectModel.ts';
 import { forecastInputsToForm, parseForecastForm } from '../engine/forecastForm.ts';
+import { parseWaccForm, waccDraftToForm, computeWaccPreview, type WaccInputs } from '../engine/waccForm.ts';
+import { assumptionCompleteness, isCompleteAssumptions } from './assumptions.ts';
 
 const approx = (x: number, y: number, e = 0.006) => assert.ok(Math.abs(x - y) < e, `${x} !≈ ${y}`);
 
@@ -130,9 +132,15 @@ test('reload: 옛 저장 형식(가정 없음)이나 비정상 값도 안전하�
   const legacy = restoreProjectState({ historicalData: samsungHistoricalData, valuationAssumptions: null, valuationResult: null });
   assert.equal(legacy.valuationAssumptions, null);
   assert.equal(legacy.valuationResult, null);
+  // 연도별 배열 길이가 어긋난 저장값: 완성되지 않은 가정(Forecast INCOMPLETE)으로 취급되어 실행되지 않는다
   const broken = restoreProjectState({ valuationAssumptions: { ...practice, capex: [1] } });
   assert.equal(broken.valuationResult, null);
-  assert.ok(broken.valuationError);
+  assert.equal(assumptionCompleteness(broken.valuationAssumptions).forecast, 'INCOMPLETE');
+  assert.equal(withValuationRun(broken), broken);
+  // 엔진이 거부하는 값(WACC ≤ g)은 오류 메시지로 남는다
+  const bad = restoreProjectState({ valuationAssumptions: { ...practice, terminalGrowth: 0.09 } });
+  assert.equal(bad.valuationResult, null);
+  assert.ok(bad.valuationError);
 });
 
 test('상태 전이는 입력 상태를 변경하지 않는다', () => {
@@ -185,17 +193,42 @@ test('입력이 유효하지 않은 상태: 가정은 유지하고 어긋난 결
   assert.equal(withResultsCleared(emptyProjectState), emptyProjectState);
 });
 
-test('가정이 없을 때 Forecast 를 직접 입력하면 학습용 기본값으로 나머지 가정을 채운다', () => {
+test('fallback 제거: Forecast 만 입력하면 WACC / DCF 가정은 비어 있다 (숨겨진 학습용 값으로 채우지 않는다)', () => {
   const s = withForecastInputs(emptyProjectState, forecastOf({ currentRevenue: 3336059.38 }));
-  assert.equal(s.valuationAssumptions!.currentRevenue, 3336059.38);
-  assert.equal(s.valuationAssumptions!.beta, LEARNING_NON_FORECAST_DEFAULTS.beta);
-  assert.ok(usesLearningNonForecastInputs(s.valuationAssumptions));
-  assert.equal(usesLearningNonForecastInputs(null), false);
-  assert.equal(usesLearningNonForecastInputs({ ...practice, beta: 1.5 }), false);
+  const a = s.valuationAssumptions!;
+  assert.equal(a.currentRevenue, 3336059.38);
+  for (const k of ['riskFreeRate', 'beta', 'marketRiskPremium', 'preTaxCostOfDebt', 'equityMarketValue', 'debtMarketValue', 'terminalGrowth', 'interestBearingDebt', 'cash', 'sharesOutstanding'] as const) {
+    assert.equal(a[k], undefined, k);
+  }
+  const c = assumptionCompleteness(a);
+  assert.equal(c.forecast, 'READY');
+  assert.equal(c.wacc, 'INCOMPLETE');
+  assert.equal(c.dcf, 'INCOMPLETE');
+  assert.equal(c.complete, false);
+  assert.equal(isCompleteAssumptions(a), false);
 });
 
-test('Run Valuation: 폼 입력(학습용 fixture 값)으로 실행하면 STEP 04 기준 EV 가 나온다', () => {
+test('fallback 제거: 가정이 완성되지 않으면 Run Valuation / Sensitivity 는 실행되지 않는다', () => {
   const s = withForecastInputs(emptyProjectState, forecastOf());
+  assert.equal(withValuationRun(s), s);
+  assert.equal(withSensitivityRun(s), s);
+  const ran = withSensitivityRun(withValuationRun(s));
+  assert.equal(ran.valuationResult, null);
+  assert.equal(ran.sensitivityResult, null);
+});
+
+test('학습용 값은 [학습용 DCF 가정 적용] 을 명시적으로 눌렀을 때만 들어온다', () => {
+  const s = withPracticeAssumptions(emptyProjectState);
+  assert.equal(assumptionCompleteness(s.valuationAssumptions).complete, true);
+  assert.ok(s.valuationResult);
+  // Forecast / WACC 입력만으로는 DCF 가정이 채워지지 않는다
+  const manual = withWaccInputs(withForecastInputs(emptyProjectState, forecastOf()), waccOf());
+  assert.equal(assumptionCompleteness(manual.valuationAssumptions).dcf, 'INCOMPLETE');
+  assert.equal(withValuationRun(manual).valuationResult, null);
+});
+
+test('Run Valuation: 학습용 가정 위에서 Forecast 입력을 바꿔 실행하면 결과가 나온다', () => {
+  const s = withForecastInputs(withPracticeAssumptions(emptyProjectState), forecastOf());
   assert.equal(s.valuationResult, null); // 입력만으로는 계산되지 않는다 (Run 버튼 방식)
   const ran = withSensitivityRun(withValuationRun(s));
   approx(ran.valuationResult!.enterpriseValue, 2345.56);
@@ -208,6 +241,12 @@ test('Forecast 입력을 바꾼 가정은 학습용 가정이 아니다 (배지 
   assert.equal(isPracticeAssumptions(s.valuationAssumptions), false);
 });
 
+const waccOf = (changes: Partial<WaccInputs> = {}): WaccInputs => {
+  const r = parseWaccForm(waccDraftToForm({ ...practice, ...changes }));
+  assert.ok(r.ok);
+  return r.value;
+};
+
 test('Forecast 입력은 historicalData 를 건드리지 않는다', () => {
   const s = withSamsungHistorical(emptyProjectState);
   const next = withForecastInputs(s, forecastOf());
@@ -219,4 +258,67 @@ test('isPracticeAssumptions 는 키 순서와 무관하게 값으로 비교한�
   assert.equal(isPracticeAssumptions(reordered), true);
   assert.equal(isPracticeAssumptions({ ...reordered, cash: 99 }), false);
   assert.equal(isPracticeAssumptions({ ...practice, extra: 1 } as typeof practice), false);
+});
+
+// ---- STEP 07-4: WACC 입력 반영 ----
+
+test('WACC 입력 변경은 WACC 6개 필드만 수정하고 Forecast / DCF 가정은 그대로 둔다', () => {
+  const s = withPracticeAssumptions(emptyProjectState);
+  const next = withWaccInputs(s, waccOf({ beta: 1.3, equityMarketValue: 1000 }));
+  const a = next.valuationAssumptions!;
+  assert.equal(a.beta, 1.3);
+  assert.equal(a.equityMarketValue, 1000);
+  assert.equal(a.riskFreeRate, practice.riskFreeRate);
+  // 그 외는 변경 없음
+  for (const k of ['currentRevenue', 'revenueGrowth', 'operatingMargin', 'taxRate', 'depreciation', 'capex', 'deltaNwc', 'terminalGrowth', 'interestBearingDebt', 'cash', 'sharesOutstanding'] as const) {
+    assert.deepEqual(a[k], practice[k], k);
+  }
+});
+
+test('WACC 입력 변경 시 stale 결과(valuationResult / sensitivityResult)가 초기화된다', () => {
+  const calculated = withPracticeAssumptions(emptyProjectState);
+  assert.ok(calculated.valuationResult && calculated.sensitivityResult);
+  const changed = withWaccInputs(calculated, waccOf({ riskFreeRate: 0.035 }));
+  assert.equal(changed.valuationResult, null);
+  assert.equal(changed.sensitivityResult, null);
+  assert.equal(changed.valuationError, null);
+});
+
+test('WACC 입력은 가정이 없어도 반영되며 나머지 섹션은 INCOMPLETE 로 남는다', () => {
+  const s = withWaccInputs(emptyProjectState, waccOf());
+  const c = assumptionCompleteness(s.valuationAssumptions);
+  assert.equal(c.wacc, 'READY');
+  assert.equal(c.forecast, 'INCOMPLETE');
+  assert.equal(c.dcf, 'INCOMPLETE');
+});
+
+test('Forecast Tax Rate 재사용: WACC 입력은 taxRate 를 소유하지 않고, 세후 Kd 는 Forecast 의 세율을 따른다', () => {
+  const s = withPracticeAssumptions(emptyProjectState);
+  const afterWacc = withWaccInputs(s, waccOf());
+  assert.equal(afterWacc.valuationAssumptions!.taxRate, practice.taxRate); // WACC 반영이 taxRate 를 바꾸지 않는다
+  const form = waccDraftToForm(afterWacc.valuationAssumptions);
+  const at25 = computeWaccPreview(form, afterWacc.valuationAssumptions!.taxRate);
+  const changedTax = withForecastInputs(afterWacc, forecastOf({ taxRate: 0.3 }));
+  const at30 = computeWaccPreview(form, changedTax.valuationAssumptions!.taxRate);
+  approx(at25.afterTaxCostOfDebt! * 100, 3.75, 1e-9);
+  approx(at30.afterTaxCostOfDebt! * 100, 3.5, 1e-9);
+});
+
+test('WACC Preview 는 Run 후 엔진의 WACC 와 같다 (같은 계산식을 공개 API 로 재사용)', () => {
+  const ran = withPracticeAssumptions(emptyProjectState);
+  const a = ran.valuationAssumptions!;
+  const preview = computeWaccPreview(waccDraftToForm(a), a.taxRate);
+  assert.equal(preview.wacc, ran.valuationResult!.wacc);
+  assert.equal(preview.costOfEquity, ran.valuationResult!.costOfEquity);
+});
+
+test('reload: 일부만 채워진 가정도 복원되고(재계산 없음), 완성된 가정만 재계산된다', () => {
+  const partial = withForecastInputs(emptyProjectState, forecastOf());
+  const restoredPartial = restoreProjectState(JSON.parse(JSON.stringify(toPersisted(partial))));
+  assert.deepEqual(restoredPartial.valuationAssumptions, partial.valuationAssumptions);
+  assert.equal(restoredPartial.valuationResult, null);
+  assert.equal(restoredPartial.valuationError, null);
+  const full = withPracticeAssumptions(emptyProjectState);
+  const restoredFull = restoreProjectState(JSON.parse(JSON.stringify(toPersisted(full))));
+  assert.deepEqual(restoredFull.valuationResult, full.valuationResult);
 });

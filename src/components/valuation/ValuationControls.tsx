@@ -1,4 +1,6 @@
 import { isPracticeAssumptions } from '../../store/projectModel';
+import { assumptionCompleteness } from '../../store/assumptions';
+import { AssumptionCompleteness } from './AssumptionCompleteness';
 import { useProject } from '../../store/project';
 import { StatusBadge } from '../ui';
 
@@ -7,8 +9,10 @@ export function ValuationControls() {
   const { project, loadSamsung, applyPracticeAssumptions, runCurrentValuation, runCurrentSensitivity, resetValuation } = useProject();
   const { historicalData: h, valuationAssumptions: a, valuationResult, sensitivityResult, valuationError, sensitivityError } = project;
   const practice = isPracticeAssumptions(a);
+  const completeness = assumptionCompleteness(a);
 
-  const valuationStatus = valuationError ? 'ERROR' : valuationResult ? 'CALCULATED' : 'NOT RUN';
+  // 가정이 완성되지 않았으면 NOT READY, 완성되었지만 아직 실행 전이면 NOT RUN
+  const valuationStatus = valuationError ? 'ERROR' : valuationResult ? 'CALCULATED' : completeness.complete ? 'NOT RUN' : 'NOT READY';
   const sensitivityStatus = sensitivityError ? 'ERROR' : sensitivityResult ? 'CALCULATED' : 'NOT RUN';
   const run = () => { runCurrentValuation(); runCurrentSensitivity(); };
 
@@ -25,7 +29,7 @@ export function ValuationControls() {
       <div className="row action-row">
         <button className="btn" onClick={loadSamsung}>삼성전자 데이터 불러오기</button>
         <button className="btn primary" onClick={applyPracticeAssumptions}>학습용 DCF 가정 적용</button>
-        <button className="btn" onClick={run} disabled={!a}>Run Valuation</button>
+        <button className="btn" onClick={run} disabled={!completeness.complete} title={completeness.complete ? undefined : '모든 가정(Forecast · WACC · DCF)이 준비되어야 실행할 수 있습니다.'}>Run Valuation</button>
         <button className="btn" onClick={resetValuation} disabled={!a}>Valuation 초기화</button>
       </div>
 
@@ -34,10 +38,11 @@ export function ValuationControls() {
 
       <dl className="status-grid">
         <div><dt>Historical Data</dt><dd><StatusBadge label={h ? 'LOADED' : 'NOT LOADED'} /></dd></div>
-        <div><dt>Assumptions</dt><dd><StatusBadge label={a ? 'READY' : 'NOT CONFIGURED'} /></dd></div>
+        <div><dt>Assumptions</dt><dd><StatusBadge label={!a ? 'NOT CONFIGURED' : completeness.complete ? 'READY' : 'INCOMPLETE'} /></dd></div>
         <div><dt>Valuation</dt><dd><StatusBadge label={valuationStatus} /></dd></div>
         <div><dt>Sensitivity</dt><dd><StatusBadge label={sensitivityStatus} /></dd></div>
       </dl>
+      {a && <AssumptionCompleteness assumptions={a} />}
       {practice && <p className="hint">Historical data 는 공시 기반, Forecast assumptions 는 STEP 04 학습용 가상값입니다. 두 값을 합쳐 삼성전자의 가치평가 결과로 해석하지 마세요.</p>}
       {!practice && h && !a && <p className="hint">Historical data: 공시 기반 · Forecast assumptions: 사용자 입력 필요</p>}
     </section>

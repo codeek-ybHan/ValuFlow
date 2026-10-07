@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useProject } from '../../store/project';
-import { isPracticeAssumptions, usesLearningNonForecastInputs } from '../../store/projectModel';
+import { isPracticeAssumptions } from '../../store/projectModel';
+import { assumptionCompleteness } from '../../store/assumptions';
+import { AssumptionCompleteness } from './AssumptionCompleteness';
+import { useAssumptionForm } from './useAssumptionForm';
 import {
-  FORECAST_YEARS, buildForecastReference, emptyForecastForm, fieldKey, forecastInputsToForm, forecastLabels,
-  isBasedOnLatestActual, mergeDrafts, parseForecastForm, sameForecastInputs, amountText, type FieldKey, type ForecastArrayField, type ForecastInputs,
+  FORECAST_YEARS, buildForecastReference, fieldKey, forecastDraftToForm, forecastLabels,
+  isBasedOnLatestActual, mergeDrafts, parseForecastForm, sameForecastInputs, amountText, type FieldKey, type ForecastArrayField, type ForecastFormValues, type ForecastInputs,
 } from '../../engine/forecastForm';
 import { fmtNum, fmtPct } from '../ui';
 import { stages } from './workflow';
@@ -22,37 +25,16 @@ export function ForecastStage() {
   const ref = useMemo(() => buildForecastReference(h), [h]);
   const estimateLabels = useMemo(() => forecastLabels(ref?.periods ?? null, FORECAST_YEARS), [ref]);
 
-  // 편집 중인 문자열(drafts). 가정이 외부에서 바뀌면(학습용 가정 적용, 초기화 등) 지운다.
-  const [drafts, setDrafts] = useState<Record<FieldKey, string>>({});
-  const [touched, setTouched] = useState<Set<FieldKey>>(new Set());
-  const lastPushed = useRef<ForecastInputs | null>(null);
-  useEffect(() => {
-    const ours = a !== null && lastPushed.current !== null && sameForecastInputs(a, lastPushed.current);
-    if (!ours) {
-      setDrafts({});
-      setTouched(new Set());
-    }
-  }, [a]);
-
-  const base = useMemo(() => (a ? forecastInputsToForm(a) : emptyForecastForm()), [a]);
-  const values = useMemo(() => mergeDrafts(base, drafts), [base, drafts]);
-  const parsed = useMemo(() => parseForecastForm(values), [values]);
-  const errors = parsed.ok ? {} : parsed.errors;
+  const { values, parsed, errors, touched, edit, blur, shown } = useAssumptionForm<ForecastFormValues, ForecastInputs>({
+    assumptions: a,
+    toForm: forecastDraftToForm,
+    merge: mergeDrafts,
+    parse: parseForecastForm,
+    isOurs: sameForecastInputs,
+    push: setForecastInputs, // 반영하면 이전 결과는 비워진다
+    onInvalid: clearStaleResults, // 가정은 마지막 유효 값을 유지하고, 어긋난 결과만 비운다
+  });
   const missing = Object.keys(errors).length;
-
-  const edit = (key: FieldKey, text: string) => {
-    const nextDrafts = { ...drafts, [key]: text };
-    setDrafts(nextDrafts);
-    setTouched((t) => new Set(t).add(key));
-    const next = parseForecastForm(mergeDrafts(base, nextDrafts));
-    if (next.ok) {
-      lastPushed.current = next.value;
-      setForecastInputs(next.value); // 반영하면 이전 결과는 비워진다
-    } else {
-      clearStaleResults(); // 가정은 마지막 유효 값을 유지하고, 어긋난 결과만 비운다
-    }
-  };
-  const blur = (key: FieldKey) => setTouched((t) => new Set(t).add(key));
 
   const currentRevenueValue = parsed.ok ? parsed.value.currentRevenue : NaN;
   const basedOnLatest = ref !== null && isBasedOnLatestActual(currentRevenueValue, ref);
@@ -60,7 +42,7 @@ export function ForecastStage() {
 
   const run = () => { runCurrentValuation(); runCurrentSensitivity(); };
   const calculated = !!project.valuationResult && !project.valuationError;
-  const shown = (key: FieldKey) => (touched.has(key) ? errors[key] : undefined);
+  const runnable = assumptionCompleteness(a).complete && parsed.ok;
   const shownErrors = Object.entries(errors).filter(([k]) => touched.has(k));
 
   const cellInput = (field: ForecastArrayField, i: number, unit: '%' | '억원') => {
@@ -171,20 +153,18 @@ export function ForecastStage() {
           <ul className="plain-list small">{shownErrors.slice(0, 6).map(([k, m]) => <li key={k}>{fieldLabel(k, estimateLabels)}: {m}</li>)}</ul>
         </div>
       )}
-      {usesLearningNonForecastInputs(a) || !a ? (
-        <p className="hint">WACC · Terminal Growth · Net Debt · 주식 수는 07-4 이후 입력 화면이 생기기 전까지 STEP 04 <strong>학습용 기본값</strong>을 사용합니다.</p>
-      ) : null}
+      <AssumptionCompleteness assumptions={a} />
 
       {/* 실행 */}
       <section className="panel fc-run">
         <div className="row between">
           <div>
             <h3>Run Valuation</h3>
-            <p className="small muted">{parsed.ok ? '입력이 유효합니다. 실행하면 Valuation 과 Sensitivity 를 계산합니다.' : `입력이 완성되지 않았습니다 (${missing}개 항목 확인 필요).`}</p>
+            <p className="small muted">{!parsed.ok ? `Forecast 입력이 완성되지 않았습니다 (${missing}개 항목 확인 필요).` : runnable ? '모든 가정이 준비되었습니다. 실행하면 Valuation 과 Sensitivity 를 계산합니다.' : 'Forecast 입력은 유효하지만 WACC / DCF 가정이 아직 준비되지 않아 실행할 수 없습니다.'}</p>
           </div>
           <div className="row">
             {calculated && <span className="badge badge-calculated">CALCULATED</span>}
-            <button className="btn primary" onClick={run} disabled={!parsed.ok || !a}>Run Valuation</button>
+            <button className="btn primary" onClick={run} disabled={!runnable}>Run Valuation</button>
           </div>
         </div>
         {calculated && (
