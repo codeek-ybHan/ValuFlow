@@ -10,17 +10,26 @@ export interface Missing {
 
 export const missing = (reason: string): Missing => ({ status: 'missing', value: null, reason });
 
-export type SourceKind = 'actual' | 'assumption' | 'calculated';
+export type SourceKind = 'actual' | 'assumption' | 'calculated' | 'document';
+/** financial-data: 숫자 Tool(재무 데이터 · 가정 · 계산) · disclosure-document: 공시 문서 인용 */
+export type SourceType = 'financial-data' | 'disclosure-document';
 
 export interface SourceInfo {
-  /** actual: 공시 기반 실적 · assumption: 사용자 / 학습용 가정 · calculated: 엔진 계산 결과 */
+  /** actual: 공시 기반 실적 · assumption: 사용자 / 학습용 가정 · calculated: 엔진 계산 결과 · document: 공시 문서 인용 */
   kind: SourceKind;
+  type?: SourceType;
   /** database | opendart | fixture | user-input | learning-fixture | valuation-engine | historical-analysis */
   origin: string;
   basis: string | null;
   fetchedAt: string | null;
   persisted: boolean | null;
   note: string | null;
+  /** disclosure-document 출처: 어느 문서의 어느 부분인가 */
+  corpName?: string | null;
+  reportName?: string | null;
+  filingDate?: string | null;
+  section?: string | null;
+  receiptNo?: string | null;
 }
 
 export interface ToolWarning {

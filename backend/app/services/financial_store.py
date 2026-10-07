@@ -69,6 +69,10 @@ class FinancialStore:
     def __init__(self, session_factory: sessionmaker[Session]):
         self._sf = session_factory
 
+    @property
+    def session_factory(self) -> sessionmaker[Session]:
+        return self._sf
+
     # ---- 기업 ----
     @staticmethod
     def _upsert_company(session: Session, *, corp_code: str, corp_name: str, stock_code: str | None = None, corp_name_eng: str | None = None,

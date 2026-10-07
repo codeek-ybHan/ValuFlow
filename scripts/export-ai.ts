@@ -6,7 +6,7 @@ import { TOOL_CATALOG } from '../src/ai/tools/definitions.ts';
 import { TOOL_CALLING_INSTRUCTIONS, buildSystemInstruction, UNSUPPORTED_DISCLOSURE } from '../src/ai/policy.ts';
 
 export const aiCatalogJson = () => JSON.stringify({
-  tools: TOOL_CATALOG.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema, allowedWhenUnsupported: t.allowedWhenUnsupported })),
+  tools: TOOL_CATALOG.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema, allowedWhenUnsupported: t.allowedWhenUnsupported, execution: t.execution })),
   systemInstruction: `${buildSystemInstruction()}\n\n${TOOL_CALLING_INSTRUCTIONS}`,
   unsupportedDisclosure: UNSUPPORTED_DISCLOSURE,
 }, null, 1) + '\n';

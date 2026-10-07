@@ -9,7 +9,7 @@ export function historicalSource(ctx: AiValuationContext): SourceInfo {
   const p = ctx.historicalProvenance;
   const fixture = ctx.dataKinds.historical === 'fixture';
   return {
-    kind: 'actual', origin: p?.source ?? (fixture ? 'fixture' : 'unknown'), basis: ctx.historicalData?.company.basis ?? null,
+    kind: 'actual', type: 'financial-data', origin: p?.source ?? (fixture ? 'fixture' : 'unknown'), basis: ctx.historicalData?.company.basis ?? null,
     fetchedAt: p?.fetchedAt ?? null, persisted: p ? p.persisted : null,
     note: fixture ? '학습용 fixture 입니다. 실제 OpenDART 조회 결과가 아닙니다.' : null,
   };
@@ -18,13 +18,13 @@ export function historicalSource(ctx: AiValuationContext): SourceInfo {
 export function assumptionSource(ctx: AiValuationContext): SourceInfo {
   const learning = ctx.dataKinds.assumptions === 'learning';
   return {
-    kind: 'assumption', origin: learning ? 'learning-fixture' : 'user-input', basis: null, fetchedAt: null, persisted: null,
+    kind: 'assumption', type: 'financial-data', origin: learning ? 'learning-fixture' : 'user-input', basis: null, fetchedAt: null, persisted: null,
     note: learning ? 'STEP 04 학습용 가상값입니다. 이 기업에 대한 애널리스트 가정이 아닙니다.' : '사용자가 입력한 가정입니다 (Actual 이 아닙니다).',
   };
 }
 
 export function calculatedSource(ctx: AiValuationContext): SourceInfo {
-  return { kind: 'calculated', origin: 'valuation-engine', basis: null, fetchedAt: null, persisted: null, note: `입력 가정: ${ctx.dataKinds.assumptions === 'learning' ? '학습용 가정' : '사용자 입력'}` };
+  return { kind: 'calculated', type: 'financial-data', origin: 'valuation-engine', basis: null, fetchedAt: null, persisted: null, note: `입력 가정: ${ctx.dataKinds.assumptions === 'learning' ? '학습용 가정' : '사용자 입력'}` };
 }
 
 /** DataQuality 의 경고를 Tool 경고로 옮긴다. review 는 답변에 반드시 언급해야 하는 경고다. */

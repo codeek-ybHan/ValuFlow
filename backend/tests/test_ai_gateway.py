@@ -20,7 +20,8 @@ GOLDEN = Path(__file__).parent / "protocol" / "ai-protocol.json"
 ANSWER = {
     "mode": "explain", "summary": "영업이익률이 개선되었습니다.",
     "evidence": [{"label": "Operating Margin 2025", "value": "13.1%", "period": "2025A", "unit": "ratio", "tool": "getHistoricalAnalysis"}],
-    "warnings": ["D&A unavailable"], "sources": [{"kind": "actual", "origin": "database", "basis": "Consolidated", "fetchedAt": "2026-10-07T00:00:00+00:00"}],
+    "warnings": ["D&A unavailable"], "sources": [{"kind": "actual", "type": "financial-data", "origin": "database", "basis": "Consolidated", "fetchedAt": "2026-10-07T00:00:00+00:00",
+                 "corpName": None, "reportName": None, "filingDate": None, "section": None, "receiptNo": None}],
     "suggestedNextActions": ["Forecast 가정을 검토하세요."],
 }
 
@@ -327,7 +328,8 @@ def test_openai_provider_request_and_response_mapping():
 
 def test_catalog_and_schema_validator():
     cat = tool_map()
-    assert set(cat) == {"getCompanyOverview", "getHistoricalAnalysis", "getHistoricalQuality", "getMappingTrace", "getForecastAssumptions", "getValuationResult", "getSensitivityAnalysis", "getScenarioAnalysis", "getRelativeValuation"}
+    assert set(cat) == {"getCompanyOverview", "getHistoricalAnalysis", "getHistoricalQuality", "getMappingTrace", "getForecastAssumptions", "getValuationResult", "getSensitivityAnalysis", "getScenarioAnalysis", "getRelativeValuation", "searchDisclosures"}
+    assert [n for n, t in cat.items() if t["execution"] == "backend"] == ["searchDisclosures"]
     assert "calculation engine" in load_catalog()["systemInstruction"] and "Call one tool at a time" in load_catalog()["systemInstruction"]
     s = cat["getMappingTrace"]["inputSchema"]
     assert validate_value(s, {"field": "revenue", "fiscalYear": 2025}) is None

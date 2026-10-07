@@ -1,6 +1,6 @@
 // AI 답변 계약. 향후 LLM 답변은 이 구조를 따르고, auditAnswer 로 근거 · 경고 · 출처 누락을 점검한다.
 import type { AnswerMode } from './capabilities.ts';
-import type { SourceInfo, ToolResult } from './tools/result.ts';
+import type { SourceInfo, SourceType, ToolResult } from './tools/result.ts';
 import { UNSUPPORTED_DISCLOSURE } from './policy.ts';
 
 export interface AnswerEvidence {
@@ -13,18 +13,32 @@ export interface AnswerEvidence {
   tool: string;
 }
 
+/** 답변의 출처. 숫자 Tool 출처(financial-data)와 공시 문서 출처(disclosure-document)를 구분한다. */
+export interface AnswerSource {
+  kind: SourceInfo['kind'];
+  type?: SourceType;
+  origin: string;
+  basis: string | null;
+  fetchedAt: string | null;
+  corpName?: string | null;
+  reportName?: string | null;
+  filingDate?: string | null;
+  section?: string | null;
+  receiptNo?: string | null;
+}
+
 export interface AiAnalystAnswer {
   mode: AnswerMode;
   summary: string;
   evidence: AnswerEvidence[];
   /** 답변에 영향을 주는 DataQuality · 가정 · 지원 범위 경고 */
   warnings: string[];
-  sources: Pick<SourceInfo, 'kind' | 'origin' | 'basis' | 'fetchedAt'>[];
+  sources: AnswerSource[];
   suggestedNextActions: string[];
 }
 
 export interface AnswerViolation {
-  code: 'unknown-tool' | 'missing-warning' | 'missing-sources' | 'unsupported-not-disclosed' | 'empty-summary' | 'missing-value-fabricated' | 'unsupported-figures' | 'ungrounded-number';
+  code: 'unknown-tool' | 'missing-warning' | 'missing-sources' | 'unsupported-not-disclosed' | 'empty-summary' | 'missing-value-fabricated' | 'unsupported-figures' | 'ungrounded-number' | 'evidence-from-failed-tool';
   detail: string;
 }
 
@@ -41,10 +55,12 @@ function missingKeys(o: unknown, key = '', out: Set<string> = new Set()): Set<st
 }
 
 /** Tool 결과 안의 모든 숫자. */
-function collectNumbers(o: unknown, out: number[] = []): number[] {
+function collectNumbers(o: unknown, out: number[] = [], key = ''): number[] {
   if (typeof o === 'number' && Number.isFinite(o)) out.push(o);
-  else if (Array.isArray(o)) o.forEach((v) => collectNumbers(v, out));
-  else if (o && typeof o === 'object') Object.values(o).forEach((v) => collectNumbers(v, out));
+  // 공시 문서 발췌(text)에 적힌 숫자도 문서 근거로 인정한다 (문서 숫자가 Valuation 결과를 대체하는 것은 아니다)
+  else if (typeof o === 'string' && key === 'text') for (const m of o.matchAll(/\d[\d,]*(?:\.\d+)?/g)) { const n = Number(m[0].replace(/,/g, '')); if (Number.isFinite(n)) out.push(n); }
+  else if (Array.isArray(o)) o.forEach((v) => collectNumbers(v, out, key));
+  else if (o && typeof o === 'object') Object.entries(o).forEach(([k, v]) => collectNumbers(v, out, k));
   return out;
 }
 
@@ -82,6 +98,11 @@ export function auditAnswer(answer: AiAnalystAnswer, results: ToolResult<unknown
   // 값이 없는 항목에 숫자를 붙인 근거 (예: D&A 가 missing 인데 숫자를 제시)
   const missing = new Set<string>();
   for (const r of results) if (r.status === 'ok') missingKeys(r.data, '', missing);
+  // 결과가 없거나 실패한 Tool 을 근거로 인용하면 안 된다 (예: 공시 검색 결과가 없는데 "회사는 ~라고 설명했다")
+  for (const e of answer.evidence) {
+    const r = results.find((x) => x.tool === e.tool);
+    if (r && r.status !== 'ok') v.push({ code: 'evidence-from-failed-tool', detail: `evidence "${e.label}" cites ${e.tool}, which returned ${r.status}` });
+  }
   // 근거의 숫자는 Tool 결과의 숫자에서 와야 한다 (표시용 변환 · 반올림만 허용). 순수 숫자 값만 검사한다.
   const toolNumbers = results.filter((r) => r.status === 'ok').flatMap((r) => collectNumbers(r.status === 'ok' ? r.data : null));
   for (const e of answer.evidence) {
@@ -104,7 +125,15 @@ export interface GroundingOutcome {
   corrections: string[];
 }
 
-const sourceKey = (s: Pick<SourceInfo, 'kind' | 'origin' | 'basis' | 'fetchedAt'>) => `${s.kind}|${s.origin}|${s.basis ?? ''}|${s.fetchedAt ?? ''}`;
+/** Tool 출처를 답변 출처 형태로 옮긴다 (문서 출처의 필드는 그대로 보존). */
+export function toAnswerSource(s: SourceInfo): AnswerSource {
+  const out: AnswerSource = { kind: s.kind, origin: s.origin, basis: s.basis, fetchedAt: s.fetchedAt };
+  if (s.type) out.type = s.type;
+  for (const k of ['corpName', 'reportName', 'filingDate', 'section', 'receiptNo'] as const) if (s[k] !== undefined && s[k] !== null) out[k] = s[k];
+  return out;
+}
+
+const sourceKey = (s: AnswerSource) => `${s.kind}|${s.origin}|${s.basis ?? ''}|${s.fetchedAt ?? ''}|${s.receiptNo ?? ''}|${s.section ?? ''}`;
 
 /**
  * 모델 답변을 Tool 결과에 맞춰 보정한다 (위반은 그대로 기록한다).
@@ -122,11 +151,13 @@ export function enforceGrounding(answer: AiAnalystAnswer, results: ToolResult<un
   if (missingWarnings.length > 0) { fixed.warnings.push(...missingWarnings); corrections.push('warnings-restored'); }
 
   // 출처는 Tool provenance 기반이다: Tool 결과에 없는 출처(모델이 지어낸 라벨)는 제거한다
-  const allowed = new Set(results.flatMap((r) => r.sources).map(sourceKey));
-  const kept = fixed.sources.filter((s) => allowed.has(sourceKey(s)));
-  if (kept.length !== fixed.sources.length) { fixed.sources = kept; corrections.push('sources-filtered'); }
+  const toolSources = new Map(results.flatMap((r) => r.sources).map((s) => { const a = toAnswerSource(s); return [sourceKey(a), a] as const; }));
+  // 모델이 인용한 출처는 Tool 의 완전한 출처 정보(type · 문서 metadata 포함)로 바꿔 둔다
+  const kept = fixed.sources.filter((s) => toolSources.has(sourceKey(s))).map((s) => toolSources.get(sourceKey(s))!);
+  if (kept.length !== fixed.sources.length) corrections.push('sources-filtered');
+  fixed.sources = kept;
   const have = new Set(fixed.sources.map(sourceKey));
-  const added = results.flatMap((r) => r.sources).map((s) => ({ kind: s.kind, origin: s.origin, basis: s.basis, fetchedAt: s.fetchedAt })).filter((s) => !have.has(sourceKey(s)) && have.add(sourceKey(s)));
+  const added = results.flatMap((r) => r.sources).map(toAnswerSource).filter((s) => !have.has(sourceKey(s)) && have.add(sourceKey(s)));
   if (added.length > 0) { fixed.sources.push(...added); corrections.push('sources-merged'); }
 
   if (violations.some((v) => v.code === 'unsupported-not-disclosed' || v.code === 'unsupported-figures')) {
@@ -134,6 +165,12 @@ export function enforceGrounding(answer: AiAnalystAnswer, results: ToolResult<un
     fixed.evidence = [];
     if (!fixed.summary.includes(UNSUPPORTED_DISCLOSURE)) fixed.summary = `${UNSUPPORTED_DISCLOSURE} ${fixed.summary}`.trim();
     corrections.push('unsupported-disclosed');
+  }
+  const failedTool = violations.filter((v) => v.code === 'evidence-from-failed-tool');
+  if (failedTool.length > 0) {
+    const labels = new Set(failedTool.map((v) => /evidence "(.*)" cites/.exec(v.detail)?.[1]));
+    fixed.evidence = fixed.evidence.filter((e) => !labels.has(e.label));
+    corrections.push('failed-tool-evidence-removed');
   }
   const fab = violations.filter((v) => v.code === 'missing-value-fabricated');
   if (fab.length > 0) {

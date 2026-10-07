@@ -25,12 +25,18 @@ export function createAuditEvent(question: string, results: ToolResult<unknown>[
 
 export type AiFinalStatus = 'answered' | 'answered-with-corrections' | 'tool-limit' | 'error';
 
-/** API Key · Raw payload · Tool 결과 본문은 기록하지 않는다: Tool 이름, 출처 라벨, 경고 문구만 남긴다. */
+/** API Key · Raw payload · Tool 결과 본문 · 공시 chunk 본문 · embedding 은 기록하지 않는다: Tool 이름, 출처 라벨, 경고 문구, 문서 식별자만 남긴다. */
 export interface AiQueryAuditEvent extends AiAuditEvent {
   conversationId: string | null;
   classification: { mode: QuestionClassification['mode']; capabilities: string[]; matched: boolean; suggestedTools: string[] };
   toolsRequested: string[];
   toolsExecuted: { tool: string; status: string }[];
+  /** Tool 별 실행 위치 (frontend: deterministic ValuFlow Tool · backend: 공시 검색 등 외부 Retrieval Tool) */
+  toolRuntimes: { tool: string; runtime: string }[];
+  /** 공시 문서 출처: `접수번호 | section` (본문은 기록하지 않는다) */
+  documentSources: string[];
+  /** 검색된 공시 문서의 접수번호 */
+  retrievedDocumentIds: string[];
   finalStatus: AiFinalStatus;
   /** 모델 답변에서 감지한 가드레일 위반 코드 */
   violations: AnswerViolation['code'][];

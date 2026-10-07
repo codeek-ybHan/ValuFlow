@@ -246,7 +246,8 @@ test('Unsupported 기업: 분석 가능한 척하지 않고 Tool 호출을 제�
   assert.equal(overview.status, 'ok');
   assert.equal(data(overview).support.status, 'unsupported');
   assert.ok(overview.warnings.some((w) => w.level === 'review' && w.text.includes('not supported')));
-  for (const def of TOOL_CATALOG.filter((t) => t.name !== 'getCompanyOverview')) {
+  // frontend 에서 실행되는 Tool 은 모두 제한된다 (backend Tool 은 gateway 가 같은 규칙으로 막는다: backend 테스트)
+  for (const def of TOOL_CATALOG.filter((t) => t.name !== 'getCompanyOverview' && t.execution === 'frontend')) {
     const r = executeTool(def.name, ctx, def.name === 'getMappingTrace' ? { field: 'revenue' } : {});
     assert.equal(r.status, 'unsupported', def.name);
     assert.equal(r.status === 'unsupported' && r.message, 'This company is not supported by the current generic analysis model.');
@@ -330,7 +331,7 @@ test('모든 Tool 출력에 NaN / Infinity 가 없고 JSON 으로 그대로 직�
   ];
   for (const [label, s] of states) {
     const ctx = ctxOf(s);
-    for (const def of TOOL_CATALOG) {
+    for (const def of TOOL_CATALOG.filter((x) => x.execution === 'frontend')) {
       const r = executeTool(def.name, ctx, def.name === 'getMappingTrace' ? { field: 'revenue', fiscalYear: 2025 } : {});
       const bad: string[] = [];
       walkNumbers(r, `${label}.${def.name}`, bad);
@@ -345,7 +346,7 @@ test('context 생성과 Tool 실행은 원본 Project State 를 변경하지 않
   const s = withValuation(live());
   const snapshot = JSON.stringify(s);
   const ctx = ctxOf(s);
-  for (const def of TOOL_CATALOG) executeTool(def.name, ctx, def.name === 'getMappingTrace' ? { field: 'revenue' } : {});
+  for (const def of TOOL_CATALOG.filter((x) => x.execution === 'frontend')) executeTool(def.name, ctx, def.name === 'getMappingTrace' ? { field: 'revenue' } : {});
   assert.equal(JSON.stringify(s), snapshot);
   assert.notEqual(ctx.historicalData, s.historicalData, 'context 는 복사본이다');
   assert.ok(Object.isFrozen(ctx) && Object.isFrozen(ctx.historicalData) && Object.isFrozen(ctx.valuationResult));
@@ -357,15 +358,17 @@ test('context 생성과 Tool 실행은 원본 Project State 를 변경하지 않
 });
 
 // Tool catalog / 실행기
-test('Tool catalog: 9개 Tool 이 이름 · 설명 · 입력/출력 schema 를 갖고 모두 실행된다', () => {
-  assert.deepEqual([...TOOL_NAMES], ['getCompanyOverview', 'getHistoricalAnalysis', 'getHistoricalQuality', 'getMappingTrace', 'getForecastAssumptions', 'getValuationResult', 'getSensitivityAnalysis', 'getScenarioAnalysis', 'getRelativeValuation']);
-  assert.equal(new Set(TOOL_NAMES).size, 9);
+test('Tool catalog: 10개 Tool(frontend 9 + backend 1)이 이름 · 설명 · 입력/출력 schema 를 갖고, frontend Tool 은 모두 실행된다', () => {
+  assert.deepEqual([...TOOL_NAMES], ['getCompanyOverview', 'getHistoricalAnalysis', 'getHistoricalQuality', 'getMappingTrace', 'getForecastAssumptions', 'getValuationResult', 'getSensitivityAnalysis', 'getScenarioAnalysis', 'getRelativeValuation', 'searchDisclosures']);
+  assert.equal(new Set(TOOL_NAMES).size, 10);
+  assert.deepEqual(TOOL_CATALOG.filter((t) => t.execution === 'backend').map((t) => t.name), ['searchDisclosures']);
   const ctx = ctxOf(withValuation(live()));
   for (const t of TOOL_CATALOG) {
     assert.ok(t.description.length > 20 && t.inputSchema.type === 'object' && t.outputSchema.type === 'object', t.name);
     assert.ok(Object.keys(t.outputSchema.properties ?? {}).length > 0, `${t.name} outputSchema`);
-    const r = executeTool(t.name, ctx, t.name === 'getMappingTrace' ? { field: 'revenue' } : undefined);
-    assert.equal(r.status, 'ok', t.name);
+    const r = executeTool(t.name, ctx, t.name === 'getMappingTrace' ? { field: 'revenue' } : t.name === 'searchDisclosures' ? { query: '설비투자' } : undefined);
+    // backend Tool 은 frontend 에서 실행하지 않는다 (값을 만들지 않고 안내)
+    assert.equal(r.status, t.execution === 'backend' ? 'unavailable' : 'ok', t.name);
     assert.equal(r.tool, t.name);
   }
   assert.deepEqual(TOOL_CATALOG.filter((t) => t.allowedWhenUnsupported).map((t) => t.name), ['getCompanyOverview']);
@@ -383,7 +386,7 @@ test('Tool catalog: 9개 Tool 이 이름 · 설명 · 입력/출력 schema 를 �
 });
 
 test('Capability 정의와 규칙 기반 질문 분류', () => {
-  assert.deepEqual(CAPABILITIES.map((c) => c.id), ['historical', 'data-quality', 'forecast', 'valuation', 'sensitivity', 'scenario', 'relative']);
+  assert.deepEqual(CAPABILITIES.map((c) => c.id), ['historical', 'data-quality', 'forecast', 'valuation', 'sensitivity', 'scenario', 'relative', 'disclosure']);
   for (const c of CAPABILITIES) { assert.ok(c.exampleQuestions.length > 0 && c.never.length > 0); for (const t of c.tools) assert.ok(TOOL_NAMES.includes(t), t); }
   const cls = (q: string) => classifyQuestion(q);
   assert.deepEqual([cls('최근 매출 성장률은?').capabilities, cls('최근 매출 성장률은?').mode], [['historical'], 'explain']);

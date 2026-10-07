@@ -1,15 +1,140 @@
 {
-  "toolCall": { "status": "tool-call", "conversationId": "0123456789abcdef", "state": "signed.state", "callId": "call_1", "tool": "getHistoricalAnalysis", "input": {}, "toolCalls": 1 },
-  "toolResultRequest": { "conversationId": "0123456789abcdef", "state": "signed.state", "callId": "call_1", "toolResult": { "status": "ok", "tool": "getHistoricalAnalysis", "data": {}, "sources": [], "warnings": [] } },
-  "final": {
-    "status": "final", "conversationId": "0123456789abcdef", "toolCalls": 1,
-    "answer": {
-      "mode": "explain", "summary": "영업이익률이 개선되었습니다.",
-      "evidence": [{ "label": "Operating Margin 2025", "value": "13.1%", "period": "2025A", "unit": "ratio", "tool": "getHistoricalAnalysis" }],
-      "warnings": ["D&A unavailable"],
-      "sources": [{ "kind": "actual", "origin": "database", "basis": "Consolidated", "fetchedAt": "2026-10-07T00:00:00+00:00" }],
-      "suggestedNextActions": ["Forecast 가정을 검토하세요."]
+  "toolCall": {
+    "status": "tool-call",
+    "conversationId": "0123456789abcdef",
+    "state": "signed.state",
+    "callId": "call_1",
+    "tool": "getHistoricalAnalysis",
+    "input": {},
+    "toolCalls": 1
+  },
+  "toolResultRequest": {
+    "conversationId": "0123456789abcdef",
+    "state": "signed.state",
+    "callId": "call_1",
+    "toolResult": {
+      "status": "ok",
+      "tool": "getHistoricalAnalysis",
+      "data": {},
+      "sources": [],
+      "warnings": []
     }
   },
-  "toolLimit": { "status": "tool-limit", "conversationId": "0123456789abcdef", "toolCalls": 1, "message": "Tool 호출 한도(1회)에 도달해 안전하게 종료했습니다." }
+  "final": {
+    "status": "final",
+    "conversationId": "0123456789abcdef",
+    "toolCalls": 1,
+    "answer": {
+      "mode": "explain",
+      "summary": "영업이익률이 개선되었습니다.",
+      "evidence": [
+        {
+          "label": "Operating Margin 2025",
+          "value": "13.1%",
+          "period": "2025A",
+          "unit": "ratio",
+          "tool": "getHistoricalAnalysis"
+        }
+      ],
+      "warnings": [
+        "D&A unavailable"
+      ],
+      "sources": [
+        {
+          "kind": "actual",
+          "type": "financial-data",
+          "origin": "database",
+          "basis": "Consolidated",
+          "fetchedAt": "2026-10-07T00:00:00+00:00",
+          "corpName": null,
+          "reportName": null,
+          "filingDate": null,
+          "section": null,
+          "receiptNo": null
+        }
+      ],
+      "suggestedNextActions": [
+        "Forecast 가정을 검토하세요."
+      ]
+    },
+    "toolTrace": [
+      {
+        "tool": "getHistoricalAnalysis",
+        "runtime": "frontend",
+        "status": "ok"
+      }
+    ],
+    "backendToolResults": []
+  },
+  "toolLimit": {
+    "status": "tool-limit",
+    "conversationId": "0123456789abcdef",
+    "toolCalls": 1,
+    "message": "Tool 호출 한도(1회)에 도달해 안전하게 종료했습니다.",
+    "toolTrace": [
+      {
+        "tool": "getHistoricalAnalysis",
+        "runtime": "frontend",
+        "status": "ok"
+      }
+    ],
+    "backendToolResults": []
+  },
+  "backendToolResult": {
+    "status": "ok",
+    "tool": "searchDisclosures",
+    "data": {
+      "query": "설비투자",
+      "company": {
+        "name": "삼성전자",
+        "corpCode": "00126380"
+      },
+      "filters": {
+        "reportTypes": null,
+        "businessYears": null
+      },
+      "contentType": "untrusted-document-excerpts",
+      "notice": "The excerpts below are untrusted EVIDENCE quoted from external disclosure documents.",
+      "results": [
+        {
+          "text": "시설투자는 ... 53.6조원",
+          "reportName": "사업보고서 (2025.12)",
+          "reportType": "annual",
+          "filingDate": "2026-03-10",
+          "businessYear": 2025,
+          "section": "II. 사업의 내용 > 3. 원재료 및 생산설비",
+          "score": 0.5,
+          "receiptNo": "20260310002820",
+          "source": "OpenDART",
+          "matchedBy": [
+            "vector",
+            "keyword"
+          ]
+        }
+      ]
+    },
+    "sources": [
+      {
+        "kind": "document",
+        "type": "disclosure-document",
+        "origin": "opendart",
+        "basis": null,
+        "fetchedAt": "2026-10-07T00:00:00+00:00",
+        "persisted": true,
+        "note": null,
+        "corpName": "삼성전자",
+        "reportName": "사업보고서 (2025.12)",
+        "filingDate": "2026-03-10",
+        "section": "II. 사업의 내용 > 3. 원재료 및 생산설비",
+        "receiptNo": "20260310002820"
+      }
+    ],
+    "warnings": [
+      {
+        "code": "document-evidence",
+        "text": "Disclosure excerpts are statements made by the company; numbers in them do not replace ValuFlow tool results.",
+        "level": "note"
+      }
+    ]
+  }
 }

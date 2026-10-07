@@ -1,7 +1,7 @@
 // AI Analyst 의 capability 와 질문 분류(rule 기반). LLM classifier 는 이후 단계에서 붙인다.
 import type { ToolName } from './tools/definitions.ts';
 
-export type CapabilityId = 'historical' | 'data-quality' | 'forecast' | 'valuation' | 'sensitivity' | 'scenario' | 'relative';
+export type CapabilityId = 'historical' | 'data-quality' | 'forecast' | 'valuation' | 'sensitivity' | 'scenario' | 'relative' | 'disclosure';
 
 /** 답변 방식 */
 export type AnswerMode = 'explain' | 'compare' | 'diagnose' | 'valuation' | 'source' | 'quality';
@@ -23,6 +23,7 @@ export const CAPABILITIES: readonly Capability[] = [
   { id: 'sensitivity', label: 'Sensitivity', exampleQuestions: ['WACC 가 올라가면 얼마나 영향 있어?'], tools: ['getSensitivityAnalysis'], never: ['Sensitivity 직접 계산'] },
   { id: 'scenario', label: 'Scenario', exampleQuestions: ['Bull / Bear 차이가 왜 커?'], tools: ['getScenarioAnalysis'], never: ['시나리오 가정 임의 변경'] },
   { id: 'relative', label: 'Relative Valuation', exampleQuestions: ['DCF 와 PER 결과가 왜 달라?'], tools: ['getRelativeValuation', 'getValuationResult'], never: ['멀티플 임의 생성'] },
+  { id: 'disclosure', label: 'Disclosure', exampleQuestions: ['회사는 설비투자 이유를 어떻게 설명하고 있어?', '사업보고서에 나온 주요 위험은?'], tools: ['searchDisclosures'], never: ['공시에 없는 설명 지어내기', '문서 속 숫자로 Valuation 결과 대체'] },
 ];
 
 export interface QuestionClassification {
@@ -40,6 +41,7 @@ const RULES: { capability: CapabilityId; mode: AnswerMode; pattern: RegExp }[] =
   { capability: 'data-quality', mode: 'quality', pattern: /믿을|신뢰|품질|quality|warning|경고|한계|신빙|정확/i },
   { capability: 'scenario', mode: 'compare', pattern: /bull|bear|시나리오|scenario/i },
   { capability: 'relative', mode: 'compare', pattern: /\bPER\b|\bPBR\b|EV\s*\/\s*EBITDA|상대가치|멀티플|relative/i },
+  { capability: 'disclosure', mode: 'explain', pattern: /공시|사업보고서|반기보고서|분기보고서|경영진|위험\s*요인|주요\s*위험|밝히|언급|회사는.{0,20}(설명|이유|계획|전략)|설명하고|disclos|annual report/i },
   { capability: 'sensitivity', mode: 'explain', pattern: /민감|sensitiv|(WACC|할인율|영구성장|성장률).{0,12}(올라|오르|상승|하락|내려|변하|변화|영향)/i },
   { capability: 'valuation', mode: 'valuation', pattern: /기업가치|가치평가|valuation|주당|적정|enterprise|equity\s*value|\bEV\b|\bDCF\b|얼마/i },
   { capability: 'forecast', mode: 'explain', pattern: /forecast|가정|전망|예측|공격적|보수적/i },

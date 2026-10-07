@@ -21,6 +21,12 @@ from app.services.historical import HistoricalService
 from app.ai.errors import AiGatewayError, MESSAGES as AI_MESSAGES
 from app.ai.gateway import AiGateway
 from app.ai.provider import OpenAiProvider
+from app.ai.runtime import make_search_disclosures
+from app.dart.filings import DartDisclosureSource, FilingsSource
+from app.rag.embeddings import EmbeddingProvider, OpenAiEmbeddings
+from app.rag.ingestion import DisclosureIngestionService
+from app.rag.retrieval import DisclosureRetriever
+from app.rag.store import DisclosureStore
 from app.ai.state import derive_secret
 from app.dart.models import DartApiError, ERROR_MESSAGES, HTTP_STATUS, CompanyDetail, CorpRecord, FinancialAccount, FinancialsQuality
 
@@ -88,7 +94,8 @@ def _error(code: str, message: str) -> JSONResponse:
 
 
 def create_app(settings: Settings | None = None, dart: DartHttpClient | None = None, cache: CorpCodeCache | None = None, financials: FinancialsService | None = None,
-               store: FinancialStore | None = None, historical: HistoricalService | None = None, ai: AiGateway | None = None) -> FastAPI:
+               store: FinancialStore | None = None, historical: HistoricalService | None = None, ai: AiGateway | None = None,
+               embedder: EmbeddingProvider | None = None, disclosure_source: FilingsSource | None = None) -> FastAPI:
     settings = settings or load_settings()
     dart = dart or DartHttpClient(settings)
     cache = cache or CorpCodeCache(dart.fetch_corp_code_zip)
@@ -96,9 +103,18 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
     if store is None and settings.has_database:
         store = FinancialStore(make_session_factory(create_db_engine(settings)))  # connect 는 첫 사용 시점
     historical = historical or HistoricalService(financials, cache, store)
+    # 공시 Retrieval: DB(pgvector)와 embedding provider 가 모두 있을 때만 켜진다 (embedding 호출은 backend 에서만)
+    if embedder is None and settings.has_ai:
+        embedder = OpenAiEmbeddings(settings.openai_api_key, settings.embedding_model, settings.openai_base_url)
+    retriever = ingestion = disclosure_store = None
+    if store is not None and embedder is not None:
+        disclosure_store = DisclosureStore(store.session_factory)
+        retriever = DisclosureRetriever(store.session_factory, embedder, min_score=settings.retrieval_min_score)
+        ingestion = DisclosureIngestionService(disclosure_source or DartDisclosureSource(dart), embedder, disclosure_store)
+    backend_tools = {"searchDisclosures": make_search_disclosures(retriever)} if retriever is not None else {}
     if ai is None and settings.has_ai:
         ai = AiGateway(OpenAiProvider(settings.openai_api_key, settings.openai_model, settings.openai_base_url),
-                       derive_secret(settings.ai_state_secret, settings.openai_api_key), max_tool_calls=settings.ai_max_tool_calls)
+                       derive_secret(settings.ai_state_secret, settings.openai_api_key), max_tool_calls=settings.ai_max_tool_calls, backend_tools=backend_tools)
     app = FastAPI(title="ValuFlow Backend")
 
     @app.exception_handler(DartApiError)
@@ -119,7 +135,7 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
-        return {"status": "ok", "dartConfigured": settings.has_api_key, "databaseConfigured": historical.persistence_enabled, "aiConfigured": ai is not None, "corpCodesFetchedAt": cache.fetched_at}
+        return {"status": "ok", "dartConfigured": settings.has_api_key, "databaseConfigured": historical.persistence_enabled, "aiConfigured": ai is not None, "disclosureSearchConfigured": retriever is not None, "corpCodesFetchedAt": cache.fetched_at}
 
     @app.get("/api/companies")
     def companies(q: str = Query(..., max_length=100), limit: int = Query(20, ge=1, le=MAX_LIMIT)) -> dict[str, Any]:
@@ -182,6 +198,27 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
         if not CORP_CODE_PATTERN.match(corp_code):
             raise DartApiError("invalid-request", "corpCode 는 8자리 숫자여야 합니다.")
         return historical.renormalize(corp_code, _parse_years(years), basis)
+
+    @app.post("/api/companies/{corp_code}/disclosures/ingest")
+    def ingest_disclosures(
+        corp_code: str,
+        years: str | None = Query(None, max_length=60),
+        types: str = Query("annual", pattern="^(annual|half|quarterly)(,(annual|half|quarterly))*$"),
+        limit: int = Query(3, ge=1, le=10),
+        force: bool = False,
+    ) -> dict[str, Any]:
+        """공시 문서(사업보고서 우선)를 수집해 chunk · embedding 으로 저장한다. 같은 접수번호는 다시 ingestion 하지 않는다(force 제외)."""
+        if ingestion is None:
+            raise AiGatewayError("ai-not-configured", "공시 검색이 설정되어 있지 않습니다 (DATABASE_URL 과 OPENAI_API_KEY 가 필요합니다).", 503)
+        if not CORP_CODE_PATTERN.match(corp_code):
+            raise DartApiError("invalid-request", "corpCode 는 8자리 숫자여야 합니다.")
+        return ingestion.ingest(corp_code, types.split(","), _parse_years(years) if years else None, limit=limit, force=force).to_dict()
+
+    @app.get("/api/companies/{corp_code}/disclosures")
+    def list_disclosures(corp_code: str) -> dict[str, Any]:
+        if not CORP_CODE_PATTERN.match(corp_code):
+            raise DartApiError("invalid-request", "corpCode 는 8자리 숫자여야 합니다.")
+        return {"corpCode": corp_code, "items": disclosure_store.list_documents(corp_code) if disclosure_store is not None else []}
 
     @app.get("/api/companies/{corp_code}/fetches")
     def company_fetches(corp_code: str, limit: int = Query(20, ge=1, le=100)) -> dict[str, Any]:

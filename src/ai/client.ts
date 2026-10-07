@@ -19,8 +19,10 @@ export interface AiToolResultRequest {
 }
 
 export interface ToolCallResponse { status: 'tool-call'; conversationId: string; state: string; callId: string; tool: string; input: Record<string, unknown>; toolCalls: number }
-export interface FinalResponse { status: 'final'; conversationId: string; answer: AiAnalystAnswer; toolCalls: number }
-export interface ToolLimitResponse { status: 'tool-limit'; conversationId: string; toolCalls: number; message: string }
+/** gateway 가 이 질문에서 실행한 Tool 의 순서와 실행 위치 (frontend Tool 의 status 는 'requested', 결과는 frontend 가 안다). */
+export interface ToolTraceEntry { tool: string; runtime: 'frontend' | 'backend' | 'gateway'; status: string }
+export interface FinalResponse { status: 'final'; conversationId: string; answer: AiAnalystAnswer; toolCalls: number; toolTrace?: ToolTraceEntry[]; backendToolResults?: ToolResult<unknown>[] }
+export interface ToolLimitResponse { status: 'tool-limit'; conversationId: string; toolCalls: number; message: string; toolTrace?: ToolTraceEntry[]; backendToolResults?: ToolResult<unknown>[] }
 export type GatewayResponse = ToolCallResponse | FinalResponse | ToolLimitResponse;
 
 export interface AiGatewayClient {

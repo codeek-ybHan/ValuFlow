@@ -165,7 +165,7 @@ def pg_url():
 def engine(pg_url):
     e = create_engine(pg_url)
     with e.begin() as c:
-        c.execute(text("TRUNCATE TABLE unsupported_results, data_quality, normalized_financials, raw_financial_accounts, financial_fetches, companies RESTART IDENTITY CASCADE"))
+        c.execute(text("TRUNCATE TABLE disclosure_chunks, disclosure_documents, unsupported_results, data_quality, normalized_financials, raw_financial_accounts, financial_fetches, companies RESTART IDENTITY CASCADE"))
     yield e
     e.dispose()
 

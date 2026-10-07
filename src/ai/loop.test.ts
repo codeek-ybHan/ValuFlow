@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  AiClientError, BackendAiClient, MAX_CLIENT_ROUNDS, TOOL_NAMES, UNSUPPORTED_DISCLOSURE, auditAnswer, buildAiContext, enforceGrounding, executeTool, runAiQuery,
+  toAnswerSource, AiClientError, BackendAiClient, MAX_CLIENT_ROUNDS, TOOL_NAMES, UNSUPPORTED_DISCLOSURE, auditAnswer, buildAiContext, enforceGrounding, executeTool, runAiQuery,
   type AiAnalystAnswer, type AiGatewayClient, type AiQueryRequest, type AiToolResultRequest, type GatewayResponse, type ToolResult,
 } from './index.ts';
 import { emptyProjectState, withAssumptions, withHistoricalLoaded, withPracticeAssumptions, withRelativeInputs, withSelectedCompany, type ProjectState } from '../store/projectModel.ts';
@@ -96,7 +96,7 @@ test('Historical 질문: 모델이 Tool 값으로 답하고 출처(Tool provenan
   ]);
   const out = await runAiQuery({ question: '최근 영업이익률이 어떻게 변했어?', project: live(), client });
   assert.deepEqual(out.answer!.evidence.map((e) => e.value), ['2.5%', '10.9%', '13.1%']);
-  assert.deepEqual(out.answer!.sources, [{ kind: 'actual', origin: 'database', basis: 'Consolidated', fetchedAt: AT }]);
+  assert.deepEqual(out.answer!.sources, [{ kind: 'actual', type: 'financial-data', origin: 'database', basis: 'Consolidated', fetchedAt: AT }]);
   assert.deepEqual(out.audit.toolsRequested, ['getHistoricalAnalysis']);
   assert.deepEqual(out.audit.toolsExecuted, [{ tool: 'getHistoricalAnalysis', status: 'ok' }]);
   assert.deepEqual(out.audit.classification.capabilities, ['historical']);
@@ -261,7 +261,7 @@ test('audit event 에는 Tool 이름 · 출처 라벨 · 경고만 남고 Tool �
   const out = await runAiQuery({ question: '매출 출처는?', project: live(), client, now: () => new Date('2026-10-07T00:00:00Z') });
   const a = out.audit;
   assert.equal(a.timestamp, '2026-10-07T00:00:00.000Z');
-  assert.deepEqual(Object.keys(a).sort(), ['classification', 'conversationId', 'corrections', 'errorCode', 'finalStatus', 'question', 'sourceUsed', 'timestamp', 'toolUsed', 'toolsExecuted', 'toolsRequested', 'violations', 'warningsIncluded'].sort());
+  assert.deepEqual(Object.keys(a).sort(), ['classification', 'conversationId', 'corrections', 'documentSources', 'errorCode', 'finalStatus', 'question', 'retrievedDocumentIds', 'sourceUsed', 'timestamp', 'toolRuntimes', 'toolUsed', 'toolsExecuted', 'toolsRequested', 'violations', 'warningsIncluded'].sort());
   const json = JSON.stringify(a);
   for (const leak of ['ifrs-full_Revenue', '333605938', 'state1', 'sk-']) assert.ok(!json.includes(leak), leak);
 });
@@ -271,7 +271,7 @@ test('enforceGrounding: 모델의 해석은 바꾸지 않고 누락된 경고 ·
   const ctx = buildAiContext(withValuation(live('hyundai')));
   const results = [executeTool('getHistoricalAnalysis', ctx)];
   const review = [...new Set(results.flatMap((r) => r.warnings).filter((w) => w.level === 'review').map((w) => w.text))];
-  const answer: AiAnalystAnswer = { mode: 'explain', summary: '모델의 해석', evidence: [{ label: 'Operating Margin 2025', value: '6.2%', tool: 'getHistoricalAnalysis' }], warnings: [...review], sources: results[0].sources.map((s) => ({ kind: s.kind, origin: s.origin, basis: s.basis, fetchedAt: s.fetchedAt })), suggestedNextActions: ['검토'] };
+  const answer: AiAnalystAnswer = { mode: 'explain', summary: '모델의 해석', evidence: [{ label: 'Operating Margin 2025', value: '6.2%', tool: 'getHistoricalAnalysis' }], warnings: [...review], sources: results[0].sources.map(toAnswerSource), suggestedNextActions: ['검토'] };
   const g = enforceGrounding(answer, results);
   assert.deepEqual(g.answer, answer);
   assert.deepEqual([g.violations, g.corrections], [[], []]);
@@ -340,7 +340,7 @@ test('출처는 Tool provenance 기반: 모델이 지어낸 출처 라벨은 제
     summary: '요약', sources: [{ kind: 'actual', origin: 'functions.getCompanyOverview', basis: null, fetchedAt: null }, { kind: 'actual', origin: 'database', basis: 'Consolidated', fetchedAt: AT }],
   })]);
   const out = await runAiQuery({ question: '최근 영업이익률이 어떻게 변했어?', project: live(), client });
-  assert.deepEqual(out.answer!.sources, [{ kind: 'actual', origin: 'database', basis: 'Consolidated', fetchedAt: AT }]);
+  assert.deepEqual(out.answer!.sources, [{ kind: 'actual', type: 'financial-data', origin: 'database', basis: 'Consolidated', fetchedAt: AT }]);
   assert.ok(out.corrections.includes('sources-filtered'));
   // Tool 을 부르지 않았다면 sources 는 비어 있어야 한다
   const none = new MockGateway([() => done({ summary: '요약', sources: [{ kind: 'actual', origin: 'invented', basis: null, fetchedAt: null }] }, 0)]);

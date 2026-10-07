@@ -8,7 +8,7 @@ import { getForecastAssumptions, getRelativeValuation, getScenarioAnalysis, getS
 import type { ToolResult } from './result.ts';
 
 type Impl = (ctx: AiValuationContext, input?: never) => ToolResult<unknown>;
-const IMPLS: Record<ToolName, Impl> = {
+const IMPLS: Record<Exclude<ToolName, 'searchDisclosures'>, Impl> = {
   getCompanyOverview: getCompanyOverview as Impl,
   getHistoricalAnalysis: getHistoricalAnalysis as Impl,
   getHistoricalQuality: getHistoricalQuality as Impl,
@@ -53,6 +53,10 @@ export function validateToolInput(schema: JsonSchema, input: unknown): string | 
 export function executeTool(name: string, ctx: AiValuationContext, input?: unknown): ToolResult<unknown> {
   const def = getToolDefinition(name);
   if (!def) return { status: 'invalid-input', tool: name, reason: `Unknown tool: ${name}`, sources: [], warnings: [] };
+  if (def.execution === 'backend') {
+    // backend Tool 은 gateway 가 직접 실행한다. frontend 가 실행하려 하면 값을 만들지 않고 안내한다.
+    return { status: 'unavailable', tool: name, reason: 'This tool is executed by the backend gateway, not the frontend runtime.', sources: [], warnings: [] };
+  }
   const err = validateToolInput(def.inputSchema, input);
   if (err) return { status: 'invalid-input', tool: name, reason: err, sources: [], warnings: [] };
   if (ctx.support.status === 'unsupported' && !def.allowedWhenUnsupported) {
@@ -61,5 +65,5 @@ export function executeTool(name: string, ctx: AiValuationContext, input?: unkno
       warnings: [{ code: 'unsupported-company', text: ctx.support.message, level: 'review' }],
     };
   }
-  return (IMPLS[def.name] as (c: AiValuationContext, i?: unknown) => ToolResult<unknown>)(ctx, input ?? {});
+  return (IMPLS[def.name as Exclude<ToolName, 'searchDisclosures'>] as (c: AiValuationContext, i?: unknown) => ToolResult<unknown>)(ctx, input ?? {});
 }

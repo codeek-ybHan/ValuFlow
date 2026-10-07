@@ -60,6 +60,21 @@ LLM 호출은 backend 에서만 합니다 (`backend/.env` 의 `OPENAI_API_KEY`, 
 - 최종 답변은 JSON schema(structured output)를 따라야 하며, 어기면 `invalid-model-output` 입니다. frontend 는 `enforceGrounding` 으로 경고 · 출처 · 지원 불가 공개를 점검 · 보정하고 audit event 를 남깁니다.
 - 주의: 모델마다 Tool 호출 습관이 다릅니다. `gpt-4o-mini` 는 불필요한 Tool 을 반복 호출해 한도(5회)에 걸리는 경우가 있었고, `gpt-4.1-mini` 는 안정적이었습니다.
 
+### 공시 RAG (STEP 08-3)
+
+OpenDART 공시 문서(사업보고서 → 반기 → 분기)를 backend 에서 수집해 section 구조를 보존한 chunk 로 나누고, embedding(OpenAI `text-embedding-3-small`, backend 에서만 호출)과 함께 PostgreSQL **pgvector** 에 저장합니다. 질문에는 backend Tool `searchDisclosures` 가 Vector + Keyword 검색(hybrid, RRF)으로 답하고, 결과는 외부 문서의 *인용 데이터*로만 모델에 전달됩니다 (문서 속 지시문은 따르지 않음).
+
+```bash
+# 공시 수집 (DATABASE_URL · OPENAI_API_KEY · DART_API_KEY 필요, alembic upgrade head 로 pgvector 확장 생성)
+curl -X POST "http://127.0.0.1:8000/api/companies/00126380/disclosures/ingest?types=annual&limit=1"
+curl "http://127.0.0.1:8000/api/companies/00126380/disclosures"
+cd backend && .venv/bin/python -m scripts.eval_disclosure_retrieval 5     # 실제 문서 retrieval 평가
+```
+
+- Tool 실행 위치: 숫자 Tool(9개)은 frontend, `searchDisclosures` 는 backend(gateway 가 직접 실행, 호출 횟수 한도에 포함). 기업(corpCode)은 AI 가 지정할 수 없고 질문 context 의 기업으로 고정됩니다.
+- 같은 접수번호(receiptNo)는 다시 수집 · embedding 하지 않습니다 (`force=true` 로만 교체).
+- 숫자(과거 실적 · 가치평가)는 deterministic Tool 이 근거이고, 이유 · 맥락 · 위험은 공시 검색이 근거입니다. 문서 속 숫자가 Valuation 결과를 대체하지 않습니다.
+
 기업 검색과 재무제표 수집(`GET /api/companies/{corpCode}/financials?years=2023,2024,2025&basis=auto`)은 backend 가 켜져 있어야 동작합니다. 실제 응답의 계정명 조사는 `.venv/bin/python -m scripts.inspect_raw_accounts` 로 다시 실행할 수 있습니다 (dev 서버가 `/api` 를 8000 포트로 전달).
 
 ```bash

@@ -8,7 +8,7 @@ import { classifyQuestion } from './capabilities.ts';
 import { TOOL_NAMES } from './tools/definitions.ts';
 import { executeTool } from './tools/registry.ts';
 import type { ToolResult } from './tools/result.ts';
-import { AiClientError, type AiGatewayClient, type GatewayResponse } from './client.ts';
+import { AiClientError, type AiGatewayClient, type GatewayResponse, type ToolTraceEntry } from './client.ts';
 import { enforceGrounding, type AiAnalystAnswer, type AnswerViolation } from './answer.ts';
 import type { AiFinalStatus, AiQueryAuditEvent } from './audit.ts';
 import { buildMinimalContext } from './minimalContext.ts';
@@ -55,20 +55,29 @@ export async function runAiQuery(options: RunAiQueryOptions): Promise<AiQueryOut
   const executed: { tool: string; status: string }[] = [];
   const results: ToolResult<unknown>[] = [];
   let conversationId: string | null = null;
+  let trace: ToolTraceEntry[] | null = null;
 
   const finish = (status: AiFinalStatus, extra: Partial<AiQueryOutcome> & { violations?: AnswerViolation[]; corrections?: string[]; error?: { code: string; message: string } } = {}): AiQueryOutcome => {
     const answer = extra.answer ?? null;
     const warnings = answer ? answer.warnings : [...new Set(results.flatMap((r) => r.warnings).map((w) => w.text))];
+    // gateway 가 알려 준 실행 순서 · 위치 (backend Tool 포함). 없으면 frontend 가 실행한 Tool 만 있다.
+    const runtimes = trace ? trace.map((t) => ({ tool: t.tool, runtime: t.runtime })) : executed.map((e) => ({ tool: e.tool, runtime: 'frontend' }));
+    let fi = 0;
+    const toolsExecuted = trace ? trace.map((t) => ({ tool: t.tool, status: t.runtime === 'frontend' ? (executed[fi++]?.status ?? t.status) : t.status })) : executed.map((e) => ({ ...e }));
+    const docSources = results.flatMap((r) => r.sources).filter((s) => s.type === 'disclosure-document');
     const audit: AiQueryAuditEvent = {
       timestamp: now().toISOString(),
       question,
-      toolUsed: [...new Set(executed.map((e) => e.tool))],
+      toolUsed: [...new Set(toolsExecuted.map((e) => e.tool))],
       sourceUsed: [...new Set(results.flatMap((r) => r.sources).map((s) => `${s.kind}:${s.origin}${s.basis ? `:${s.basis}` : ''}`))],
       warningsIncluded: warnings,
       conversationId,
       classification: { mode: classification.mode, capabilities: [...classification.capabilities], matched: classification.matched, suggestedTools: [...classification.suggestedTools] },
-      toolsRequested: [...requested],
-      toolsExecuted: executed.map((e) => ({ ...e })),
+      toolsRequested: trace ? trace.map((t) => t.tool) : [...requested],
+      toolsExecuted,
+      toolRuntimes: runtimes,
+      documentSources: [...new Set(docSources.map((s) => `${s.receiptNo ?? ''} | ${s.section ?? ''}`))],
+      retrievedDocumentIds: [...new Set(docSources.map((s) => s.receiptNo).filter((x): x is string => !!x))],
       finalStatus: status,
       violations: (extra.violations ?? []).map((v) => v.code),
       corrections: extra.corrections ?? [],
@@ -84,8 +93,10 @@ export async function runAiQuery(options: RunAiQueryOptions): Promise<AiQueryOut
     });
     for (let round = 0; round < MAX_CLIENT_ROUNDS; round++) {
       conversationId = res.conversationId;
-      if (res.status === 'tool-limit') return finish('tool-limit', { message: res.message });
+      if (res.status === 'tool-limit') { trace = res.toolTrace ?? trace; results.push(...(res.backendToolResults ?? [])); return finish('tool-limit', { message: res.message }); }
       if (res.status === 'final') {
+        trace = res.toolTrace ?? trace;
+        results.push(...(res.backendToolResults ?? []));  // backend 가 실행한 Tool 결과(공시 검색 등)도 같은 grounding 대상이다
         const g = enforceGrounding(res.answer, results, { unsupported: ctx.support.status === 'unsupported' });
         return finish(g.corrections.length > 0 ? 'answered-with-corrections' : 'answered', { answer: g.answer, violations: g.violations, corrections: g.corrections });
       }

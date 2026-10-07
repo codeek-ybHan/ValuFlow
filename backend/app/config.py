@@ -39,6 +39,9 @@ class Settings:
     openai_base_url: str = "https://api.openai.com/v1"
     ai_state_secret: str = field(default="", repr=False)
     ai_max_tool_calls: int = 5
+    # 공시 Retrieval (embedding 도 backend 에서만 호출한다)
+    embedding_model: str = "text-embedding-3-small"
+    retrieval_min_score: float = 0.3
 
     @property
     def has_api_key(self) -> bool:
@@ -67,5 +70,7 @@ def load_settings(env: dict[str, str] | None = None, dotenv_path: Path | None = 
         openai_base_url=(source.get("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/"),
         ai_state_secret=(source.get("AI_STATE_SECRET") or dotenv.get("AI_STATE_SECRET", "")).strip(),
         ai_max_tool_calls=int(source.get("AI_MAX_TOOL_CALLS") or 5),
+        embedding_model=source.get("OPENAI_EMBEDDING_MODEL") or dotenv.get("OPENAI_EMBEDDING_MODEL", "") or "text-embedding-3-small",
+        retrieval_min_score=float(source.get("RETRIEVAL_MIN_SCORE") or 0.3),
         db_pool_size=int(source.get("DB_POOL_SIZE") or 2), db_max_overflow=int(source.get("DB_MAX_OVERFLOW") or 0), db_pool=(source.get("DB_POOL") or "queue").lower(),
     )

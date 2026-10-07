@@ -6,7 +6,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, BigInteger, Boolean, DateTime, Float, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func, text
+from datetime import date
+
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import JSON, BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -150,3 +153,45 @@ class UnsupportedResult(Base):
     detail: Mapped[dict] = mapped_column(JsonType, nullable=False)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     __table_args__ = (UniqueConstraint("company_id", "report_code", "basis_mode", "years_key", name="ux_unsupported_key"),)
+
+
+# ---- 공시 문서 Retrieval (STEP 08-3) ----
+EMBEDDING_DIM = 1536  # text-embedding-3-small. 다른 차원의 모델을 쓰려면 새 migration 이 필요하다.
+
+
+class DisclosureDocument(Base):
+    """수집된 공시 문서 한 건. receipt_no(접수번호)가 문서 버전의 식별자이며 재수집 시 중복 ingestion 을 막는 기준이다."""
+    __tablename__ = "disclosure_documents"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    receipt_no: Mapped[str] = mapped_column(String(14), unique=True, nullable=False)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), nullable=False)
+    corp_code: Mapped[str] = mapped_column(String(8), nullable=False)
+    corp_name: Mapped[str] = mapped_column(Text, nullable=False)
+    report_name: Mapped[str] = mapped_column(Text, nullable=False)
+    report_type: Mapped[str] = mapped_column(String(16), nullable=False)   # annual | half | quarterly | other
+    is_correction: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    filing_date: Mapped[date] = mapped_column(Date, nullable=False)
+    business_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source: Mapped[str] = mapped_column(String(32), nullable=False, server_default="OpenDART")
+    url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    section_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    chunk_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    char_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    embedding_model: Mapped[str] = mapped_column(String(64), nullable=False)
+    ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    __table_args__ = (Index("ix_disclosure_doc_lookup", "corp_code", "report_type", "business_year"),)
+
+
+class DisclosureChunk(Base):
+    """문서의 chunk. section 구조를 보존하고, embedding 은 pgvector 로 저장한다 (정확 검색: 회사 단위로 걸러 낸 뒤 비교)."""
+    __tablename__ = "disclosure_chunks"
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("disclosure_documents.id", ondelete="CASCADE"), nullable=False)
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    section: Mapped[str] = mapped_column(Text, nullable=False)
+    section_path: Mapped[list[str]] = mapped_column(JsonType, nullable=False)
+    kind: Mapped[str] = mapped_column(String(8), nullable=False, server_default="text")  # text | table
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    char_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    embedding: Mapped[Any] = mapped_column(Vector(EMBEDDING_DIM), nullable=False)
+    __table_args__ = (UniqueConstraint("document_id", "chunk_index", name="ux_chunk_doc_index"),)

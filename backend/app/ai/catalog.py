@@ -29,8 +29,14 @@ ANSWER_SCHEMA: dict[str, Any] = {
         "sources": {
             "type": "array",
             "items": {
-                "type": "object", "additionalProperties": False, "required": ["kind", "origin", "basis", "fetchedAt"],
-                "properties": {"kind": {"type": "string", "enum": ["actual", "assumption", "calculated"]}, "origin": {"type": "string"}, "basis": _NULLABLE_STR, "fetchedAt": _NULLABLE_STR},
+                "type": "object", "additionalProperties": False,
+                "required": ["kind", "type", "origin", "basis", "fetchedAt", "corpName", "reportName", "filingDate", "section", "receiptNo"],
+                "properties": {
+                    "kind": {"type": "string", "enum": ["actual", "assumption", "calculated", "document"]},
+                    "type": {"type": "string", "enum": ["financial-data", "disclosure-document"]},
+                    "origin": {"type": "string"}, "basis": _NULLABLE_STR, "fetchedAt": _NULLABLE_STR,
+                    "corpName": _NULLABLE_STR, "reportName": _NULLABLE_STR, "filingDate": _NULLABLE_STR, "section": _NULLABLE_STR, "receiptNo": _NULLABLE_STR,
+                },
             },
         },
         "suggestedNextActions": {"type": "array", "items": {"type": "string"}},

@@ -80,3 +80,30 @@ class DartHttpClient:
         if not isinstance(rows, list):
             raise DartApiError("no-data")
         return [r for r in rows if isinstance(r, dict)]
+
+    def list_filings(self, corp_code: str, bgn_de: str, end_de: str, page: int = 1, page_count: int = 100, filing_type: str = "A") -> dict[str, Any]:
+        """공시검색(list.json). 정기공시(A)가 기본. 데이터가 없으면(013) 빈 목록을 돌려준다."""
+        response = self._get("list.json", {"corp_code": corp_code, "bgn_de": bgn_de, "end_de": end_de, "pblntf_ty": filing_type,
+                                           "page_no": str(page), "page_count": str(page_count)})
+        try:
+            body = response.json()
+        except ValueError:
+            raise DartApiError("unknown") from None
+        if not isinstance(body, dict):
+            raise DartApiError("unknown")
+        if body.get("status") == "013":
+            return {"list": [], "total_page": 0}
+        map_status(body.get("status"))
+        return body
+
+    def fetch_document_zip(self, receipt_no: str) -> bytes:
+        """공시 원문(document.xml): XML 이 아니라 ZIP binary 다. 오류일 때만 XML 상태 메시지가 온다."""
+        content = self._get("document.xml", {"rcept_no": receipt_no}).content
+        if not zipfile.is_zipfile(io.BytesIO(content)):
+            try:
+                status = ET.fromstring(content).findtext("status")
+            except ET.ParseError:
+                raise DartApiError("unknown") from None
+            map_status(status)
+            raise DartApiError("unknown")
+        return content
