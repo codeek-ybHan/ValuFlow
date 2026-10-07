@@ -171,6 +171,10 @@ Agent 가 만든 분석 문장의 핵심 claim 을 **Claim → Evidence → Sour
 - **라이브(실제 LLM · backend 필요)**: `DOCS=1 node scripts/eval-live.ts <baseUrl> out.json [repeat]` → `node scripts/eval-report.ts out.json …`. 합성 PDF 는 `PYTHONPATH=. python -m scripts.make_eval_pdfs <dir>`, provider 장애는 `APP_ENV=production` backend 로, provider 지연은 `python -m scripts.probe_latency` 로 본다.
 - **출력 가드레일**: system instruction 조각이 답변에 들어가면 제거(`src/ai/guard.ts`), Quick Answer 의 요약 · 근거 항목 숫자는 Tool 결과에서 찾을 수 없으면 제거(`src/ai/quickGuard.ts`).
 
+### Report Architecture (STEP 09-1)
+
+`src/report/` 는 Valuation Report 의 **데이터 계약**이다: `Project State → ReportInput(snapshot) → ReportModel → Renderer / Export`. Report 는 UI state 를 읽지 않고, 숫자를 새로 계산하지 않으며(엔진 · 분석 결과를 옮김), AI 서술은 STEP 08 의 검증된 Grounded Claim 만 재사용한다. 모든 숫자는 Actual / Estimate / Calculated, 정책 단위(억원 · 원 · % · 주), 출처 id 를 가진 `Cell` 이고 값이 없으면 missing / unavailable / not-applicable 로 구분한다. `schemaVersion: "1.0"`. 자세한 내용은 `docs/STEP09-1_report_architecture.md`. Renderer(HTML · PDF)는 STEP 09-2.
+
 ### Credential 정책
 
 | 환경변수 | 쓰이는 곳 | 없을 때 |
