@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { steps, BRAND } from '../content';
 import { stepPath } from '../routes';
+import { navActive } from './navActive';
 import { useApp } from '../store/state';
 import { useProject } from '../store/project';
 import { nextAction, overallProgress, stepProgress } from '../store/progress';
@@ -22,7 +23,7 @@ function crumb(path: string): Crumb {
   if (path.startsWith('/learn')) return { area: 'Learn', page: 'Overview' };
   if (path.startsWith('/workspace')) return { area: 'Project', page: 'Workspace' };
   if (path.startsWith('/valuation')) return { area: 'Project', page: 'Valuation' };
-  if (path.startsWith('/analysis')) return { area: 'Project', page: 'Analysis' };
+  if (path === '/valuation/validation' || path.startsWith('/analysis')) return { area: 'Project', page: 'Analysis · Validation' };
   if (path.startsWith('/ai')) return { area: 'Project', page: 'AI Analyst' };
   if (path.startsWith('/report')) return { area: 'Project', page: 'Report' };
   return { area: 'Project', page: 'Dashboard' };
@@ -36,6 +37,7 @@ export function Layout() {
   const overall = overallProgress(steps, state);
   const next = nextAction(steps, state);
   const c = crumb(pathname);
+  const nav = navActive(pathname);
   const company = project.historicalData?.company;
 
   // 라우트가 바뀌면 모바일 드로어를 닫고 화면 맨 위로 이동한다.
@@ -53,8 +55,8 @@ export function Layout() {
         <nav className="side-nav" aria-label="PROJECT 메뉴">
           <NavLink to="/dashboard"><IconDashboard />Dashboard</NavLink>
           <NavLink to="/workspace"><IconWorkspace />Workspace</NavLink>
-          <NavLink to="/valuation"><IconValuation />Valuation</NavLink>
-          <NavLink to="/analysis"><IconAnalysis />Analysis</NavLink>
+          <NavLink to="/valuation" className={() => (nav.valuation ? 'active' : '')}><IconValuation />Valuation</NavLink>
+          <NavLink to="/valuation/validation" className={() => (nav.analysis ? 'active' : '')}><IconAnalysis />Analysis</NavLink>
           <NavLink to="/ai"><IconAi />AI Analyst</NavLink>
           <NavLink to="/report"><IconReport />Report</NavLink>
         </nav>

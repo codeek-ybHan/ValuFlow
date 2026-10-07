@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { step04PracticeAssumptions as practice } from '../data/step04PracticeAssumptions.ts';
 import { runValuation } from '../valuation/index.ts';
-import { TV_HIGH_THRESHOLD, buildDcfView, buildEquityBridge, terminalValueContribution } from './dcfView.ts';
+import { TV_HIGH_THRESHOLD, bridgeAdjustment, buildDcfView, buildEquityBridge, terminalValueContribution } from './dcfView.ts';
 
 const approx = (x: number, y: number, e = 0.006) => assert.ok(Math.abs(x - y) < e, `${x} !≈ ${y}`);
 const close = (x: number, y: number, e = 1e-9) => assert.ok(Math.abs(x - y) < e, `${x} !≈ ${y}`);
@@ -97,4 +97,34 @@ test('DCF 폼 / 표시 모델 / 화면은 valuation 공개 API 만 사용한다'
       assert.ok(/(^|\/)valuation(\/index(\.ts)?)?$/.test(m[1]) || /\.\/(workflow|Assumption|useAssumption)/.test(m[1]), `${rel} → ${m[1]}`);
     }
   }
+});
+
+// ---- STEP 07-7: Net Debt / Net Cash 표기 (표현만 바꾸고 엔진 값은 그대로) ----
+test('Net Debt ≥ 0: "− Net Debt 200" (EV − Net Debt = Equity Value)', () => {
+  assert.deepEqual(bridgeAdjustment(200), { operator: '−', label: 'Net Debt', amount: 200 });
+  assert.deepEqual(bridgeAdjustment(0), { operator: '−', label: 'Net Debt', amount: 0 });
+});
+
+test('Net Debt < 0: "+ Net Cash 200" (이중 부정 없음, 금액은 항상 0 이상)', () => {
+  assert.deepEqual(bridgeAdjustment(-200), { operator: '+', label: 'Net Cash', amount: 200 });
+  assert.ok(bridgeAdjustment(-0.5).amount >= 0);
+});
+
+test('표기가 바뀌어도 값은 같다: EV ∓ 표시 금액 = Equity Value', () => {
+  for (const [debt, cash] of [[300, 100], [100, 300], [0, 0], [250, 250]] as const) {
+    const r = runValuation({ ...practice, interestBearingDebt: debt, cash });
+    const adj = bridgeAdjustment(r.netDebt);
+    const shown = adj.operator === '−' ? r.enterpriseValue - adj.amount : r.enterpriseValue + adj.amount;
+    close(shown, r.equityValue);
+    assert.equal(r.netDebt, debt - cash); // 엔진 값은 부호 있는 Net Debt 그대로
+  }
+});
+
+test('화면 코드: Equity Bridge 는 bridgeAdjustment 로 연산자와 라벨을 정한다', () => {
+  const ui = readFileSync(new URL('../components/valuation/DcfStage.tsx', import.meta.url), 'utf8');
+  assert.ok(ui.includes('bridgeAdjustment(bridge.netDebt)'));
+  assert.ok(ui.includes('{adj.operator}') && ui.includes('{adj.label}') && ui.includes('adj.amount'));
+  assert.ok(!ui.includes('fmtNum(bridge.netDebt'), '부호 있는 Net Debt 를 그대로 출력하지 않는다');
+  const result = readFileSync(new URL('../components/valuation/ResultStage.tsx', import.meta.url), 'utf8');
+  assert.ok(result.includes('bridgeAdjustment(r.netDebt)'));
 });

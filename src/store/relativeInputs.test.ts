@@ -36,10 +36,19 @@ test('입력 객체와 이전 상태를 변경하지 않는다 (복사본 저장
   assert.deepEqual(emptyProjectState.relativeInputs, {});
 });
 
-test('Valuation 초기화 / 학습용 적용은 상대가치 입력을 지우지 않는다 (별개의 입력)', () => {
+test('Reset 정책: Valuation 초기화는 가정 · 결과 · 상대가치 입력을 모두 지우고 Historical 은 유지한다', () => {
+  const s = withRelativeInputs(withPracticeAssumptions(withSamsungHistorical(emptyProjectState)), { netIncome: 150, per: 12 });
+  const r = withValuationReset(s);
+  assert.deepEqual(r.relativeInputs, {});
+  assert.equal(r.valuationAssumptions, null);
+  assert.equal(r.valuationResult, null);
+  assert.equal(r.sensitivityResult, null);
+  assert.equal(r.historicalData, s.historicalData); // Historical 은 유지
+});
+
+test('학습용 적용은 상대가치 입력을 비우지만 Forecast 입력은 지우지 않는다', () => {
   const s = withRelativeInputs(withPracticeAssumptions(emptyProjectState), { netIncome: 150, per: 12 });
-  assert.deepEqual(withValuationReset(s).relativeInputs, { netIncome: 150, per: 12 });
-  assert.deepEqual(withPracticeAssumptions(s).relativeInputs, { netIncome: 150, per: 12 });
+  assert.deepEqual(withPracticeAssumptions(s).relativeInputs, {});
   assert.deepEqual(withForecastInputs(s, { ...fixture }).relativeInputs, { netIncome: 150, per: 12 });
 });
 

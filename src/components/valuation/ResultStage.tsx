@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useProject } from '../../store/project';
-import { Kpi, fmtNum, fmtPct } from '../ui';
+import { Kpi, StatusBadge, fmtNum, fmtPct } from '../ui';
+import { bridgeAdjustment } from '../../engine/dcfView';
 import { stages } from './workflow';
 
 /** 5. Result — Engine 결과의 핵심 값만 보여 준다 (표·차트·Heatmap 은 이후 단계). 표시용 반올림은 여기서만 한다. */
@@ -16,13 +17,13 @@ export function ResultStage() {
       <p className="muted">{stages[4].summary}</p>
       <section className="kpi-row" aria-label="Valuation Result">
         <Kpi label="Enterprise Value" value={r ? fmtNum(r.enterpriseValue, 2) : '—'} sub="억원" />
-        <Kpi label="Equity Value" value={r ? fmtNum(r.equityValue, 2) : '—'} sub={r ? `Net Debt ${fmtNum(r.netDebt, 0)} 억원` : '억원'} />
+        <Kpi label="Equity Value" value={r ? fmtNum(r.equityValue, 2) : '—'} sub={r ? `${bridgeAdjustment(r.netDebt).label} ${fmtNum(bridgeAdjustment(r.netDebt).amount, 0)} 억원` : '억원'} />
         <Kpi label="Implied Share Price" value={r ? fmtNum(r.perShareValue, 0) : '—'} sub="원" />
         <Kpi label="WACC" value={r ? fmtPct(r.wacc, 4) : '—'} sub={r ? `Ke ${fmtPct(r.costOfEquity, 2)} · Kd(세후) ${fmtPct(r.afterTaxCostOfDebt, 2)}` : undefined} />
       </section>
       {!r && <div className="callout">아직 계산되지 않았습니다. 위의 [학습용 DCF 가정 적용] 또는 [Run Valuation] 을 실행하세요. 계산되지 않은 값은 임의로 채우지 않습니다.</div>}
       <section className="panel">
-        <div className="panel-head"><h3>Sensitivity</h3>{s ? <span className="badge badge-complete">Calculated</span> : <span className="badge badge-not-started">Not run</span>}</div>
+        <div className="panel-head"><h3>Sensitivity</h3><StatusBadge label={s ? 'CALCULATED' : 'NOT RUN'} /></div>
         {s ? (
           <dl className="stat-dl">
             <div><dt>Matrix</dt><dd className="num">WACC {s.waccValues.length} × g {s.terminalGrowthValues.length}</dd></div>

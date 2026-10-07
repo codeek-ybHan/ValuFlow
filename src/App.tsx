@@ -39,7 +39,7 @@ export default function App() {
             <Route path="workspace" element={<Workspace />} />
             <Route path="valuation" element={<Valuation />} />
             <Route path="valuation/:stage" element={<Valuation />} />
-            <Route path="analysis" element={<PlannedPage eyebrow="Analysis" title="Analysis" comingIn="MVP 2 · Analysis" description="DCF 결과를 다른 관점으로 검증하는 영역입니다." items={['Comparable Companies', 'Sensitivity Matrix', 'Scenario (Bear / Base / Bull)']} />} />
+            <Route path="analysis" element={<Navigate to="/valuation/validation" replace />} />
             <Route path="ai" element={<PlannedPage eyebrow="AI Analyst" title="AI Analyst" comingIn="STEP 08 · AI Valuation Analyst" description="계산은 Valuation Engine 이 하고, AI 는 Tool 로 호출해 근거 있는 답변을 합니다." items={['Financial Data Tool', 'Valuation Engine Tool', 'Sensitivity Tool', 'RAG Search']} />} />
             <Route path="report" element={<PlannedPage eyebrow="Report" title="Report" comingIn="STEP 09 · Report Automation" description="가치평가 보고서 생성과 내보내기 영역입니다." items={['Generate Report', 'Report Preview', 'Export PDF']} />} />
 

@@ -59,14 +59,12 @@ export interface PracticeConfig {
   samsungLoad?: 'form' | 'dataset';
 }
 
-export type BuildKind = 'dataset' | 'analysis' | 'dcf' | 'valuation' | 'planned';
+export type BuildKind = 'dataset' | 'analysis' | 'dcf' | 'valuation';
 
 export interface BuildConfig {
   title: string;
   description: Rich;
   kind: BuildKind;
-  /** kind === 'planned' 일 때: 아직 구현되지 않았음을 명시하고 설계만 보여준다. */
-  planned?: { comingIn: string; modules: string[]; architecture?: string };
 }
 
 export interface Evolution {

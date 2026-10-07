@@ -63,3 +63,20 @@ export function buildEquityBridge(r: ValuationResult, sharesOutstanding: number)
     netCash: r.netDebt < 0,
   };
 }
+
+export interface BridgeAdjustment {
+  /** '−' (Net Debt 차감) 또는 '+' (Net Cash 가산) */
+  operator: '−' | '+';
+  label: 'Net Debt' | 'Net Cash';
+  /** 항상 0 이상. 부호는 operator 로 표현한다 */
+  amount: number;
+}
+
+/**
+ * Equity Bridge 의 표기만 정한다 (계산식과 엔진 값은 그대로).
+ *  Net Debt ≥ 0 : EV − Net Debt = Equity Value
+ *  Net Debt < 0 : EV + Net Cash = Equity Value  ("− Net Debt −200" 같은 이중 부정을 피한다)
+ */
+export function bridgeAdjustment(netDebt: number): BridgeAdjustment {
+  return netDebt < 0 ? { operator: '+', label: 'Net Cash', amount: -netDebt } : { operator: '−', label: 'Net Debt', amount: netDebt };
+}

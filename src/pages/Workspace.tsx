@@ -101,7 +101,7 @@ export function Workspace() {
 
       {!h ? (
         <div className="coming">
-          <span className="badge badge-not-started">NO DATA</span>
+          <StatusBadge label="NO DATA" />
           <p className="muted">[삼성전자 데이터 불러오기] 를 누르면 Historical Financials 가 채워집니다. 값을 임의로 만들지 않습니다.</p>
         </div>
       ) : tab === 'Overview' ? (

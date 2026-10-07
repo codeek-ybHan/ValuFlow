@@ -232,24 +232,25 @@ export interface ReviewMetrics {
 }
 
 export type WarningCode = 'tv-dependence' | 'narrow-spread' | 'wide-sensitivity' | 'wide-scenario' | 'relative-divergence';
-export interface ValidationWarning { code: WarningCode; message: string }
+/** message 는 검토를 요청하는 관찰 문장이고, basis 는 그 문장이 나온 참고 기준이다 (실무 판단을 대신하는 기준이 아니다). */
+export interface ValidationWarning { code: WarningCode; message: string; basis: string }
 
 export function buildValidationWarnings(m: Pick<ReviewMetrics, 'terminalValueContribution' | 'spread' | 'relativeDivergence'> & { sensitivityWidth: number | null; scenarioWidth: number | null }): ValidationWarning[] {
   const w: ValidationWarning[] = [];
   if (m.terminalValueContribution !== null && m.terminalValueContribution > TV_WARNING_THRESHOLD) {
-    w.push({ code: 'tv-dependence', message: 'DCF 가치가 Terminal Value에 크게 의존합니다.' });
+    w.push({ code: 'tv-dependence', message: 'DCF 가치가 Terminal Value에 크게 의존합니다.', basis: `참고 기준: PV(TV) ÷ EV ${Math.round(TV_WARNING_THRESHOLD * 100)}% 초과` });
   }
   if (m.spread < SPREAD_NARROW_THRESHOLD) {
-    w.push({ code: 'narrow-spread', message: 'WACC와 영구성장률의 차이가 작아 Terminal Value가 가정 변화에 매우 민감합니다.' });
+    w.push({ code: 'narrow-spread', message: 'WACC와 영구성장률의 차이가 작아 Terminal Value가 가정 변화에 민감합니다.', basis: `참고 기준: WACC − g ${Math.round(SPREAD_NARROW_THRESHOLD * 100)}%p 미만` });
   }
   if (m.sensitivityWidth !== null && m.sensitivityWidth > SENSITIVITY_WIDE_THRESHOLD) {
-    w.push({ code: 'wide-sensitivity', message: '가정 변화에 따른 가치 변동성이 큽니다.' });
+    w.push({ code: 'wide-sensitivity', message: '가정 변화에 따른 가치 변동성이 큽니다.', basis: `참고 기준: 분석 범위의 EV 폭이 Base 의 ${Math.round(SENSITIVITY_WIDE_THRESHOLD * 100)}% 초과` });
   }
   if (m.scenarioWidth !== null && m.scenarioWidth > SCENARIO_WIDE_THRESHOLD) {
-    w.push({ code: 'wide-scenario', message: '시나리오에 따른 가치 차이가 큽니다. 영업 가정의 불확실성을 검토하세요.' });
+    w.push({ code: 'wide-scenario', message: '시나리오에 따른 가치 차이가 큽니다. 영업 가정을 함께 검토하세요.', basis: `참고 기준: Bear ~ Bull 의 Equity 폭이 Base 의 ${Math.round(SCENARIO_WIDE_THRESHOLD * 100)}% 초과` });
   }
   if (m.relativeDivergence !== null && m.relativeDivergence > RELATIVE_DIVERGENCE_THRESHOLD) {
-    w.push({ code: 'relative-divergence', message: '상대가치 결과와 DCF의 차이가 큽니다. 멀티플과 이익 기준을 확인하세요.' });
+    w.push({ code: 'relative-divergence', message: '상대가치 결과와 DCF의 차이가 큽니다. 멀티플과 이익 기준을 확인하세요.', basis: `참고 기준: 상대가치 Equity 가 DCF 와 ${Math.round(RELATIVE_DIVERGENCE_THRESHOLD * 100)}% 넘게 차이` });
   }
   return w;
 }

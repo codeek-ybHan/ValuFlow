@@ -45,7 +45,7 @@ export function ValidationStage() {
   return (
     <>
       <p className="muted">{SECTION.summary}</p>
-      {isPracticeAssumptions(a) && <p className="hint"><span className="badge badge-in-progress">학습용 가정</span> STEP 04 가상 실습값 기준의 검증입니다. 실제 기업의 가치평가가 아닙니다.</p>}
+      {isPracticeAssumptions(a) && <p className="hint"><span className="chip">학습용 가정</span> STEP 04 가상 실습값 기준의 검증입니다. 실제 기업의 가치평가가 아닙니다.</p>}
 
       <ValidationWarnings view={view} />
       {view.sensitivity && <SensitivityPanel view={view.sensitivity} />}

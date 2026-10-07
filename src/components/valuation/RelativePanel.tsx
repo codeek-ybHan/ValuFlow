@@ -64,10 +64,12 @@ export function RelativePanel({ view }: { view: RelativeView }) {
             {input(g.metric, g.metricLabel, '억원', g.metricHelper)}
             {input(g.multiple, g.multipleLabel, '배')}
             <p className="small muted formula">{g.formula}</p>
-            {ref && (g.metric === 'netIncome' || g.metric === 'bookEquity') && (
-              <button className="btn small" type="button" onClick={() => useActual(g.metric as 'netIncome' | 'bookEquity')}>최근 Actual 사용 ({ref.period})</button>
-            )}
-            {g.metric === 'ebitda' && <p className="small muted">Historical 데이터에 감가상각비가 없어 EBITDA 참고값은 제공하지 않습니다. 직접 입력하세요.</p>}
+            <div className="relative-actions">
+              {ref && (g.metric === 'netIncome' || g.metric === 'bookEquity') && (
+                <button className="btn small" type="button" onClick={() => useActual(g.metric as 'netIncome' | 'bookEquity')}>최근 Actual 사용 ({ref.period})</button>
+              )}
+              {g.metric === 'ebitda' && <p className="small muted">Historical 데이터에 감가상각비가 없어 EBITDA 참고값은 제공하지 않습니다. 직접 입력하세요.</p>}
+            </div>
           </div>
         ))}
       </div>

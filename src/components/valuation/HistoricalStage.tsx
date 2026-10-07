@@ -66,7 +66,7 @@ export function HistoricalStage() {
             <h3>{header.name}</h3>
             <p className="small muted">{header.ticker}</p>
           </div>
-          <span className="badge badge-in-progress" title="공시로 확정된 실적(Actual)입니다. Forecast 는 이후 단계에서 2026E … 로 구분합니다.">Actual · 공시 기반</span>
+          <span className="chip" title="공시로 확정된 실적(Actual)입니다. Forecast 는 이후 단계에서 2026E … 로 구분합니다.">Actual · 공시 기반</span>
         </div>
         <dl className="status-grid">
           <div><dt>Basis</dt><dd>{header.basis}</dd></div>

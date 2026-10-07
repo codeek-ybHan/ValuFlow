@@ -6,7 +6,7 @@ import {
   emptyProjectState, isPracticeAssumptions, restoreProjectState, toPersisted, withAssumptions, withHistoricalData,
   withPracticeAssumptions, withSamsungHistorical, withSensitivityRun, withValuationReset, withValuationRun,
   withForecastInputs, withResultsCleared, withWaccInputs,
-  DEFAULT_TERMINAL_GROWTH_VALUES, DEFAULT_WACC_VALUES, type ProjectState,
+  type ProjectState,
 } from './projectModel.ts';
 import { forecastInputsToForm, parseForecastForm } from '../engine/forecastForm.ts';
 import { parseWaccForm, waccDraftToForm, computeWaccPreview, type WaccInputs } from '../engine/waccForm.ts';
@@ -51,10 +51,10 @@ test('학습용 가정 적용: 가정 설정 + Valuation + Sensitivity 계산, h
   assert.ok(isPracticeAssumptions(s.valuationAssumptions));
 });
 
-test('Sensitivity 기본 축은 5×5 이고 Base 칸이 하나 표시된다', () => {
+test('Sensitivity 축은 Base 중심으로 만들어진다: 학습용 가정은 5×5 이고 Base 칸이 하나 표시된다', () => {
   const s = withPracticeAssumptions(emptyProjectState);
-  assert.deepEqual(s.sensitivityResult!.waccValues, DEFAULT_WACC_VALUES);
-  assert.deepEqual(s.sensitivityResult!.terminalGrowthValues, DEFAULT_TERMINAL_GROWTH_VALUES);
+  assert.deepEqual(s.sensitivityResult!.waccValues, [0.075, 0.08, 0.081375, 0.085, 0.09]);
+  assert.deepEqual(s.sensitivityResult!.terminalGrowthValues, [0.01, 0.015, 0.02, 0.025, 0.03]);
   assert.equal(s.sensitivityResult!.cells.flat().length, 25);
   assert.equal(s.sensitivityResult!.cells.flat().filter((c) => c.isBaseCase).length, 1);
 });

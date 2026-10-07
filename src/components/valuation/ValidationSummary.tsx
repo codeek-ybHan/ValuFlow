@@ -1,15 +1,16 @@
 import type { ValidationView } from '../../engine/validationView';
 import { fmtNum, fmtPct } from '../ui';
 
-/** 검토 경고. 기준을 넘는 항목이 있을 때만 표시한다. */
+/** 검토 필요 항목. 참고 기준을 넘는 항목이 있을 때만 표시하며, 실무 판단을 대신하지 않는다. */
 export function ValidationWarnings({ view }: { view: ValidationView }) {
   if (view.warnings.length === 0) {
-    return <p className="hint">검토 지표 기준을 넘는 경고는 없습니다. 그래도 가정의 근거는 직접 확인해야 합니다.</p>;
+    return <p className="hint">참고 기준을 넘는 검토 항목은 없습니다. 그래도 가정의 근거는 직접 확인해야 합니다.</p>;
   }
   return (
     <div className="callout warn" role="alert">
-      <strong>검토 경고 {view.warnings.length}건</strong>
-      <ul className="plain-list">{view.warnings.map((w) => <li key={w.code}>{w.message}</li>)}</ul>
+      <strong>검토 필요 {view.warnings.length}건</strong>
+      <ul className="plain-list">{view.warnings.map((w) => <li key={w.code}>{w.message} <span className="small muted">({w.basis})</span></li>)}</ul>
+      <p className="small muted">표시된 기준은 검토를 돕기 위한 참고 기준이며, 실무 판단이나 투자 판단을 대신하지 않습니다.</p>
     </div>
   );
 }

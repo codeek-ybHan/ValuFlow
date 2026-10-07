@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useProject } from '../../store/project';
-import { isPracticeAssumptions } from '../../store/projectModel';
 import { AssumptionCompleteness } from './AssumptionCompleteness';
 import { useAssumptionForm } from './useAssumptionForm';
 import {
@@ -89,13 +88,12 @@ export function WaccStage() {
   return (
     <>
       <p className="muted">{SECTION.summary}</p>
-      {isPracticeAssumptions(a) && <p className="hint"><span className="badge badge-in-progress">학습용 가정</span> STEP 04 가상 실습값이 입력되어 있습니다. 값을 바꾸면 학습용 가정이 아니게 됩니다.</p>}
 
       <div className="wacc-grid">
         {/* A. Cost of Equity */}
-        <section className="panel" aria-label="Cost of Equity">
+        <section className="panel wide" aria-label="Cost of Equity">
           <div className="panel-head"><h3>A. Cost of Equity</h3><span className="small muted">CAPM</span></div>
-          {COE.map(input)}
+          <div className="field-row">{COE.map(input)}</div>
           <dl className="calc-box">{calc('Calculated Cost of Equity', preview.costOfEquity, 2, 'Re = Rf + β × MRP')}</dl>
         </section>
 
@@ -127,8 +125,8 @@ export function WaccStage() {
         </section>
 
         {/* D. WACC Result */}
-        <section className="panel wacc-result" aria-label="WACC Result">
-          <div className="panel-head"><h3>D. WACC Result</h3>{preview.wacc !== null && <span className="badge badge-in-progress">Preview</span>}</div>
+        <section className="panel wide wacc-result" aria-label="WACC Result">
+          <div className="panel-head"><h3>D. WACC Result</h3>{preview.wacc !== null && <span className="chip">Preview</span>}</div>
           <div className="wacc-value num" aria-live="polite">{preview.wacc === null ? '—' : fmtPct(preview.wacc, 4)}</div>
           <p className="small muted">Calculated WACC = Equity Weight × Cost of Equity + Debt Weight × After-tax Cost of Debt</p>
           {contributions ? (

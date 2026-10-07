@@ -211,20 +211,27 @@ test('reload: 일부만 입력된 가정은 복원 후에도 완성되지 않고
 // ---------------------------------------------------------------------------
 const src = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
-test('UI: 두 곳의 Run Valuation 이 모두 가정 완성도로 비활성화된다', () => {
+test('UI: 상단과 DCF 단계의 Run Valuation 이 모두 가정 완성도로 비활성화된다 (Forecast 단계에는 중복 패널이 없다)', () => {
   const controls = src('../components/valuation/ValuationControls.tsx');
   assert.ok(/onClick=\{run\} disabled=\{!completeness\.complete\}/.test(controls), '상단 Run Valuation');
-  const forecast = src('../components/valuation/ForecastStage.tsx');
-  assert.ok(forecast.includes('assumptionCompleteness(a).complete'), 'Forecast 단계 runnable 판정');
-  assert.ok(/onClick=\{run\} disabled=\{!runnable\}/.test(forecast), 'Forecast 단계 Run Valuation');
+  const dcf = src('../components/valuation/DcfStage.tsx');
+  assert.ok(dcf.includes('completeness.complete && form.parsed.ok'), 'DCF 단계 runnable 판정');
+  assert.ok(/onClick=\{run\} disabled=\{!runnable\}/.test(dcf), 'DCF 단계 Run Valuation');
+  assert.ok(!/Run Valuation<\/button>/.test(src('../components/valuation/ForecastStage.tsx')), 'Forecast 단계에는 Run 버튼이 없다');
 });
 
 test('UI: completeness 가 Forecast / WACC / DCF/Equity / Valuation 로 표시된다', () => {
   const c = src('../components/valuation/AssumptionCompleteness.tsx');
   for (const label of ["'Forecast'", "'WACC'", "'DCF/Equity'", 'Valuation', 'NOT READY']) assert.ok(c.includes(label), label);
+  // 가정을 입력하는 단계 화면(Forecast / WACC / DCF)과 검증할 결과가 없는 Validation 화면이 완성도를 보여 준다
+  for (const f of ['ForecastStage', 'WaccStage', 'DcfStage', 'ValidationStage']) {
+    assert.ok(src(`../components/valuation/${f}.tsx`).includes('<AssumptionCompleteness'), f);
+  }
+  // 상단 패널은 Valuation 실행 상태를 한 줄 요약으로 보여 주고, 단계별 상태는 Stepper 가 보여 준다 (같은 배지를 두 번 보여 주지 않는다)
   const controls = src('../components/valuation/ValuationControls.tsx');
   assert.ok(controls.includes("'NOT READY'"), '상단 Valuation 상태가 가정 미완성일 때 NOT READY');
-  assert.ok(controls.includes('<AssumptionCompleteness'));
+  assert.ok(!controls.includes('status-grid') && !controls.includes('<AssumptionCompleteness'), '상단 패널에 중복 상태 배지가 없다');
+  assert.ok(src('../components/valuation/ValuationStepper.tsx').includes('stageStatuses(project)'));
 });
 
 test('코드 경로: 학습용 fixture 는 withPracticeAssumptions 와 배지 비교에서만 쓰인다', () => {

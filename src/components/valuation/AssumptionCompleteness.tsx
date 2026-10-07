@@ -14,6 +14,14 @@ export function AssumptionCompleteness({ assumptions }: { assumptions: Assumptio
   const c = assumptionCompleteness(assumptions);
   const sections = ['forecast', 'wacc', 'dcf'] as const;
   const open = sections.filter((s) => c[s] === 'INCOMPLETE');
+  if (c.complete) {
+    // 모두 준비되면 항목별 상태를 반복하지 않고 한 줄로 접는다.
+    return (
+      <div className="completeness" aria-label="가정 완성도">
+        <span className="completeness-item"><StatusBadge label="READY" /><span className="small muted">Forecast · WACC · DCF/Equity 가정이 모두 준비되었습니다.</span></span>
+      </div>
+    );
+  }
   return (
     <div className="completeness" aria-label="가정 완성도">
       <div className="completeness-row">

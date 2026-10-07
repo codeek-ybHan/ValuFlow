@@ -1,8 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useProject } from '../../store/project';
-import { isPracticeAssumptions } from '../../store/projectModel';
-import { assumptionCompleteness } from '../../store/assumptions';
 import { AssumptionCompleteness } from './AssumptionCompleteness';
 import { useAssumptionForm } from './useAssumptionForm';
 import {
@@ -14,12 +12,12 @@ import { stages } from './workflow';
 
 // 2. Forecast — 사용자가 미래 가정을 직접 입력한다. Historical 값은 참고용(reference-only)이며 자동 입력하지 않는다.
 // 입력은 % / 억원 단위의 문자열로 받고, 유효한 완성 입력만 valuationAssumptions(소수 / 억원)에 반영한다.
-// 계산은 [Run Valuation] 버튼으로만 실행한다 (입력이 바뀌면 이전 결과는 비워진다).
+// 계산은 상단 [Run Valuation] 과 DCF 단계의 실행 패널에서만 한다 (입력이 바뀌면 이전 결과는 비워진다).
 
 const SECTION = stages[1];
 
 export function ForecastStage() {
-  const { project, setForecastInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity } = useProject();
+  const { project, setForecastInputs, clearStaleResults } = useProject();
   const a = project.valuationAssumptions;
   const h = project.historicalData;
   const ref = useMemo(() => buildForecastReference(h), [h]);
@@ -34,15 +32,11 @@ export function ForecastStage() {
     push: setForecastInputs, // 반영하면 이전 결과는 비워진다
     onInvalid: clearStaleResults, // 가정은 마지막 유효 값을 유지하고, 어긋난 결과만 비운다
   });
-  const missing = Object.keys(errors).length;
 
   const currentRevenueValue = parsed.ok ? parsed.value.currentRevenue : NaN;
   const basedOnLatest = ref !== null && isBasedOnLatestActual(currentRevenueValue, ref);
   const useLatestActual = () => ref && edit('currentRevenue', amountText(ref.latestRevenueEok));
 
-  const run = () => { runCurrentValuation(); runCurrentSensitivity(); };
-  const calculated = !!project.valuationResult && !project.valuationError;
-  const runnable = assumptionCompleteness(a).complete && parsed.ok;
   const shownErrors = Object.entries(errors).filter(([k]) => touched.has(k));
 
   const cellInput = (field: ForecastArrayField, i: number, unit: '%' | '억원') => {
@@ -72,7 +66,7 @@ export function ForecastStage() {
 
       {/* Current Revenue / Tax Rate */}
       <section className="panel">
-        <div className="panel-head"><h3>기준 입력</h3>{isPracticeAssumptions(a) && <span className="badge badge-in-progress" title="STEP 04 가상 실습값입니다. 삼성전자의 실제 Forecast 가 아닙니다.">학습용 가정</span>}</div>
+        <div className="panel-head"><h3>기준 입력</h3></div>
         <div className="form-grid fc-base-grid">
           <label className="field">
             <span>Current Revenue <em>(억원)</em></span>
@@ -102,7 +96,7 @@ export function ForecastStage() {
           <div className="row fc-latest">
             <button className="btn small" onClick={useLatestActual}>최근 Actual 매출 사용</button>
             <span className="small muted">{ref.latestRevenuePeriod} Revenue → {fmtNum(ref.latestRevenueEok, 2)} 억원 (KRW million ÷ 100)</span>
-            {basedOnLatest && <span className="badge badge-in-progress">Based on latest actual revenue</span>}
+            {basedOnLatest && <span className="chip">Based on latest actual revenue</span>}
           </div>
         )}
       </section>
@@ -154,23 +148,6 @@ export function ForecastStage() {
         </div>
       )}
       <AssumptionCompleteness assumptions={a} />
-
-      {/* 실행 */}
-      <section className="panel fc-run">
-        <div className="row between">
-          <div>
-            <h3>Run Valuation</h3>
-            <p className="small muted">{!parsed.ok ? `Forecast 입력이 완성되지 않았습니다 (${missing}개 항목 확인 필요).` : runnable ? '모든 가정이 준비되었습니다. 실행하면 Valuation 과 Sensitivity 를 계산합니다.' : 'Forecast 입력은 유효하지만 WACC / DCF 가정이 아직 준비되지 않아 실행할 수 없습니다.'}</p>
-          </div>
-          <div className="row">
-            {calculated && <span className="badge badge-calculated">CALCULATED</span>}
-            <button className="btn primary" onClick={run} disabled={!runnable}>Run Valuation</button>
-          </div>
-        </div>
-        {calculated && (
-          <p className="hint">계산되었습니다. <Link to="/valuation/wacc">WACC →</Link> 단계를 거쳐 <Link to="/valuation/dcf">DCF →</Link>, <Link to="/valuation/result">Result</Link> 에서 결과를 확인할 수 있습니다.</p>
-        )}
-      </section>
 
       <div className="row between slot-nav">
         <Link className="btn" to={`/valuation/${stages[0].id}`}>← {stages[0].label}</Link>

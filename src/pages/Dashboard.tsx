@@ -7,7 +7,7 @@ import { useProject } from '../store/project';
 import { isPracticeAssumptions } from '../store/projectModel';
 import { nextAction, overallProgress, stepProgress } from '../store/progress';
 import { Kpi, PageHeader, ProgressBar, StatusBadge, fmtNum, fmtPct } from '../components/ui';
-import { dashboardWorkflow } from '../components/valuation/workflow';
+import { buildWorkflowProgress } from '../store/workflowStatus';
 
 
 export function Dashboard() {
@@ -17,6 +17,8 @@ export function Dashboard() {
   const learn = overallProgress(steps, state);
   const next = nextAction(steps, state);
   const r = project.valuationResult;
+  const progress = buildWorkflowProgress(project);
+  const readyCount = progress.filter((w) => w.status === 'READY' || w.status === 'CALCULATED').length;
 
   return (
     <>
@@ -42,12 +44,12 @@ export function Dashboard() {
       <div className="dash-grid">
         <div>
           <section className="panel">
-            <div className="panel-head"><h3>Workflow Progress</h3><span className="small muted">0 / {dashboardWorkflow.length} 완료</span></div>
+            <div className="panel-head"><h3>Workflow Progress</h3><span className="small muted">{readyCount} / {progress.length} 준비됨</span></div>
             <ol className="wf-list">
-              {dashboardWorkflow.map((w) => (
-                <li key={w.no}>
+              {progress.map((w, i) => (
+                <li key={w.key}>
                   <Link to={w.to} className="wf-row">
-                    <span className="num">{w.no}</span><span>{w.label}</span><StatusBadge label="NOT STARTED" />
+                    <span className="num">{String(i + 1).padStart(2, '0')}</span><span>{w.label}</span><StatusBadge label={w.display} />
                   </Link>
                 </li>
               ))}
@@ -81,7 +83,7 @@ export function Dashboard() {
             <dl className="stat-dl">
               {[
                 ['WACC', r ? fmtPct(r.wacc, 4) : null],
-                ['Terminal Growth', project.valuationAssumptions ? fmtPct(project.valuationAssumptions.terminalGrowth, 2) : null],
+                ['Terminal Growth', typeof project.valuationAssumptions?.terminalGrowth === 'number' ? fmtPct(project.valuationAssumptions.terminalGrowth, 2) : null],
                 ['Forecast Period', r ? `${r.fcff.length}년` : null],
               ].map(([k, v]) => <div key={k}><dt>{k}</dt><dd className={`num${v ? '' : ' empty'}`}>{v ?? '—'}</dd></div>)}
             </dl>

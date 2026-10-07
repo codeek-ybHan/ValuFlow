@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
+/** 상태 표시: 알약(버튼처럼 보임) 대신 점 + 텍스트. 상태가 아닌 보조 라벨은 .chip 을 쓴다. */
 export function StatusBadge({ label }: { label: string }) {
-  return <span className={`badge badge-${label.toLowerCase().replace(/\s+/g, '-')}`}>{label}</span>;
+  return <span className={`status status-${label.toLowerCase().replace(/\s+/g, '-')}`}><i aria-hidden />{label}</span>;
 }
 
 export function ProgressBar({ ratio, label }: { ratio: number; label?: string }) {
@@ -47,7 +48,7 @@ export function PageHeader({ eyebrow, title, children, actions }: { eyebrow?: st
 export function ComingSoon({ comingIn, children }: { comingIn: string; children?: ReactNode }) {
   return (
     <div className="coming">
-      <span className="badge badge-locked">{comingIn}</span>
+      <span className="chip">{comingIn}</span>
       <p className="muted">이 기능은 아직 구현되지 않았습니다. 가짜 결과를 보여주지 않고 개발 예정 상태로 표시합니다.</p>
       {children}
     </div>

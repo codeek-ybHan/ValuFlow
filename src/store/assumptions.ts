@@ -9,7 +9,7 @@ export type AssumptionsDraft = Partial<ValuationInput>;
 
 export const FORECAST_FIELDS = ['currentRevenue', 'revenueGrowth', 'operatingMargin', 'taxRate', 'depreciation', 'capex', 'deltaNwc'] as const;
 export const WACC_FIELDS = ['riskFreeRate', 'beta', 'marketRiskPremium', 'preTaxCostOfDebt', 'equityMarketValue', 'debtMarketValue'] as const;
-/** DCF 입력 화면은 07-5 에서 추가된다. */
+/** DCF / Equity 단계의 입력: 영구성장률과 Equity Bridge (이자부부채, 현금, 발행주식수) */
 export const DCF_FIELDS = ['terminalGrowth', 'interestBearingDebt', 'cash', 'sharesOutstanding'] as const;
 
 export type AssumptionSection = 'forecast' | 'wacc' | 'dcf';

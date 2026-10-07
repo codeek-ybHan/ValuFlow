@@ -1,17 +1,16 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useProject } from '../../store/project';
-import { isPracticeAssumptions } from '../../store/projectModel';
 import { assumptionCompleteness } from '../../store/assumptions';
 import { AssumptionCompleteness } from './AssumptionCompleteness';
 import { useAssumptionForm } from './useAssumptionForm';
 import {
   DCF_FIELD_SOURCE, dcfDraftToForm, dcfWarnings, mergeDcfDrafts, parseDcfForm, sameDcfInputs, terminalSpread, type DcfField, type DcfFormValues, type DcfInputs,
 } from '../../engine/dcfForm';
-import { buildDcfView, buildEquityBridge } from '../../engine/dcfView';
+import { bridgeAdjustment, buildDcfView, buildEquityBridge } from '../../engine/dcfView';
 import { SOURCE_LABELS, computeWaccPreview, waccDraftToForm } from '../../engine/waccForm';
 import { forecastLabels } from '../../engine/forecastForm';
-import { fmtNum, fmtPct } from '../ui';
+import { StatusBadge, fmtNum, fmtPct } from '../ui';
 import { stages } from './workflow';
 
 // 4. DCF / Equity — Terminal Growth 와 Equity Bridge(이자부부채, 현금, 발행주식수)를 입력받고, 실행하면 DCF 와 Equity Value 결과를 보여 준다.
@@ -56,6 +55,7 @@ export function DcfStage() {
   const yearLabels = forecastLabels(project.historicalData?.company.period ?? null, r?.fcff.length);
   const dcf = r ? buildDcfView(r, yearLabels) : null;
   const bridge = r && a?.sharesOutstanding !== undefined ? buildEquityBridge(r, a.sharesOutstanding) : null;
+  const adj = bridge ? bridgeAdjustment(bridge.netDebt) : null;
 
   const completeness = assumptionCompleteness(a);
   const runnable = completeness.complete && form.parsed.ok;
@@ -91,32 +91,33 @@ export function DcfStage() {
   return (
     <>
       <p className="muted">{SECTION.summary}</p>
-      {isPracticeAssumptions(a) && <p className="hint"><span className="badge badge-in-progress">학습용 가정</span> STEP 04 가상 실습값이 입력되어 있습니다. 값을 바꾸면 학습용 가정이 아니게 됩니다.</p>}
 
       <div className="dcf-inputs">
         {/* A. Terminal Value Assumption */}
-        <section className="panel" aria-label="Terminal Value Assumption">
+        <section className="panel wide" aria-label="Terminal Value Assumption">
           <div className="panel-head"><h3>A. Terminal Value Assumption</h3></div>
+          <div className="split">
           {input('terminalGrowth', 'Terminal Growth', '%', 'Forecast 기간 이후의 장기 성장률')}
           <dl className="spread-box">
             <div><dt>WACC</dt><dd className="num">{wacc === null ? '—' : fmtPct(wacc, 4)}</dd></div>
             <div><dt>Terminal Growth</dt><dd className="num">{g === null ? '—' : fmtPct(g, 2)}</dd></div>
             <div className={spread !== null && spread <= 0 ? 'bad' : undefined}><dt>Spread (WACC − g)</dt><dd className="num">{spread === null ? '—' : pp(spread)}</dd></div>
           </dl>
+          </div>
           {wacc === null && <p className="hint">WACC 가 아직 계산되지 않았습니다. <Link to="/valuation/wacc">WACC</Link> 와 Forecast 의 Tax Rate 를 입력하면 Spread 가 표시됩니다.</p>}
         </section>
 
         {/* B. Equity Bridge Inputs */}
-        <section className="panel" aria-label="Equity Bridge Inputs">
+        <section className="panel wide" aria-label="Equity Bridge Inputs">
           <div className="panel-head"><h3>B. Equity Bridge Inputs</h3></div>
-          {BRIDGE_FIELDS.map((f) => input(f.field, f.label, f.unit, f.helper))}
+          <div className="field-row">{BRIDGE_FIELDS.map((f) => input(f.field, f.label, f.unit, f.helper))}</div>
           <p className="hint">Net Debt = 이자부부채 − 현금 입니다. 현금이 부채보다 많으면 Net Debt 가 음수(순현금)가 될 수 있고, 이때 Equity Value 는 EV 보다 커집니다.</p>
         </section>
       </div>
 
       {/* C. DCF Result */}
       <section className="panel" aria-label="DCF Result">
-        <div className="panel-head"><h3>C. DCF Result</h3>{calculated ? <span className="badge badge-calculated">CALCULATED</span> : <span className="badge badge-not-started">NOT RUN</span>}</div>
+        <div className="panel-head"><h3>C. DCF Result</h3><StatusBadge label={calculated ? 'CALCULATED' : 'NOT RUN'} /></div>
         {dcf ? (
           <>
             <div className="table-wrap">
@@ -146,11 +147,11 @@ export function DcfStage() {
 
       {/* D. Equity Value Bridge */}
       <section className="panel" aria-label="Equity Value Bridge">
-        <div className="panel-head"><h3>D. Equity Value Bridge</h3>{bridge?.netCash && <span className="badge badge-in-progress">순현금 (Net Debt &lt; 0)</span>}</div>
+        <div className="panel-head"><h3>D. Equity Value Bridge</h3>{bridge?.netCash && <span className="chip">순현금 (현금 &gt; 이자부부채)</span>}</div>
         {bridge ? (
           <ol className="bridge">
             <li><span className="op" aria-hidden /><span className="label">Enterprise Value</span><span className="value num">{fmtNum(bridge.enterpriseValue, 2)} 억원</span></li>
-            <li><span className="op" aria-label="빼기">−</span><span className="label">Net Debt <span className="small muted">(이자부부채 − 현금)</span></span><span className="value num">{fmtNum(bridge.netDebt, 2)} 억원</span></li>
+            {adj && <li><span className="op" aria-label={adj.operator === '+' ? '더하기' : '빼기'}>{adj.operator}</span><span className="label">{adj.label} <span className="small muted">({adj.label === 'Net Cash' ? '현금 − 이자부부채' : '이자부부채 − 현금'})</span></span><span className="value num">{fmtNum(adj.amount, 2)} 억원</span></li>}
             <li className="result"><span className="op" aria-label="같음">=</span><span className="label">Equity Value</span><span className="value num">{fmtNum(bridge.equityValue, 2)} 억원</span></li>
             <li><span className="op" aria-label="나누기">÷</span><span className="label">Shares Outstanding</span><span className="value num">{fmtNum(bridge.sharesOutstanding, 0)} 주</span></li>
             <li className="result final"><span className="op" aria-label="같음">=</span><span className="label">Per Share Value</span><span className="value num">{fmtNum(bridge.perShareValue, 0)} 원</span></li>
@@ -175,7 +176,7 @@ export function DcfStage() {
             </p>
           </div>
           <div className="row">
-            {calculated && <span className="badge badge-calculated">CALCULATED</span>}
+            {calculated && <StatusBadge label="CALCULATED" />}
             {calculated && <Link className="btn" to="/valuation/result">View Result →</Link>}
             <button className="btn primary" onClick={run} disabled={!runnable}>Run Valuation</button>
           </div>

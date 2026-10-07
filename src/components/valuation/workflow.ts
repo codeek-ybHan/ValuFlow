@@ -1,6 +1,8 @@
 // Valuation Workflow 정의. Stepper 와 단계 이동 링크가 이 설정을 읽는다. 계산식은 여기에 두지 않는다.
 // 계산은 valuation 공개 API(runValuation / runSensitivity)가 하고, 각 단계 컴포넌트가 입력과 결과를 보여 준다.
 
+import { SOURCE_LABELS } from '../../engine/waccForm.ts';
+
 export type StageId = 'historical' | 'forecast' | 'wacc' | 'dcf' | 'result' | 'validation';
 
 export interface WorkflowStage {
@@ -41,13 +43,16 @@ export const stages: WorkflowStage[] = [
 
 export const stageIndex = (id: string | undefined) => stages.findIndex((s) => s.id === id);
 
-/** Dashboard 의 Workflow Progress. Engine 연결 전이므로 모두 NOT STARTED 로 표시한다. */
-export const dashboardWorkflow = [
-  { no: '01', label: 'Historical Analysis', to: '/workspace' },
-  { no: '02', label: 'Forecast', to: '/valuation/forecast' },
-  { no: '03', label: 'WACC', to: '/valuation/wacc' },
-  { no: '04', label: 'DCF', to: '/valuation/dcf' },
-  { no: '05', label: 'Comparable Analysis', to: '/analysis' },
-  { no: '06', label: 'Sensitivity', to: '/analysis' },
-  { no: '07', label: 'Report', to: '/report' },
-];
+/**
+ * 단계별 입력의 출처(basis). 이후 Source / Date / Note 로 확장할 수 있다.
+ *  Historical : 공시 기반 실적(Actual)        Forecast : 애널리스트 가정
+ *  WACC / DCF / Validation(상대가치) : 사용자 가정(Assumption)
+ */
+export const STAGE_BASIS: Record<StageId, string> = {
+  historical: 'Actual · 공시 기반',
+  forecast: SOURCE_LABELS.analyst,
+  wacc: SOURCE_LABELS.assumption,
+  dcf: SOURCE_LABELS.assumption,
+  result: '엔진 계산 결과',
+  validation: `${SOURCE_LABELS.assumption} (상대가치 입력) · 엔진 계산`,
+};

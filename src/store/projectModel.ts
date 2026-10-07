@@ -10,11 +10,12 @@
 // 계산은 valuation 공개 API 로만 수행한다 (forecast.ts / wacc.ts / dcf.ts 직접 import 금지).
 // 저장 대상은 historicalData 와 valuationAssumptions 뿐이며, 결과는 로드할 때 다시 계산한다
 // (입력과 결과가 어긋난 stale state 를 만들지 않기 위해).
-import { runSensitivity, runValuation, ValuationError } from '../valuation/index.ts';
+import { calculateWacc, runSensitivity, runValuation, ValuationError } from '../valuation/index.ts';
 import type { RelativeInput, SensitivityResult, ValuationInput, ValuationResult } from '../valuation/index.ts';
 import type { HistoricalData } from '../data/types.ts';
 import type { ForecastInputs } from '../engine/forecastForm.ts';
 import type { WaccInputs } from '../engine/waccForm.ts';
+import { buildSensitivityAxes } from '../engine/sensitivityAxes.ts';
 import type { DcfInputs } from '../engine/dcfForm.ts';
 import { isCompleteAssumptions, type AssumptionsDraft } from './assumptions.ts';
 import { samsungHistoricalData } from '../data/samsungHistorical.ts';
@@ -48,10 +49,6 @@ export const emptyProjectState: ProjectState = {
   valuationError: null,
   sensitivityError: null,
 };
-
-/** Sensitivity 기본 축 (소수). Base WACC 8.1375% / g 2% 가 축에 포함된다. */
-export const DEFAULT_WACC_VALUES = [0.075, 0.08, 0.081375, 0.085, 0.09];
-export const DEFAULT_TERMINAL_GROWTH_VALUES = [0.01, 0.015, 0.02, 0.025, 0.03];
 
 function toMessage(e: unknown): string {
   if (e instanceof ValuationError) return e.message;
@@ -126,29 +123,60 @@ export function withValuationRun(state: ProjectState): ProjectState {
   }
 }
 
-/** 기본 축(WACC 5 × g 5)으로 runSensitivity 를 실행한다. 가정이 완성되지 않았으면 변화 없음. */
+/** Base WACC / g 를 중심으로 만든 축(보통 WACC 5 × g 5)으로 runSensitivity 를 실행한다. 가정이 완성되지 않았으면 변화 없음. */
 export function withSensitivityRun(state: ProjectState): ProjectState {
   const a = state.valuationAssumptions;
   if (!isCompleteAssumptions(a)) return state;
   try {
-    return { ...state, sensitivityResult: runSensitivity(a, DEFAULT_WACC_VALUES, DEFAULT_TERMINAL_GROWTH_VALUES), sensitivityError: null };
+    const axes = buildSensitivityAxes(calculateWacc(a).wacc, a.terminalGrowth);
+    return { ...state, sensitivityResult: runSensitivity(a, axes.waccValues, axes.terminalGrowthValues), sensitivityError: null };
   } catch (e) {
     return { ...state, sensitivityResult: null, sensitivityError: toMessage(e) };
   }
 }
 
-/** 가정 + 결과를 모두 비운다. historicalData 는 유지한다. */
+/**
+ * "새 Valuation 을 시작한다": 가정 · 결과 · 오류 · 상대가치 입력을 모두 비운다. historicalData 는 유지한다.
+ * 이전 상대가치 멀티플이 새 Valuation 과 섞여 혼동되지 않도록 함께 지운다.
+ */
 export function withValuationReset(state: ProjectState): ProjectState {
-  return withAssumptions(state, null);
+  return { ...withAssumptions(state, null), relativeInputs: {} };
 }
 
 /**
  * STEP 04 학습용 가정을 적용하고 두 계산을 모두 실행한다. historicalData 는 건드리지 않는다.
+ * 이전 상대가치 입력은 학습용 가정과 섞이지 않도록 함께 비운다 (Reset 과 같은 이유).
  * 학습용 fixture 가 가정으로 들어오는 유일한 경로다 (명시적으로 이 동작을 실행했을 때만).
  * 이후의 수정이 fixture 객체에 영향을 주지 않도록 값을 복사해서 저장한다.
  */
 export function withPracticeAssumptions(state: ProjectState): ProjectState {
-  return withSensitivityRun(withValuationRun(withAssumptions(state, structuredClone(step04PracticeAssumptions))));
+  const fresh = { ...withAssumptions(state, structuredClone(step04PracticeAssumptions)), relativeInputs: {} };
+  return withSensitivityRun(withValuationRun(fresh));
+}
+
+/**
+ * [학습용 DCF 가정 적용] 이 사용자가 입력한 값을 덮어쓰게 되는가.
+ * 가정에 값이 하나라도 있고, 그것이 이미 학습용 값과 같은 것이 아니면 true (같으면 덮어써도 잃는 것이 없다).
+ * 상대가치 입력도 함께 비워지므로 값이 있으면 확인이 필요하다.
+ * 아무 입력도 없는 초기 상태에서는 false 라서 확인 없이 바로 적용한다.
+ */
+export function practiceApplyNeedsConfirmation(state: ProjectState): boolean {
+  if (hasRelativeInputs(state)) return true;
+  const a = state.valuationAssumptions;
+  if (a === null) return false;
+  const hasValue = Object.values(a).some((v) => v !== undefined);
+  return hasValue && !isPracticeAssumptions(a);
+}
+
+/** 사용자가 입력한 상대가치 값이 하나라도 있는가. */
+export function hasRelativeInputs(state: ProjectState): boolean {
+  return Object.values(state.relativeInputs).some((v) => v !== undefined);
+}
+
+/** 확인 절차를 거친 적용. 확인이 필요한데 승인하지 않았으면(취소) 상태를 그대로 돌려준다. */
+export function applyPracticeWithConfirmation(state: ProjectState, confirmed: boolean): ProjectState {
+  if (practiceApplyNeedsConfirmation(state) && !confirmed) return state;
+  return withPracticeAssumptions(state);
 }
 
 // ---- 저장 / 복원 ----

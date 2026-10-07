@@ -204,5 +204,8 @@ test('Forecast 화면 코드는 Valuation 결과를 읽지 않고 필요한 문�
   const formSrc = readFileSync(new URL('./forecastForm.ts', import.meta.url), 'utf8');
   for (const forbidden of ['valuationResult', 'sensitivityResult', 'runValuation']) assert.ok(!formSrc.includes(forbidden), forbidden);
   const ui = readFileSync(new URL('../components/valuation/ForecastStage.tsx', import.meta.url), 'utf8');
-  for (const needed of ['Based on latest actual revenue', 'Run Valuation', '학습용 가정', 'Actual', 'Estimate']) assert.ok(ui.includes(needed), needed);
+  for (const needed of ['Based on latest actual revenue', 'Run Valuation', 'Actual', 'Estimate']) assert.ok(ui.includes(needed), needed);
+  // 학습용 가정 배지는 단계마다 반복하지 않고 상단 패널 한 곳에서 보여 준다
+  const top = readFileSync(new URL('../components/valuation/ValuationControls.tsx', import.meta.url), 'utf8');
+  assert.ok(top.includes('학습용 가정'));
 });

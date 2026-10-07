@@ -246,3 +246,17 @@ test('Validation 모델 / 화면은 valuation 공개 API 만 사용한다', () =
     }
   }
 });
+
+// ---- STEP 07-7: Warning 은 실무 판단을 대신하는 기준이 아니다 ----
+test('경고는 판단이 아니라 검토 요청이며, 참고 기준(basis)을 함께 보여 준다', () => {
+  for (const w of view.warnings) {
+    assert.ok(w.basis.startsWith('참고 기준:'), w.code);
+    for (const forbidden of ['매수', '매도', '투자하세요', '과대평가', '과소평가', '고평가', '저평가', '적정']) assert.ok(!w.message.includes(forbidden), `${w.code}: ${forbidden}`);
+  }
+  assert.match(view.warnings.find((x) => x.code === 'tv-dependence')!.basis, /PV\(TV\) ÷ EV 80% 초과/);
+  const ui = readFileSync(new URL('../components/valuation/ValidationSummary.tsx', import.meta.url), 'utf8');
+  assert.ok(ui.includes('검토 필요'));
+  assert.ok(ui.includes('실무 판단이나 투자 판단을 대신하지 않습니다'));
+  assert.ok(ui.includes('w.basis'));
+  assert.ok(!ui.includes('검토 경고'));
+});
