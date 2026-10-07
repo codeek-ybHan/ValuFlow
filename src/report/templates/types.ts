@@ -1,10 +1,10 @@
 // STEP 09-2 Template 계약. ReportModel 은 데이터이고 Template 은 "어떤 section 을 어떤 순서 · 제목 · 번호 · 가시성 · layout 힌트로 보여 줄지"만 정한다.
 // Template 은 숫자를 만들거나 바꾸지 않는다 (Cell 은 모델 그대로이며 Renderer 도 다시 계산하지 않는다).
-import type { Cell, SourceRef } from '../types.ts';
-import type { Appendix, CompanyOverview, DcfSection, ExecutiveSummary, ForecastSection, HistoricalPerformance, KeyRisks, RelativeSection, ReportMetadata, ScenarioSection, SensitivitySection, TableRow, ValuationRangeSection, WaccSection } from '../model.ts';
+import type { Cell, SourceDocument, SourceKind, SourceProvider, SourceRef } from '../types.ts';
+import type { Appendix, ExternalReference, CompanyOverview, DcfSection, ExecutiveSummary, ForecastSection, HistoricalPerformance, KeyRisks, RelativeSection, ReportMetadata, ScenarioSection, SensitivitySection, TableRow, ValuationRangeSection, WaccSection } from '../model.ts';
 import type { Narrative, SectionState } from '../types.ts';
 
-export const SECTION_IDS = ['cover', 'executiveSummary', 'companyOverview', 'historicalPerformance', 'forecast', 'wacc', 'dcf', 'sensitivity', 'scenario', 'relativeValuation', 'keyRisks', 'conclusion', 'sources', 'appendix'] as const;
+export const SECTION_IDS = ['cover', 'executiveSummary', 'companyOverview', 'historicalPerformance', 'forecast', 'wacc', 'dcf', 'sensitivity', 'scenario', 'relativeValuation', 'marketReference', 'keyRisks', 'conclusion', 'sources', 'appendix'] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
 
 /** always: 데이터가 없어도 section 을 보여 준다(unavailable 안내) · when-available: 데이터가 없으면 숨기고 diagnostics 에 이유를 남긴다 · never: 이 template 에서 쓰지 않는다 */
@@ -45,13 +45,21 @@ export interface SourceEntry {
   marker: string;
   id: string;
   label: string;
+  /** ValuFlow Engine · OpenDART · Disclosure · Uploaded PDF · Assumption · Market Data · Peer Data · News · Learning Fixture */
   type: string;
+  kind: SourceKind;
   asOf: string | null;
   provider: string | null;
   reliability: string | null;
-  /** 문서 · page · section 등 가능한 정보만 */
+  /** 문서 · page · section · 접수번호 · 공시일 등 가능한 정보만 */
   reference: string | null;
   url: string | null;
+  /** 문서 · 뉴스 출처의 위치 정보 */
+  document: SourceDocument | null;
+  /** 외부 provider 메타데이터 (등급 · official · valuationGrade) */
+  providerInfo: SourceProvider | null;
+  /** Development provider 등 사용자가 알아야 하는 고지 */
+  notice: string | null;
 }
 
 export interface CoverContent {
@@ -97,6 +105,7 @@ export interface ForecastContent {
   projections: TableRow[];
   scalars: ForecastSection['scalars'];
   basisNote: string;
+  narrative: ForecastSection['narrative'];
   /** 가정의 출처 (user-input / learning-fixture) */
   assumptionSource: { sourceId: string; label: string; origin: string };
 }
@@ -121,6 +130,7 @@ export interface SectionContentMap {
   sensitivity: SensitivitySection;
   scenario: ScenarioSection;
   relativeValuation: RelativeSection & { inputSource: { sourceId: string; label: string } | null; note: string };
+  marketReference: ExternalReference;
   keyRisks: KeyRisks;
   conclusion: { headline: ExecutiveSummary['headline']; range: SectionState<ValuationRangeSection>; narrative: SectionState<Narrative>; disclaimers: string[] };
   sources: { entries: SourceEntry[] };
@@ -137,6 +147,8 @@ export interface AppendixContent {
   assumptionSources: { key: string; label: string; cell: Cell; sourceLabel: string }[];
   unitPolicy: Appendix['unitPolicy'];
   kindLegend: Appendix['kindLegend'];
+  narrativeRejected: Appendix['narrativeRejected'];
+  narrativeOmitted: number;
   technical: { schemaVersion: string; templateId: string; templateVersion: string; reportId: string; inputHash: string; contextSnapshotId: string; valuationSnapshotId: string | null };
 }
 

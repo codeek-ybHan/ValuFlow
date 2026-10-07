@@ -30,7 +30,7 @@ export interface Evidence {
   /** 문서 · 뉴스 근거의 짧은 발췌 (표시용, ≤240자). audit 에는 저장하지 않는다. */
   excerpt?: string;
   /** 외부 provider 의 신뢰 등급 (ProviderInfo) */
-  provider?: { name: string; reliability: string; tier: string };
+  provider?: { name: string; reliability: string; tier: string; official?: boolean; valuationGrade?: boolean };
   /** Historical DataQuality: 지표 상태(available | partial | ambiguous | missing …) 또는 Tool 의 review 경고('review') */
   quality?: string;
   /** 검색 품질 (문서 근거): 순위 · 점수 · 같은 검색의 결과 수 */

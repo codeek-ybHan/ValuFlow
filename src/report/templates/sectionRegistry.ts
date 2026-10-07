@@ -63,7 +63,7 @@ export const SECTION_REGISTRY: { [K in SectionId]: (m: ReportModel, ctx: Resolve
   forecast: (m) => {
     const f = m.forecast;
     const src = find(m, 'src-assumptions');
-    return ok({ periods: f.periods, assumptions: f.assumptions, projections: f.projections, scalars: f.scalars, basisNote: f.basisNote, assumptionSource: { sourceId: 'src-assumptions', label: src?.label ?? 'src-assumptions', origin: src?.origin ?? 'unknown' } }, noticesFor(m, { assumptions: true }));
+    return ok({ periods: f.periods, assumptions: f.assumptions, projections: f.projections, scalars: f.scalars, basisNote: f.basisNote, narrative: f.narrative, assumptionSource: { sourceId: 'src-assumptions', label: src?.label ?? 'src-assumptions', origin: src?.origin ?? 'unknown' } }, noticesFor(m, { assumptions: true }));
   },
 
   wacc: (m) => ok({
@@ -85,6 +85,8 @@ export const SECTION_REGISTRY: { [K in SectionId]: (m: ReportModel, ctx: Resolve
     }, noticesFor(m, { assumptions: true }));
   },
 
+  marketReference: (m) => (m.externalReference.status === 'ok' ? ok(m.externalReference.data) : na(m.externalReference.status === 'not-applicable' ? 'not-applicable' : 'unavailable', m.externalReference.reason)),
+
   keyRisks: (m) => {
     const k = m.keyRisks;
     return k.items.length > 0 || k.narrative.status === 'ok' ? ok(k) : na('unavailable', '표시할 위험 항목이 없습니다 (엔진 검토 경고 · 데이터 품질 검토 · AI risk claim 없음).');
@@ -103,7 +105,7 @@ export const SECTION_REGISTRY: { [K in SectionId]: (m: ReportModel, ctx: Resolve
       missingData: ctx.missingData,
       validationWarnings: m.appendix.validation.warnings,
       assumptionSources: m.appendix.inputAssumptions.map((a) => ({ key: a.key, label: a.label, cell: a.cell, sourceLabel: labelOf(a.cell.sourceId) })),
-      unitPolicy: m.appendix.unitPolicy, kindLegend: m.appendix.kindLegend,
+      unitPolicy: m.appendix.unitPolicy, kindLegend: m.appendix.kindLegend, narrativeRejected: m.appendix.narrativeRejected, narrativeOmitted: m.appendix.narrativeOmitted,
       technical: { schemaVersion: m.schemaVersion, templateId: ctx.template.id, templateVersion: ctx.template.version, reportId: m.metadata.reportId, inputHash: m.metadata.snapshot.inputHash, contextSnapshotId: m.metadata.snapshot.contextSnapshotId, valuationSnapshotId: m.metadata.snapshot.valuationSnapshotId },
     };
     return ok(content);

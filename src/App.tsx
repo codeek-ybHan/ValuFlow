@@ -7,7 +7,8 @@ import { Valuation } from './pages/Valuation';
 import { Workspace } from './pages/Workspace';
 import { AiAnalyst } from './pages/AiAnalyst';
 import { AnalystProvider } from './store/analyst';
-import { PlannedPage } from './pages/PlannedPage';
+import { ReportProvider } from './store/report';
+import { ReportPage } from './pages/ReportPage';
 import { LearnHome } from './pages/LearnHome';
 import { Roadmap } from './pages/Roadmap';
 import { StepOverview } from './pages/StepOverview';
@@ -34,6 +35,7 @@ export default function App() {
     <StateProvider>
       <ProjectProvider>
       <AnalystProvider>
+      <ReportProvider>
       <HashRouter>
         <Routes>
           <Route element={<Layout />}>
@@ -44,7 +46,7 @@ export default function App() {
             <Route path="valuation/:stage" element={<Valuation />} />
             <Route path="analysis" element={<Navigate to="/valuation/validation" replace />} />
             <Route path="ai" element={<AiAnalyst />} />
-            <Route path="report" element={<PlannedPage eyebrow="Report" title="Report" comingIn="STEP 09 · Report Automation" description="가치평가 보고서 생성과 내보내기 영역입니다." items={['Generate Report', 'Report Preview', 'Export PDF']} />} />
+            <Route path="report" element={<ReportPage />} />
 
             <Route path="learn">
               <Route index element={<LearnHome />} />
@@ -65,6 +67,7 @@ export default function App() {
           </Route>
         </Routes>
       </HashRouter>
+      </ReportProvider>
       </AnalystProvider>
       </ProjectProvider>
     </StateProvider>

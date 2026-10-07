@@ -7,6 +7,7 @@ import type { CheckpointKind, StepStatus, WorkflowOutcome, WorkflowType } from '
 import type { ClaimStatus, ClaimType, Confidence, Evidence, GroundedClaim } from '../grounding/types.ts';
 import { UNSUPPORTED_DISCLOSURE } from '../policy.ts';
 import { sameFamily } from '../agent/run.ts';
+import { aiAnalysisFromWorkflow, type AiAnalysisInput } from '../../report/input.ts';
 import { formatFinancialValue, formatPercent, normalizeDisplayUnit } from '../tools/display.ts';
 
 export type AnalystMode = 'quick' | 'workflow';
@@ -383,6 +384,8 @@ export interface AnalystTurn {
   wacc: WaccPanelView | null;
   error: ErrorView | null;
   debug: DebugInfo | null;
+  /** Report 에 쓸 수 있는 검증된 분석 snapshot (Deep Analysis 만. Quick 은 claim 구조가 없어 null) */
+  analysis: AiAnalysisInput | null;
 }
 
 /** 검토 대기 중인 제안이 모두 처리되면 completed 로 본다. */
@@ -459,6 +462,7 @@ export function buildWorkflowTurn(o: WorkflowOutcome, ctx: BuildContext, questio
     id: ctx.id, question, mode: 'workflow', askedAt: ctx.now, company: ctx.company, workflowType: o.plan.workflowType, workflowLabel: o.plan.label, contextSnapshotId: ctx.snapshotId,
     status, steps: stepViews, usedSources, answer: sections, evidence: evidence.map(evidenceView), sources: sourceViews(a?.sources ?? [], evidence), timeBasis, warnings, grounding, checkpoints,
     wacc: ctx.showWacc ? ctx.wacc : null, error: o.error ? errorView(o.error.code) : null,
+    analysis: a && !o.error && !unsupported && a.grounding ? aiAnalysisFromWorkflow(a, { analysisId: ctx.id, question, workflowType: o.plan.workflowType, contextSnapshotId: o.state.contextSnapshotId, createdAt: ctx.now }) : null,
     debug: g ? {
       coverage: g.coverage, claims: g.totalClaims, supported: g.groundedClaims, unsupported: Math.max(0, g.totalClaims - g.groundedClaims), regenerated: g.regenerated, fallback: g.fallbackUsed,
       firstPassCoverage: g.firstPass.coverage, violations: [...g.violations], corrections: [...g.corrections], toolsExecuted: o.state.toolsExecuted.map((t) => ({ ...t })), groundingLevel: 'claim-evidence',
@@ -486,7 +490,7 @@ export function buildQuickTurn(o: AiQueryOutcome, ctx: BuildContext, question: s
     id: ctx.id, question, mode: 'quick', askedAt: ctx.now, company: ctx.company, workflowType: null, workflowLabel: null, contextSnapshotId: ctx.snapshotId,
     status, steps: [], usedSources, evidence: [], sources, timeBasis: null, warnings, grounding: null, checkpoints: [], wacc: ctx.showWacc ? ctx.wacc : null,
     answer: a ? { summary: a.summary, keyFindings: [], interpretation: [], considerations: [], limitations: [], judgmentItems: [], nextActions: [...a.suggestedNextActions], reviewedAreas: [], plainEvidence: a.evidence.map((e) => ({ label: e.label, value: e.value, period: e.period ?? null, tool: toolLabel(e.tool) })) } : null,
-    error: o.error ? errorView(o.error.code) : null,
+    error: o.error ? errorView(o.error.code) : null, analysis: null,
     debug: { coverage: null, claims: 0, supported: 0, unsupported: 0, regenerated: false, fallback: false, firstPassCoverage: null, violations: [...o.audit.violations], corrections: [...o.corrections], toolsExecuted: executed.map((t) => ({ ...t })), groundingLevel: 'tool-guardrails' },
   };
 }

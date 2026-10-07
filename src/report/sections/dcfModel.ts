@@ -4,13 +4,13 @@ import type { ValuationInput, ValuationResult } from '../../valuation/index.ts';
 import type { ReportInput } from '../input.ts';
 import type { DcfSection, EquityBridge, ForecastSection, TableRow, WaccSection } from '../model.ts';
 import { SRC_ASSUMPTIONS, SRC_ENGINE } from '../sources.ts';
-import type { Cell, DataKind, PeriodLabel, ReportUnit } from '../types.ts';
+import type { Cell, DataKind, Narrative, PeriodLabel, ReportUnit, SectionState } from '../types.ts';
 import { cell } from '../units.ts';
 
 const series = (key: string, label: string, unit: ReportUnit, kind: DataKind, src: string, values: number[], note: string | null = null): TableRow => ({ key, label, unit, note, cells: values.map((v) => cell(v, unit, kind, src)) });
 const estimatePeriods = (input: ReportInput, n: number): PeriodLabel[] => forecastLabels(input.historical?.company.period, n).map((label) => ({ label, kind: 'estimate' as const }));
 
-export function buildForecast(input: ReportInput, a: ValuationInput, r: ValuationResult): ForecastSection {
+export function buildForecast(input: ReportInput, a: ValuationInput, r: ValuationResult, narrative: SectionState<Narrative>): ForecastSection {
   const n = r.fcff.length;
   const A = SRC_ASSUMPTIONS;
   return {
@@ -31,6 +31,7 @@ export function buildForecast(input: ReportInput, a: ValuationInput, r: Valuatio
       { key: 'taxRate', label: 'Tax Rate', cell: cell(a.taxRate, 'ratio', 'estimate', A) },
     ],
     basisNote: 'Forecast(E)는 가정과 그 투영이며 Actual(A)이 아닙니다.',
+    narrative,
   };
 }
 
@@ -48,7 +49,7 @@ export function buildWacc(a: ValuationInput, r: ValuationResult): WaccSection {
   };
 }
 
-export function buildDcf(input: ReportInput, a: ValuationInput, r: ValuationResult): DcfSection {
+export function buildDcf(input: ReportInput, a: ValuationInput, r: ValuationResult, narrative: SectionState<Narrative>): DcfSection {
   const E = SRC_ENGINE, A = SRC_ASSUMPTIONS;
   const t = (key: string, label: string, v: number, unit: ReportUnit, kind: DataKind, src: string) => ({ key, label, cell: cell(v, unit, kind, src) });
   return {
@@ -71,6 +72,7 @@ export function buildDcf(input: ReportInput, a: ValuationInput, r: ValuationResu
       t('sharesOutstanding', 'Shares Outstanding (입력)', a.sharesOutstanding, 'shares', 'estimate', A), t('perShareValue', 'Value per Share', r.perShareValue, 'won', 'calculated', E),
     ],
     equityBridge: buildEquityBridge(a, r),
+    narrative,
     tvContribution: cell(input.reviewMetrics?.terminalValueContribution, 'ratio', 'calculated', E, { state: 'unavailable', reason: 'PV(TV) / EV 를 구할 수 없습니다.' }),
   };
 }

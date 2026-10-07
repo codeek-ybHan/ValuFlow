@@ -62,7 +62,7 @@ test('2. section title', () => {
 test('3. required section: 필수 section 은 숨길 수 없고, 필수 표시는 template 이 가진다', () => {
   const req = valuationStandardV1.sections.filter((s) => s.required).map((s) => s.sectionId);
   assert.deepEqual(req, ['cover', 'executiveSummary', 'companyOverview', 'historicalPerformance', 'forecast', 'wacc', 'dcf', 'conclusion', 'sources', 'appendix']);
-  assert.deepEqual(valuationStandardV1.sections.filter((s) => !s.required).map((s) => s.sectionId), ['sensitivity', 'scenario', 'relativeValuation', 'keyRisks']);
+  assert.deepEqual(valuationStandardV1.sections.filter((s) => !s.required).map((s) => s.sectionId), ['sensitivity', 'scenario', 'relativeValuation', 'marketReference', 'keyRisks']);
   const bad: ReportTemplate = { ...valuationStandardV1, id: 'bad', sections: valuationStandardV1.sections.map((s) => (s.sectionId === 'dcf' ? { ...s, visibility: 'never' as const } : s)) };
   assert.match(validateTemplate(bad)[0]!, /필수 section 을 숨길 수 없습니다: dcf/);
   assert.throws(() => buildReportDocument(modelOf(inputOf()), bad), TemplateError);
@@ -77,14 +77,15 @@ test('4. optional sensitivity: 없으면 숨기고 이유를 diagnostics 에 남
   const p = full();
   const d = docOf({ ...p, sensitivityResult: null });
   assert.ok(!sec(d, 'sensitivity'));
-  assert.deepEqual(d.diagnostics.hiddenSections.map((h) => [h.sectionId, h.reason]), [['sensitivity', 'Sensitivity 가 계산되지 않았습니다.']]);
-  assert.deepEqual(d.sections.filter((s) => s.number !== null && s.number !== 'A').map((s) => s.number), ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'], '숨긴 section 때문에 번호에 구멍이 생기지 않는다');
+  assert.deepEqual(d.diagnostics.hiddenSections.map((h) => h.sectionId), ['sensitivity', 'marketReference'], 'AI 근거가 없으면 Market & Peer Reference 도 숨긴다');
+  assert.equal(d.diagnostics.hiddenSections[0]!.reason, 'Sensitivity 가 계산되지 않았습니다.');
+  assert.deepEqual(d.sections.filter((s) => s.number !== null && s.number !== 'A').map((s) => s.number), ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'].slice(0, d.sections.length - 2), '숨긴 section 때문에 번호에 구멍이 생기지 않는다');
   // template 이 "unavailable 로 보여 주기"를 고르면 빈 표 없이 상태와 이유만 보인다
   const showing: ReportTemplate = { ...valuationStandardV1, id: 'show', sections: valuationStandardV1.sections.map((s) => (s.sectionId === 'sensitivity' ? { ...s, visibility: 'always' as const } : s)) };
   const d2 = docOf({ ...p, sensitivityResult: null }, null, showing);
   const s = sec(d2, 'sensitivity')!;
   assert.deepEqual([s.status, s.content, s.reason], ['unavailable', null, 'Sensitivity 가 계산되지 않았습니다.']);
-  assert.equal(d2.diagnostics.hiddenSections.length, 0);
+  assert.deepEqual(d2.diagnostics.hiddenSections.map((h) => h.sectionId), ['marketReference']);
 });
 
 test('5. optional scenario: 모델에 없으면 숨긴다', () => {
@@ -287,9 +288,10 @@ test('19. source registry: [S1]… 번호 · label · type · as-of · provider 
   const input = inputOf();
   const d = docOf(full(), aiFor(input));
   assert.deepEqual(d.sources.map((s) => s.marker), d.sources.map((_, i) => `S${i + 1}`));
-  assert.deepEqual(d.sources.slice(0, 3).map((s) => [s.marker, s.id, s.type]), [['S1', 'src-historical', 'Historical (Actual)'], ['S2', 'src-assumptions', 'Assumption'], ['S3', 'src-engine', 'Valuation Engine']]);
+  assert.deepEqual(d.sources.slice(0, 3).map((s) => [s.marker, s.id, s.type]), [['S1', 'src-historical', 'OpenDART'], ['S2', 'src-assumptions', 'Learning Fixture'], ['S3', 'src-engine', 'ValuFlow Engine']]);
   const doc = d.sources.find((s) => s.type === 'Disclosure')!;
   assert.deepEqual([doc.label, doc.asOf, doc.provider, doc.reference], ['사업보고서 (2025.12)', '2026-03-10', 'opendart', 'II. 사업의 내용 · documentId 20260310002820']);
+  assert.equal(doc.document?.section, 'II. 사업의 내용');
   const mkt = d.sources.find((s) => s.type === 'Market Data')!;
   assert.deepEqual([mkt.provider, mkt.reliability, mkt.asOf], ['yahoo-finance', 'unofficial · development', '2026-10-07T03:00:00+00:00']);
   assert.deepEqual(content(d, 'sources').entries, d.sources);
@@ -310,8 +312,7 @@ test('20. footnote reference: sourceId → [S#] marker contract (Cell · narrati
   assert.deepEqual(markersOf(d.footnoteIndex, item.sourceIds), [docSrc.marker]);
   assert.equal(markerText(markersOf(d.footnoteIndex, [docSrc.id, 'src-historical'])), `[S1][${docSrc.marker}]`, '번호 순서, 중복 제거');
   assert.deepEqual(markersOf(d.footnoteIndex, ['unknown-source']), [], '알 수 없는 출처는 marker 를 만들지 않는다');
-  assert.deepEqual(sec(d, 'historicalPerformance')!.sourceMarkers, ['S1', docSrc.marker], 'Historical 표(S1)와 그 section 의 AI fact claim 이 인용한 공시 출처');
-  assert.deepEqual(sec(docOf(), 'historicalPerformance')!.sourceMarkers, ['S1'], 'AI 가 없으면 Historical 출처만');
+  assert.deepEqual(sec(d, 'historicalPerformance')!.sourceMarkers, ['S1'], 'Historical 표의 출처 (공시 claim 은 한 번만 쓰이므로 Executive Summary 에 있다)');
   assert.ok(sec(d, 'dcf')!.sourceMarkers.includes('S3') && sec(d, 'dcf')!.sourceMarkers.includes('S2'));
   assert.ok(sec(d, 'executiveSummary')!.sourceMarkers.includes(docSrc.marker));
   assert.deepEqual(sec(d, 'sources')!.sourceMarkers, []);

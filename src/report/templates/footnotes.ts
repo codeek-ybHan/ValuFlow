@@ -18,13 +18,37 @@ export function markersOf(index: Record<string, string>, ids: string | string[] 
 /** "[S1][S3]" 형태 문자열 (Renderer 가 그대로 붙일 수 있는 표기). */
 export const markerText = (markers: string[]): string => markers.map((m) => `[${m}]`).join('');
 
-const KIND_LABEL: Record<string, string> = { historical: 'Historical (Actual)', assumption: 'Assumption', engine: 'Valuation Engine', market: 'Market Data', disclosure: 'Disclosure', document: 'Uploaded Document', news: 'News', ai: 'AI Analysis' };
+/** 출처 종류 라벨: ValuFlow Engine · OpenDART · Disclosure · Uploaded PDF · Assumption · Market Data · Peer Data · News · Learning Fixture */
+export function sourceTypeLabel(s: SourceRef): string {
+  switch (s.kind) {
+    case 'historical': return s.origin === 'fixture' ? 'Learning Fixture' : 'OpenDART';
+    case 'assumption': return s.origin === 'learning-fixture' ? 'Learning Fixture' : 'Assumption';
+    case 'engine': return 'ValuFlow Engine';
+    case 'disclosure': return 'Disclosure';
+    case 'document': return 'Uploaded PDF';
+    case 'market': return 'Market Data';
+    case 'peer': return 'Peer Data';
+    case 'news': return 'News';
+    default: return 'AI Analysis';
+  }
+}
+
+const DEV_NOTICE = 'Development Source: 공식 · Valuation 등급 데이터가 아닙니다 (참고용).';
 
 export function sourceEntries(sources: SourceRef[], index: Record<string, string>): SourceEntry[] {
-  return sources.map((s) => ({
-    marker: index[s.id]!, id: s.id, label: s.label, type: KIND_LABEL[s.kind] ?? s.kind, asOf: s.asOf, provider: s.origin, reliability: s.reliability,
-    reference: [s.basis, s.note && !/^https?:/.test(s.note) ? s.note : null].filter(Boolean).join(' · ') || null, url: s.note && /^https?:/.test(s.note) ? s.note : null,
-  }));
+  return sources.map((s) => {
+    const d = s.document ?? null;
+    const reference = [
+      s.document ? null : s.basis,
+      d?.section, d?.page != null ? `p.${d.page}` : null, d?.receiptNo ? `접수번호 ${d.receiptNo}` : null, d?.filingDate ? `공시일 ${d.filingDate}` : null, d?.publisher,
+      s.note && !/^https?:/.test(s.note) ? s.note : null,
+    ].filter(Boolean).join(' · ') || null;
+    const url = d?.url ?? (s.note && /^https?:/.test(s.note) ? s.note : null);
+    return {
+      marker: index[s.id]!, id: s.id, label: s.label, type: sourceTypeLabel(s), kind: s.kind, asOf: s.asOf, provider: s.origin, reliability: s.reliability, reference, url, document: d, providerInfo: s.provider ?? null,
+      notice: s.provider?.development ? DEV_NOTICE : null,
+    };
+  });
 }
 
 /** content 안에서 sourceId / sourceIds 를 모은다 (Cell · NarrativeItem · RiskItem · dataSource …). */

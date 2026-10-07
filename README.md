@@ -308,3 +308,6 @@ src/
 학습 기록(Lesson 완료, 메모, Quiz 답안, Practice, 재무 데이터셋)과 계산기 입력값은 브라우저 `localStorage` 에만 저장됩니다. 서버로 전송되지 않으며, 브라우저를 바꾸거나 사이트 데이터를 지우면 사라집니다. 초기화는 Learn의 Project Report 페이지 "학습 기록 초기화"에서 할 수 있습니다.
 
 초기 상태에서는 STEP 01 이 IN PROGRESS 이고 Lesson 01~06 과 Quiz 가 완료로 표시됩니다. Quiz 는 완료 표시만 있고 답안 기록은 없습니다.
+
+## Report Automation (STEP 09)
+`/report` 에서 현재 Project snapshot 으로 Valuation Report 를 생성·Preview 하고 PDF/HTML/JSON 으로 내보낸다. PDF 는 backend(`POST /api/report/pdf`, reportlab)가 만들며 한글 폰트 전략은 `backend/app/report/fonts.py` 참고. 자세한 내용: `docs/STEP09_report_automation.md`. QA: `node scripts/report-qa.ts <dir>` 후 `backend/.venv/bin/python backend/scripts/verify_report_pdf.py <dir>`.

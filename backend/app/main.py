@@ -5,10 +5,11 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import FastAPI, File, Form, Query, Request, UploadFile
+from fastapi import Body, FastAPI, File, Form, Query, Request, UploadFile
+from urllib.parse import quote
 from pydantic import BaseModel, Field
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.config import Settings, load_settings
 from app.dart.client import DartHttpClient
@@ -23,6 +24,7 @@ from app.ai.gateway import AiGateway
 from app.ai.provider import OpenAiProvider
 from app.ai.runtime import make_retrieval_tools
 from app.knowledge.loaders.pdf_loader import PdfError
+from app.report.pdf import ReportError, render_pdf
 from app.knowledge.service import KnowledgeService, parse_meta
 from app.rag.rerank import Reranker, build_reranker
 from app.ai.external_tools import ExternalProviders, TickerInfo, make_external_tools
@@ -172,6 +174,10 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
 
     @app.exception_handler(PdfError)
     async def _pdf_error(_: Request, exc: PdfError) -> JSONResponse:
+        return JSONResponse({"error": {"code": exc.code, "message": exc.message}}, status_code=exc.status)
+
+    @app.exception_handler(ReportError)
+    async def _report_error(_: Request, exc: ReportError) -> JSONResponse:
         return JSONResponse({"error": {"code": exc.code, "message": exc.message}}, status_code=exc.status)
 
     @app.exception_handler(RequestValidationError)
@@ -332,6 +338,23 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
     def ai_regenerate(body: AiRegenerateRequest) -> dict[str, Any]:
         """Grounding 검증에 실패한 workflow 답변을 위반 목록과 허용 근거만으로 1회 교정 재생성한다 (Tool 결과 원문 전체는 보내지 않는다)."""
         return _require_ai().regenerate(body.question, body.answer, body.issues, body.evidence)
+
+    @app.post("/api/report/pdf")
+    def report_pdf(request: Request, render_model: dict[str, Any] = Body(...)) -> Response:
+        """RenderModel(JSON)을 A4 PDF 로 그린다. 값은 계산하지 않고 표시 문자열을 그대로 그린다 (외부 API · LLM 호출 없음). 한글 폰트는 서버 폰트 전략(app/report/fonts.py)을 따른다."""
+        if int(request.headers.get("content-length") or 0) > 8 * 1024 * 1024:
+            raise ReportError("render-model-too-large", "Report 가 너무 큽니다.", 413)
+        try:
+            data, info = render_pdf(render_model)
+        except ReportError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise ReportError("pdf-render-failed", "PDF 를 만들지 못했습니다.", 500) from exc   # 내부 오류 내용은 노출하지 않는다
+        meta = render_model.get("meta", {})
+        name = str(meta.get("filename") or "ValuFlow_Valuation_Report.pdf")
+        ascii_name = "".join(c if c.isascii() and (c.isalnum() or c in "._-") else "_" for c in name) or "ValuFlow_Report.pdf"
+        headers = {"Content-Disposition": f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(name)}", "X-Report-Font": info["font"], "X-Report-Pages": info["pages"], "Cache-Control": "no-store"}
+        return Response(content=data, media_type="application/pdf", headers=headers)
 
     return app
 

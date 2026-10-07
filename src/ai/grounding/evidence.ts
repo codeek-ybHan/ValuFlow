@@ -58,7 +58,7 @@ export function extractEvidence(results: ToolResult<unknown>[]): EvidenceIndex {
     const label = src ? (src.title ?? src.reportName ?? `${src.origin}${src.basis ? `:${src.basis}` : ''}`) : undefined;
     const data = rec(r.data);
     if (!data) continue;
-    const provider = (() => { const p = rec(Array.isArray(data.providers) ? data.providers[0] : null); return p ? { name: String(p.name), reliability: String(p.reliability), tier: String(p.tier) } : undefined; })();
+    const provider = (() => { const p = rec(Array.isArray(data.providers) ? data.providers[0] : null); return p ? { name: String(p.name), reliability: String(p.reliability), tier: String(p.tier), ...(typeof p.official === 'boolean' ? { official: p.official } : {}), ...(typeof p.valuationGrade === 'boolean' ? { valuationGrade: p.valuationGrade } : {}) } : undefined; })();
     const histReview = r.tool.startsWith('getHistorical') && r.warnings.some((w) => w.level === 'review');
     const periods = Array.isArray(data.periods) ? (data.periods as unknown[]).map(String) : null;
     const unitsRec = rec(data.units);

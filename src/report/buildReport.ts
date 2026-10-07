@@ -7,7 +7,9 @@ import type { ReportInput } from './input.ts';
 import type { Appendix, CompanyOverview, Conclusion, ExecutiveSummary, KeyRisks, ReportMetadata, ReportModel, RiskItem } from './model.ts';
 import { buildRange, buildRelative, buildScenario, buildSensitivity } from './sections/analysis.ts';
 import { buildHistorical, periodLabels } from './sections/historical.ts';
-import { selectNarrative } from './sections/narrative.ts';
+import { buildNarrative } from './narrative/buildNarrative.ts';
+import { buildExternalReference } from './sections/externalReference.ts';
+import { collectSourceIds } from './templates/footnotes.ts';
 import { buildDcf, buildForecast, buildWacc } from './sections/dcfModel.ts';
 import { baseSources, SRC_ASSUMPTIONS, SRC_ENGINE, SRC_HISTORICAL, SourceRegistry } from './sources.ts';
 import { REPORT_SCHEMA_VERSION } from './types.ts';
@@ -44,15 +46,16 @@ export function buildReport(input: ReportInput, options: BuildReportOptions = {}
   baseSources(input, reg);
 
   // ---- AI narrative: 검증을 통과한 claim 만 (유형별로 나눠 쓰고 새 문장을 만들지 않는다) ----
-  const summaryNarrative = selectNarrative(input, reg, ['fact', 'calculation', 'interpretation'], 5);
-  const historicalNarrative = selectNarrative(input, reg, ['fact', 'calculation'], 4);
-  const riskNarrative = selectNarrative(input, reg, ['risk'], 5);
-  const conclusionNarrative = selectNarrative(input, reg, ['recommendation'], 3);
+  const narrative = buildNarrative(input, reg);
+  const summaryNarrative = narrative.sections.executiveSummary;
+  const riskNarrative = narrative.sections.keyRisks;
+  const conclusionNarrative = narrative.sections.conclusion;
 
   const notices: string[] = [];
   if (input.historicalKind === 'fixture') notices.push('Historical 은 학습용 fixture 이며 실제 공시 조회 결과가 아닙니다.');
   if (input.assumptionKind === 'learning') notices.push('가정이 STEP 04 학습용 가상값입니다. 이 결과를 해당 기업의 가치평가로 해석하면 안 됩니다.');
 
+  const externalReference = buildExternalReference(input, reg);
   const range = buildRange(input);
   const executiveSummary: ExecutiveSummary = {
     headline: {
@@ -84,11 +87,12 @@ export function buildReport(input: ReportInput, options: BuildReportOptions = {}
 
   const appendix: Appendix = {
     unitPolicy: Object.entries(REPORT_UNIT_POLICY).map(([key, value]) => ({ key, value })),
-    kindLegend: KIND_LEGEND,
+    kindLegend: externalReference.status === 'ok' ? [...KIND_LEGEND, { kind: 'reference' as const, meaning: 'Reference: 외부 시장 · Peer 관측값. Actual 도 Estimate 도 아니며 Valuation 에 사용하지 않았다' }] : KIND_LEGEND,
     dataQualityNotes: [...new Set([...(input.historicalAnalysis.warnings), ...(quality?.notes.map((n) => n.text) ?? [])])],
     inputAssumptions: ASSUMPTION_LABELS.map(([key, label, unit]) => ({ key, label, cell: cell((a as unknown as Record<string, number>)[key], unit, 'estimate', SRC_ASSUMPTIONS) })),
     validation: { errors: validation.errors, warnings: validation.warnings },
     aiLimitations: input.aiAnalysis ? [...input.aiAnalysis.limitations] : [],
+    narrativeRejected: narrative.rejected, narrativeOmitted: narrative.omitted,
   };
 
   const snap = input.snapshot;
@@ -106,11 +110,15 @@ export function buildReport(input: ReportInput, options: BuildReportOptions = {}
 
   const model: ReportModel = {
     schemaVersion: REPORT_SCHEMA_VERSION, metadata, executiveSummary, companyOverview,
-    historicalPerformance: buildHistorical(input, historicalNarrative),
-    forecast: buildForecast(input, a, r), wacc: buildWacc(a, r), dcf: buildDcf(input, a, r),
-    sensitivity: buildSensitivity(input), scenario: buildScenario(input), relativeValuation: buildRelative(input),
+    historicalPerformance: buildHistorical(input, narrative.sections.historicalCommentary),
+    forecast: buildForecast(input, a, r, narrative.sections.forecastCommentary), wacc: buildWacc(a, r), dcf: buildDcf(input, a, r, narrative.sections.valuationCommentary),
+    sensitivity: buildSensitivity(input), scenario: buildScenario(input), relativeValuation: buildRelative(input), externalReference,
     keyRisks, conclusion, sources: reg.all(), appendix,
   };
+  // 출처 정책: 어디에도 인용되지 않은 출처는 목록에 두지 않는다 (예: 항목 수 제한으로 싣지 않은 claim 의 출처). 인용된 출처만 번호를 받는다.
+  const { sources: _s, metadata: _m, ...body } = model;
+  const referenced = collectSourceIds(body);
+  model.sources = model.sources.filter((s) => referenced.has(s.id));
   model.metadata.sourceSummary = model.sources.map((s) => ({ id: s.id, kind: s.kind, label: s.label }));
   return { status: 'ok', model: structuredClone(model), validation };
 }

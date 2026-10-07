@@ -74,7 +74,7 @@ export async function askAnalyst(o: AskOptions): Promise<AnalystTurn> {
 export function emptyTurn(base: BuildContext, question: string, mode: AnalystMode): AnalystTurn {
   return {
     id: base.id, question, mode, askedAt: base.now, company: base.company, workflowType: null, workflowLabel: null, contextSnapshotId: base.snapshotId, status: 'failed', steps: [], usedSources: [],
-    answer: null, evidence: [], sources: [], timeBasis: null, warnings: [], grounding: null, checkpoints: [], wacc: null, error: null, debug: null,
+    answer: null, evidence: [], sources: [], timeBasis: null, warnings: [], grounding: null, checkpoints: [], wacc: null, error: null, debug: null, analysis: null,
   };
 }
 

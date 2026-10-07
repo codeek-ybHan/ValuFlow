@@ -7,4 +7,5 @@ psycopg[binary]>=3.2
 pgvector>=0.3
 python-multipart>=0.0.9
 pypdf>=5
+reportlab>=4   # Report PDF 렌더링 (app/report). 한글 폰트는 서버 폰트 전략을 따른다
 yfinance>=0.2.50

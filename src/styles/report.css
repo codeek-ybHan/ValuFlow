@@ -1,0 +1,30 @@
+/* ===== Report Workspace (STEP 09-7) ===== */
+.rp-grid { display: grid; grid-template-columns: 280px minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+.rp-left, .rp-right { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 76px; max-height: calc(100vh - 92px); overflow-y: auto; scrollbar-width: thin; }
+.rp-center { min-width: 0; }
+.rp-paper { background: #fff; color: #1c1e22; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 40px 44px; box-shadow: var(--shadow-1); overflow-x: auto; }
+.rp-empty { padding: 36px; text-align: center; }
+.rp-empty h3 { margin-bottom: 8px; }
+.rp-empty .rp-issues { text-align: left; max-width: 640px; margin: 14px auto 0; }
+.rp-fieldset { border: 0; padding: 0; margin: 0; }
+.rp-fieldset legend { font-size: 14px; font-weight: 700; margin-bottom: 8px; padding: 0; }
+.rp-radio, .rp-check { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; font-size: 13.5px; cursor: pointer; }
+.rp-radio input, .rp-check input { margin-top: 3px; flex: none; }
+.rp-radio span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rp-radio small, .rp-check small { color: var(--muted); font-size: 12px; }
+.rp-check small { margin-left: 6px; }
+.rp-fresh { font-weight: 650; }
+.rp-fresh::before { content: '● '; }
+.rp-current { color: var(--pos); }
+.rp-stale { color: var(--warn); }
+.rp-banner { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; border: 1px solid var(--warn); background: var(--warn-soft); color: var(--ink); border-radius: var(--radius-sm); padding: 10px 14px; margin: 0 0 16px; font-size: 13.5px; }
+.rp-banner strong { color: var(--warn); }
+.rp-issues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rp-issue { display: flex; gap: 8px; font-size: 13px; line-height: 1.5; }
+.rp-sev { flex: none; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border: 1px solid currentColor; border-radius: 4px; height: fit-content; }
+.rp-error .rp-sev, .rp-issue.rp-error .rp-sev { color: var(--neg); }
+.rp-issue.rp-warning .rp-sev { color: var(--warn); }
+.rp-error { color: var(--neg); }
+.rp-export .btn.block { margin-bottom: 8px; }
+@media (max-width: 1180px) { .rp-grid { grid-template-columns: 260px minmax(0, 1fr); } .rp-right { grid-column: 1 / -1; position: static; max-height: none; flex-direction: row; flex-wrap: wrap; } .rp-right > * { flex: 1 1 280px; } }
+@media (max-width: 860px) { .rp-grid { grid-template-columns: minmax(0, 1fr); } .rp-left { position: static; max-height: none; } .rp-paper { padding: 20px 16px; } }

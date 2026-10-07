@@ -61,6 +61,8 @@ export interface ForecastSection {
   projections: TableRow[];
   scalars: { key: string; label: string; cell: Cell }[];
   basisNote: string;
+  /** Forecast Commentary: 검증된 AI claim 만 (없으면 unavailable) */
+  narrative: SectionState<Narrative>;
 }
 
 export interface WaccSection {
@@ -84,6 +86,8 @@ export interface DcfSection {
   bridge: { key: string; label: string; cell: Cell }[];
   equityBridge: EquityBridge;
   tvContribution: Cell;
+  /** Valuation Commentary: 검증된 AI claim 만 (없으면 unavailable) */
+  narrative: SectionState<Narrative>;
 }
 
 export interface SensitivitySection {
@@ -121,6 +125,22 @@ export interface RiskItem {
   sourceIds: string[];
 }
 
+/** Market & Peer Reference: 선택한 AI 분석의 evidence snapshot 으로만 들어온 외부 시장 · Peer 관측값. Report 가 외부 API 를 새로 호출하지 않고 Valuation 에도 쓰지 않는 참고값(kind=reference)이다. */
+export interface ExternalReferenceItem {
+  key: string;
+  label: string;
+  group: 'market' | 'peer';
+  toolLabel: string;
+  cell: Cell;
+  asOf: string | null;
+  evidenceId: string;
+  /** provider 라벨 (이름 · 등급) */
+  providerLabel: string | null;
+  /** Development provider 인가 (공식 · Valuation 등급이 아님) */
+  development: boolean;
+}
+export interface ExternalReference { items: ExternalReferenceItem[]; notice: string }
+
 export interface KeyRisks { items: RiskItem[]; narrative: SectionState<Narrative> }
 
 export interface ValuationRangeSection {
@@ -136,11 +156,14 @@ export interface Conclusion { range: SectionState<ValuationRangeSection>; narrat
 
 export interface Appendix {
   unitPolicy: { key: string; value: string }[];
-  kindLegend: { kind: 'actual' | 'estimate' | 'calculated'; meaning: string }[];
+  kindLegend: { kind: 'actual' | 'estimate' | 'calculated' | 'reference'; meaning: string }[];
   dataQualityNotes: string[];
   inputAssumptions: { key: string; label: string; cell: Cell }[];
   validation: { errors: ReportIssue[]; warnings: ReportIssue[] };
   aiLimitations: string[];
+  /** 사용하지 못한 AI claim 과 이유 (같은 snapshot · 검증 · 출처 추적 기준) */
+  narrativeRejected: { claimId: string; reason: string }[];
+  narrativeOmitted: number;
 }
 
 export interface ReportModel {
@@ -155,6 +178,7 @@ export interface ReportModel {
   sensitivity: SectionState<SensitivitySection>;
   scenario: SectionState<ScenarioSection>;
   relativeValuation: SectionState<RelativeSection>;
+  externalReference: SectionState<ExternalReference>;
   keyRisks: KeyRisks;
   conclusion: Conclusion;
   sources: SourceRef[];

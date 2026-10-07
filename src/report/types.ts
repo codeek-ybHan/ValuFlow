@@ -6,7 +6,8 @@ export const REPORT_SCHEMA_VERSION = '1.0' as const;
 export type ReportSchemaVersion = typeof REPORT_SCHEMA_VERSION;
 
 /** Actual: 공시 확정값 · Estimate: 가정 · 예측값(2026E …) · Calculated: 엔진이 계산한 결과. Estimate 를 Actual 처럼 표현하지 않는다. */
-export type DataKind = 'actual' | 'estimate' | 'calculated';
+/** reference: 외부 시장 · Peer 관측값 (Actual 도 Estimate 도 아니고 Valuation 에 쓰지 않은 참고값) */
+export type DataKind = 'actual' | 'estimate' | 'calculated' | 'reference';
 
 /** 값이 없는 이유를 구분한다: missing(있어야 하는데 없음) · unavailable(출처가 제공하지 않음) · not-applicable(정의상 해당 없음). 0 · N/A 로 뭉뚱그리지 않는다. */
 export type CellState = 'ok' | 'missing' | 'unavailable' | 'not-applicable';
@@ -30,7 +31,7 @@ export interface Cell {
   reason: string | null;
 }
 
-export type SourceKind = 'historical' | 'assumption' | 'engine' | 'market' | 'disclosure' | 'document' | 'news' | 'ai';
+export type SourceKind = 'historical' | 'assumption' | 'engine' | 'market' | 'peer' | 'disclosure' | 'document' | 'news' | 'ai';
 
 export interface SourceRef {
   id: string;
@@ -43,7 +44,14 @@ export interface SourceRef {
   /** 외부 provider 등급 (development · unofficial …) */
   reliability: string | null;
   note: string | null;
+  /** 문서 · 뉴스 출처의 위치 정보 (가능한 것만) */
+  document?: SourceDocument;
+  /** 외부 provider 메타데이터 (AI 근거가 가진 값 그대로) */
+  provider?: SourceProvider;
 }
+
+export interface SourceDocument { title: string | null; reportName: string | null; filingDate: string | null; receiptNo: string | null; documentId: string | null; section: string | null; page: number | null; publisher: string | null; url: string | null }
+export interface SourceProvider { name: string; reliability: string; tier: string; official: boolean | null; valuationGrade: boolean | null; development: boolean }
 
 export interface PeriodLabel { label: string; kind: 'actual' | 'estimate' }
 

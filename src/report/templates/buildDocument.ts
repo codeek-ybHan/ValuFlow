@@ -27,7 +27,6 @@ export function buildReportDocument(model: ReportModel, template: ReportTemplate
   const bad = validateTemplate(template);
   if (bad.length > 0) throw new TemplateError(`잘못된 template(${template.id}): ${bad.join('; ')}`);
 
-  const footnoteIndex = buildFootnoteIndex(model.sources);
   const ordered = [...template.sections].sort((a, b) => a.order - b.order);
   const ctx: ResolveContext = { template, missingData: [] };
   const hidden: ReportDocument['diagnostics']['hiddenSections'] = [];
@@ -45,6 +44,12 @@ export function buildReportDocument(model: ReportModel, template: ReportTemplate
   for (const t of ordered) if (t.sectionId !== 'appendix') resolve(t);
   const appendixT = ordered.find((t) => t.sectionId === 'appendix');
   if (appendixT) resolve(appendixT);
+
+  // 숨겨진 section 에서만 쓰인 출처는 Sources 에서도 뺀다 (인용되지 않는 출처 0). 번호는 남은 출처로 S1.. 다시 매긴다.
+  const usedIds = new Set<string>();
+  for (const [id, s] of shown) if (id !== 'sources' && s.res.content) collectSourceIds(s.res.content, usedIds);
+  const sources = model.sources.filter((x) => usedIds.has(x.id));
+  const footnoteIndex = buildFootnoteIndex(sources);
 
   let n = 0;
   const sections: ResolvedSection[] = [];
@@ -74,7 +79,7 @@ export function buildReportDocument(model: ReportModel, template: ReportTemplate
   return {
     documentVersion: '1.0',
     template: { id: template.id, name: template.name, version: template.version },
-    metadata: model.metadata, banners, sections, sources: sourceEntries(model.sources, footnoteIndex), footnoteIndex,
+    metadata: model.metadata, banners, sections, sources: sourceEntries(sources, footnoteIndex), footnoteIndex,
     diagnostics: { hiddenSections: hidden, sectionStatus: status },
   };
 }

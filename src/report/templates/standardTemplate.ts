@@ -19,10 +19,11 @@ export const valuationStandardV1: ReportTemplate = {
     S(8, { sectionId: 'sensitivity', title: 'Sensitivity Analysis', required: false, visibility: 'when-available', numbering: 'decimal', layout: { kind: 'matrix' } }),
     S(9, { sectionId: 'scenario', title: 'Scenario Analysis', required: false, visibility: 'when-available', numbering: 'decimal', layout: { kind: 'columns', columns: 3 } }),
     S(10, { sectionId: 'relativeValuation', title: 'Relative Valuation', required: false, visibility: 'when-available', numbering: 'decimal', layout: { kind: 'table' } }),
-    S(11, { sectionId: 'keyRisks', title: 'Key Risks / Considerations', required: false, visibility: 'when-available', numbering: 'decimal', layout: { kind: 'list' } }),
-    S(12, { sectionId: 'conclusion', title: 'Conclusion', required: true, visibility: 'always', numbering: 'decimal', layout: { kind: 'narrative' } }),
-    S(13, { sectionId: 'sources', title: 'Sources', required: true, visibility: 'always', numbering: 'decimal', layout: { kind: 'sources', pageBreakBefore: true } }),
-    S(14, { sectionId: 'appendix', title: 'Appendix', required: true, visibility: 'always', numbering: 'appendix', layout: { kind: 'appendix' } }),
+    S(11, { sectionId: 'marketReference', title: 'Market & Peer Reference', required: false, visibility: 'when-available', numbering: 'decimal', layout: { kind: 'table' } }),
+    S(12, { sectionId: 'keyRisks', title: 'Key Risks / Considerations', required: false, visibility: 'when-available', numbering: 'decimal', layout: { kind: 'list' } }),
+    S(13, { sectionId: 'conclusion', title: 'Conclusion', required: true, visibility: 'always', numbering: 'decimal', layout: { kind: 'narrative' } }),
+    S(14, { sectionId: 'sources', title: 'Sources', required: true, visibility: 'always', numbering: 'decimal', layout: { kind: 'sources', pageBreakBefore: true } }),
+    S(15, { sectionId: 'appendix', title: 'Appendix', required: true, visibility: 'always', numbering: 'appendix', layout: { kind: 'appendix' } }),
   ],
 };
 
