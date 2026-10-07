@@ -1,5 +1,5 @@
-// Forecast: 매출 → EBIT. 이후 단계(NOPAT, FCFF)는 fcff.ts.
-import { ValuationError } from './models.ts';
+// Forecast: 매출 → EBIT → NOPAT → FCFF.
+import { ValuationError, notImplemented } from './models.ts';
 
 const finite = (n: number) => typeof n === 'number' && Number.isFinite(n);
 
@@ -32,4 +32,14 @@ export function calculateEbit(revenue: number[], operatingMargin: number[]): num
     throw new ValuationError(`operatingMargin: 예측 기간(${revenue.length}년)과 길이가 다릅니다(${operatingMargin.length}).`);
   }
   return revenue.map((r, i) => r * operatingMargin[i]);
+}
+
+/** NOPAT = EBIT × (1 − 세율). [05-2 구현 예정] */
+export function calculateNopat(_ebit: number[], _taxRate: number): number[] {
+  return notImplemented('calculateNopat');
+}
+
+/** FCFF = NOPAT + D&A − CAPEX − ΔNWC (D&A, CAPEX, ΔNWC 는 양수 입력). [05-2 구현 예정] */
+export function calculateFcff(_nopat: number[], _depreciation: number[], _capex: number[], _deltaNwc: number[]): number[] {
+  return notImplemented('calculateFcff');
 }
