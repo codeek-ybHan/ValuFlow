@@ -47,7 +47,7 @@ export function ValuationControls() {
       </dl>
 
       <div className="row action-row">
-        <button className="btn" onClick={loadSamsung}>삼성전자 데이터 불러오기</button>
+        <button className="btn" onClick={loadSamsung}>삼성전자 학습용 Historical 불러오기</button>
         <button className="btn primary" onClick={onPractice}>학습용 DCF 가정 적용</button>
         <button className="btn" onClick={run} disabled={!completeness.complete} title={completeness.complete ? undefined : '모든 가정(Forecast · WACC · DCF)이 준비되어야 실행할 수 있습니다.'}>Run Valuation</button>
         <button className="btn" onClick={resetValuation} disabled={!a && Object.keys(project.relativeInputs).length === 0} title="가정 · 결과 · 상대가치 입력을 모두 지우고 새 Valuation 을 시작합니다. Historical Data 는 유지됩니다.">Valuation 초기화</button>

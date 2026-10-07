@@ -3,6 +3,7 @@
 import type { HistoricalData } from '../types.ts';
 import type { DartBasis } from '../dart/types.ts';
 import type { DataQuality } from '../normalization/quality.ts';
+import type { DartFetchQuality } from '../dart/types.ts';
 
 export interface CompanyProfile {
   name: string;
@@ -23,14 +24,16 @@ export interface CompanyRef {
 }
 
 export interface HistoricalFinancialsRequest extends CompanyRef {
+  /** HistoricalData.company.name 에 쓸 이름. 없으면 corpCode 를 쓴다. */
+  companyName?: string;
   /** 비우면 저장소가 가진 최신 3개년. */
   fiscalYears?: number[];
   preferredBasis?: DartBasis;
 }
 
 export type HistoricalFinancialsResult =
-  | { ok: true; data: HistoricalData; quality: DataQuality }
-  | { ok: false; reason: 'not-found' | 'incomplete' | 'unavailable' | 'not-implemented'; message: string; quality?: DataQuality };
+  | { ok: true; data: HistoricalData; quality: DataQuality; fetch?: DartFetchQuality }
+  | { ok: false; reason: 'not-found' | 'incomplete' | 'unavailable' | 'not-implemented'; message: string; quality?: DataQuality; fetch?: DartFetchQuality };
 
 export interface FinancialRepository {
   searchCompanies(query: string): Promise<CompanyProfile[]>;

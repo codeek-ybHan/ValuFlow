@@ -73,3 +73,31 @@ class CompanyDetail:
     industry_code: str | None
     establishment_date: str | None
     fiscal_month: int | None
+
+
+@dataclass(frozen=True)
+class FinancialAccount:
+    """DartRawAccount 로 내보내는 한 행 (회계연도 하나, 계정 하나). raw 에 원본 응답 행 전체를 보존한다."""
+
+    account_name: str
+    account_id: str | None
+    statement_type: str          # BS | IS | CF  (포괄손익계산서 CIS 는 IS 로 묶음)
+    raw_statement_type: str      # 원본 sj_div (BS / IS / CIS / CF)
+    basis: str                   # Consolidated | Separate
+    fiscal_year: int
+    report_year: int
+    amount: float | int | None   # 빈 값은 0 이 아니라 None
+    currency: str | None
+    raw: dict
+
+
+@dataclass
+class FinancialsQuality:
+    basis_requested: str
+    basis_used: str | None
+    basis_fallback: bool
+    years_requested: list[int]
+    years_received: list[int]
+    missing_years: list[int]
+    raw_account_count: int
+    warnings: list[str]

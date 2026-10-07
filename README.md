@@ -29,7 +29,7 @@ cp .env.example .env            # DART_API_KEY= 에 본인 키를 입력 (.env �
 .venv/bin/python -m pytest      # DART_API_KEY 가 있으면 실제 OpenDART smoke test 도 실행, 없으면 skip
 ```
 
-기업 검색은 backend 가 켜져 있어야 동작합니다 (dev 서버가 `/api` 를 8000 포트로 전달).
+기업 검색과 재무제표 수집(`GET /api/companies/{corpCode}/financials?years=2023,2024,2025&basis=auto`)은 backend 가 켜져 있어야 동작합니다. 실제 응답의 계정명 조사는 `.venv/bin/python -m scripts.inspect_raw_accounts` 로 다시 실행할 수 있습니다 (dev 서버가 `/api` 를 8000 포트로 전달).
 
 ```bash
 npm install
@@ -100,7 +100,7 @@ LEARN 은 STEP 01~04 만 포함합니다. STEP 05 이후는 아래 PROJECT 로�
 
 ```text
 STEP 05 Valuation Engine v1       Forecast · FCFF · CAPM · WACC · DCF · EV · Equity · 주당가치 · Sensitivity · Scenario · 상대가치   ✅
-STEP 06 Financial Data Pipeline   OpenDART → 파서 → 정규화 → PostgreSQL → Historical 테이블   (06-1 구조 · 06-2 기업 검색 완료 · 06-3 재무제표 수집 다음)
+STEP 06 Financial Data Pipeline   OpenDART → 파서 → 정규화 → PostgreSQL → Historical 테이블   (06-1 구조 · 06-2 기업 검색 · 06-3 재무제표 Raw 수집 완료 · 06-4 계정 매핑 보정 다음)
 STEP 07 Valuation Workspace       Historical → Forecast → WACC → DCF/Equity → Result → Validation   ✅
 STEP 08 AI Valuation Analyst      Agent + Tool Calling + RAG (계산은 엔진, LLM 은 해석)
 STEP 09 Report Automation         보고서 생성 · 미리보기 · PDF 내보내기

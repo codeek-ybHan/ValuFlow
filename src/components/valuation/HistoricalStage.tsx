@@ -45,7 +45,7 @@ export function HistoricalStage() {
         <div className="empty-state">
           <h3>No historical data loaded</h3>
           <p>과거 재무데이터가 없어 Historical 분석을 표시할 수 없습니다. 값을 임의로 채우지 않습니다.</p>
-          <button className="btn primary" onClick={loadSamsung}>삼성전자 데이터 불러오기</button>
+          <button className="btn primary" onClick={loadSamsung}>삼성전자 학습용 Historical 불러오기</button>
         </div>
       </>
     );

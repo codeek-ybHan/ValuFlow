@@ -63,3 +63,20 @@ class DartHttpClient:
             raise DartApiError("unknown")
         map_status(body.get("status"))
         return body
+
+    def fetch_financials(self, corp_code: str, business_year: int, report_code: str, fs_div: str) -> list[dict[str, Any]]:
+        """단일회사 전체 재무제표(fnlttSinglAcntAll). 데이터가 없으면(status 013) DartApiError('no-data')."""
+        response = self._get("fnlttSinglAcntAll.json", {
+            "corp_code": corp_code, "bsns_year": str(business_year), "reprt_code": report_code, "fs_div": fs_div,
+        })
+        try:
+            body = response.json()
+        except ValueError:
+            raise DartApiError("unknown") from None
+        if not isinstance(body, dict):
+            raise DartApiError("unknown")
+        map_status(body.get("status"))
+        rows = body.get("list")
+        if not isinstance(rows, list):
+            raise DartApiError("no-data")
+        return [r for r in rows if isinstance(r, dict)]

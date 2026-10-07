@@ -117,7 +117,7 @@ test('Forecast / Result 데이터가 섞이지 않는다: view 의 입력은 his
 test('Empty State / CTA 문구가 화면 코드에 있다', () => {
   const src = readFileSync(new URL('../components/valuation/HistoricalStage.tsx', import.meta.url), 'utf8');
   assert.ok(src.includes('No historical data loaded'));
-  assert.ok(src.includes('삼성전자 데이터 불러오기'));
+  assert.ok(src.includes('삼성전자 학습용 Historical 불러오기'));
   assert.ok(src.includes('Continue to Forecast'));
   assert.ok(src.includes('Use historical trends to build forecast assumptions'));
 });

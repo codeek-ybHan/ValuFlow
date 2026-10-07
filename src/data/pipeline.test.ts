@@ -12,7 +12,6 @@ import { capexForValuation } from './normalization/derived.ts';
 import { assessHistoricalQuality, fromSamsungFixture } from './repository/fixtureAdapter.ts';
 import { FixtureFinancialRepository } from './repository/fixtureRepository.ts';
 import type { FinancialRepository } from './repository/financialRepository.ts';
-import { BackendDartClient } from './dart/client.ts';
 import { buildHistoricalView } from '../engine/historicalView.ts';
 import { deriveHistoricalMetrics } from '../engine/historical.ts';
 import { krwMillionToEok } from '../engine/units.ts';
@@ -232,7 +231,6 @@ test('Repository interface: Workspace 는 구현체를 모르고 interface 로�
   assert.ok(!nf.ok && nf.reason === 'not-found');
   const un = await repo.getHistoricalFinancials({ stockCode: '005930', fiscalYears: [2019] });
   assert.ok(!un.ok && un.reason === 'unavailable');
-  await assert.rejects(new BackendDartClient().fetchFinancials(), /STEP 06-3/);
 });
 
 // 10. 기존 Historical View / metrics 와 호환

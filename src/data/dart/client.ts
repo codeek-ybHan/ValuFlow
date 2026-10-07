@@ -1,13 +1,12 @@
 // External API 의 경계. 프론트는 OpenDART URL 도 API Key 도 모른다: ValuFlow backend(/api/...)만 호출한다.
 import type { DartCompanyQuery } from './company.ts';
 import type { DartFinancialsRequest } from './financials.ts';
-import type { DartCompanyDetail, DartCompanySummary, DartErrorCode, DartRawAccount } from './types.ts';
+import type { DartCompanyDetail, DartCompanySummary, DartErrorCode, DartFinancialsResponse, DartRawAccount } from './types.ts';
 
 export interface DartClient {
   searchCompanies(query: DartCompanyQuery): Promise<DartCompanySummary[]>;
   getCompany(corpCode: string): Promise<DartCompanyDetail>;
-  /** STEP 06-3 에서 구현. 그 전에는 DartNotImplementedError 를 던진다. */
-  fetchFinancials(request: DartFinancialsRequest): Promise<DartRawAccount[]>;
+  fetchFinancials(request: DartFinancialsRequest): Promise<DartFinancialsResponse>;
 }
 
 /** backend 가 오류를 돌려줬거나 backend 에 닿지 못했을 때. message 는 사용자에게 보여 줘도 되는 정제된 문구다. */
@@ -22,14 +21,16 @@ export class DartClientError extends Error {
   }
 }
 
-export class DartNotImplementedError extends Error {
-  constructor(what: string) {
-    super(`${what} 은(는) STEP 06-3 에서 구현됩니다.`);
-    this.name = 'DartNotImplementedError';
-  }
-}
-
 type FetchFn = (input: string, init?: { method?: string }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
+
+const STATEMENTS = ['BS', 'IS', 'CIS', 'CF', 'SCE'];
+/** 형식이 맞는 행만 통과시킨다. 금액은 숫자 또는 null (빈 값을 0 으로 만들지 않는다). */
+function isRawAccount(v: unknown): v is DartRawAccount {
+  if (typeof v !== 'object' || v === null) return false;
+  const a = v as Record<string, unknown>;
+  return typeof a.accountName === 'string' && STATEMENTS.includes(a.statementType as string) && (a.basis === 'Consolidated' || a.basis === 'Separate')
+    && typeof a.fiscalYear === 'number' && (a.amount === null || (typeof a.amount === 'number' && Number.isFinite(a.amount))) && typeof a.raw === 'object' && a.raw !== null;
+}
 
 const CODES: readonly DartErrorCode[] = ['invalid-key', 'no-data', 'rate-limit', 'dart-unavailable', 'invalid-request', 'unknown'];
 
@@ -74,7 +75,15 @@ export class BackendDartClient implements DartClient {
     return this.request<DartCompanyDetail>(`/api/companies/${encodeURIComponent(corpCode)}`);
   }
 
-  fetchFinancials(): Promise<DartRawAccount[]> {
-    return Promise.reject(new DartNotImplementedError('재무제표 수집'));
+  /** Raw 재무제표 행을 가져온다 (사업보고서 기준). 값은 어떤 기본값으로도 채우지 않는다. */
+  async fetchFinancials(request: DartFinancialsRequest): Promise<DartFinancialsResponse> {
+    const params = new URLSearchParams({ years: [...request.years].sort((a, b) => a - b).join(','), basis: request.basis ?? 'auto' });
+    if (request.refresh) params.set('refresh', 'true');
+    const body = await this.request<Partial<DartFinancialsResponse> & { accounts?: unknown }>(`/api/companies/${encodeURIComponent(request.corpCode)}/financials?${params.toString()}`);
+    if (!Array.isArray(body.accounts) || !body.quality || typeof body.fetchedAt !== 'string') throw new DartClientError('unknown', '서버 응답을 해석할 수 없습니다.');
+    const accounts = body.accounts.filter(isRawAccount);
+    const dropped = body.accounts.length - accounts.length;
+    const quality = dropped > 0 ? { ...body.quality, warnings: [...body.quality.warnings, `${dropped} malformed account row(s) dropped`] } : body.quality;
+    return { corpCode: body.corpCode ?? request.corpCode, accounts, quality, source: 'OpenDART', fetchedAt: body.fetchedAt, cached: body.cached === true };
   }
 }

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { BackendDartClient, DartClientError, DartNotImplementedError } from './dart/client.ts';
+import { BackendDartClient, DartClientError } from './dart/client.ts';
 import { DartFinancialRepository } from './repository/dartRepository.ts';
 import type { DartCompanyDetail } from './dart/types.ts';
 
@@ -68,19 +68,6 @@ test('Repository: 검색 결과 변환(비상장 포함) / 개황 조회 / corpC
   assert.equal(m.calls.length, before);
 });
 
-test('재무 API 는 아직 호출하지 않는다: 미구현을 명확히 돌려주고 fixture 로 대체하지 않는다', async () => {
-  const m = mockFetch(() => ({ body: {} }));
-  const client = new BackendDartClient({ fetch: m.fn });
-  const repo = new DartFinancialRepository(client);
-  const r = await repo.getHistoricalFinancials({ corpCode: '00126380', stockCode: '005930' });
-  assert.equal(r.ok, false);
-  if (!r.ok) { assert.equal(r.reason, 'not-implemented'); assert.match(r.message, /STEP 06-3/); }
-  await assert.rejects(client.fetchFinancials(), DartNotImplementedError);
-  assert.equal(m.calls.length, 0, '네트워크 호출 없음');
-  const src = (f: string) => readFileSync(new URL(f, import.meta.url), 'utf8').replace(/\/\/.*$/gm, '');
-  assert.ok(!/import[^;]*(fixture|samsungHistorical)/i.test(src('./repository/dartRepository.ts')), 'DART repository 는 fixture 를 import 하지 않는다');
-});
-
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((n) => {
     const p = join(dir, n);
@@ -88,7 +75,7 @@ function walk(dir: string): string[] {
   });
 }
 
-test('프론트 소스는 OpenDART URL / API Key / 재무 endpoint 를 모르고, unconnected client 잔재가 없다', () => {
+test('프론트 소스는 OpenDART URL / API Key / OpenDART 재무 endpoint 를 모르고, unconnected client 잔재가 없다', () => {
   const root = new URL('..', import.meta.url).pathname;
   const files = walk(root).filter((f) => /\.(ts|tsx)$/.test(f) && !f.endsWith('.test.ts'));
   const all = files.map((f) => [f, readFileSync(f, 'utf8')] as const);

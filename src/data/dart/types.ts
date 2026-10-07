@@ -16,7 +16,9 @@ export interface DartRawAccount {
   accountName: string;
   /** XBRL 계정 ID (예: "ifrs-full_Revenue"). 없을 수 있다. */
   accountId?: string;
+  /** 내부 구분. OpenDART 의 CIS(포괄손익계산서)는 backend 에서 IS 로 묶이고 원본 값은 rawStatementType / raw.sj_div 에 남는다. */
   statementType: DartStatementType;
+  rawStatementType?: string;
   basis: DartBasis;
   /** 해당 금액이 속한 회계연도. 상대 표기(당기/전기)만 있으면 null 로 두고 periodLabel 을 채운다. */
   fiscalYear: number | null;
@@ -30,6 +32,29 @@ export interface DartRawAccount {
   unit?: DartRawUnit;
   /** 응답 행 전체 (원본 보존용). Normalization 은 읽기만 한다. */
   raw: Readonly<Record<string, unknown>>;
+}
+
+/** 재무제표 수집 품질 (backend 가 계산). */
+export interface DartFetchQuality {
+  basisRequested: DartBasis;
+  /** 데이터가 하나도 없으면 null. 연결 + 별도가 섞이는 일은 없다. */
+  basisUsed: DartBasis | null;
+  basisFallback: boolean;
+  yearsRequested: number[];
+  yearsReceived: number[];
+  missingYears: number[];
+  rawAccountCount: number;
+  warnings: string[];
+}
+
+export interface DartFinancialsResponse {
+  corpCode: string;
+  accounts: DartRawAccount[];
+  quality: DartFetchQuality;
+  source: 'OpenDART';
+  fetchedAt: string;
+  /** backend 메모리 cache 에서 온 응답인가. */
+  cached: boolean;
 }
 
 /** backend 가 돌려주는 검색 결과 한 건. OpenDART 원본이 아니라 backend 가 변환한 구조다. */

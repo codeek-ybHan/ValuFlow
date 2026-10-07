@@ -35,6 +35,34 @@ COMPANY_BODY = {
 }
 
 
+def row(sj: str, name: str, values: tuple[str | None, str | None, str | None], account_id: str | None = None, year: int = 2025, **extra) -> dict:
+    """OpenDART fnlttSinglAcntAll 응답 행 (당기 / 전기 / 전전기)."""
+    th, fr, bf = values
+    r = {"rcept_no": "20260310002820", "reprt_code": "11011", "bsns_year": str(year), "corp_code": "00126380", "sj_div": sj,
+         "sj_nm": {"BS": "재무상태표", "IS": "손익계산서", "CIS": "포괄손익계산서", "CF": "현금흐름표", "SCE": "자본변동표"}[sj], "account_id": account_id or "-표준계정코드 미사용-",
+         "account_nm": name, "account_detail": "-", "thstrm_nm": f"제 {year-1968} 기", "thstrm_amount": th, "frmtrm_nm": "전기", "frmtrm_amount": fr,
+         "bfefrmtrm_nm": "전전기", "bfefrmtrm_amount": bf, "ord": "1", "currency": "KRW"}
+    r.update(extra)
+    return r
+
+
+def sample_rows(year: int = 2025) -> list[dict]:
+    return [
+        row("BS", "자산총계", ("566,942,110,000,000", "514,531,948,000,000", "455,905,980,000,000"), "ifrs-full_Assets", year),
+        row("BS", "재고자산", ("52,636,828,000,000", "51,754,865,000,000", "51,625,874,000,000"), "ifrs-full_Inventories", year),
+        row("IS", "매출액", ("333,605,938,000,000", "300,870,903,000,000", "258,935,494,000,000"), "ifrs-full_Revenue", year),
+        row("IS", "영업이익", ("43,601,051,000,000", "32,725,961,000,000", "6,566,976,000,000"), "dart_OperatingIncomeLoss", year),
+        row("CIS", "당기순이익", ("45,206,805,000,000", "34,451,351,000,000", "15,487,100,000,000"), "ifrs-full_ProfitLoss", year),
+        row("CF", "영업활동현금흐름", ("85,315,148,000,000", "72,982,621,000,000", "44,137,427,000,000"), "ifrs-full_CashFlowsFromUsedInOperatingActivities", year),
+    ]
+
+
+def default_financials(request: httpx.Request) -> httpx.Response:
+    if request.url.params.get("fs_div") == "CFS":
+        return httpx.Response(200, json={"status": "000", "message": "정상", "list": sample_rows(int(request.url.params["bsns_year"]))})
+    return httpx.Response(200, json={"status": "013", "message": "조회된 데이타가 없습니다."})
+
+
 def make_zip(xml: bytes = CORP_XML, name: str = "CORPCODE.xml") -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
@@ -49,6 +77,8 @@ class FakeDart:
         self.requests: list[httpx.Request] = []
         self.company_response: Callable[[], httpx.Response] = lambda: httpx.Response(200, json=COMPANY_BODY)
         self.corp_response: Callable[[], httpx.Response] = lambda: httpx.Response(200, content=make_zip())
+        # 재무제표: request 를 받아 응답을 만든다 (기본: 연결(CFS)만 있고 별도(OFS)는 데이터 없음 013)
+        self.financials_response: Callable[[httpx.Request], httpx.Response] = default_financials
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
@@ -56,6 +86,8 @@ class FakeDart:
             return self.corp_response()
         if request.url.path.endswith("company.json"):
             return self.company_response()
+        if request.url.path.endswith("fnlttSinglAcntAll.json"):
+            return self.financials_response(request)
         return httpx.Response(404)
 
     def count(self, suffix: str) -> int:

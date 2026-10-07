@@ -1,9 +1,13 @@
-// OpenDART 재무제표 요청 모델. (STEP 06-1: 타입만 정의하고 HTTP 호출은 구현하지 않는다.)
-import type { DartBasis } from './types.ts';
+// 재무제표 요청 모델. 프론트는 OpenDART 파라미터(reprt_code, fs_div, bsns_year …)를 모른다: backend 가 사업보고서 기준으로 변환한다.
+
+export type DartBasisMode = 'auto' | 'consolidated' | 'separate';
 
 export interface DartFinancialsRequest {
   corpCode: string;
-  /** 사업보고서의 사업연도. 한 보고서에는 당기·전기·전전기가 함께 들어 있다. */
-  reportYear: number;
-  basis: DartBasis;
+  /** 가져올 회계연도. 예: [2023, 2024, 2025] */
+  years: number[];
+  /** auto: 연결을 먼저 시도하고 없거나 불완전하면 별도 전체로 전환 (섞지 않는다). 기본 auto. */
+  basis?: DartBasisMode;
+  /** true 면 backend cache 를 건너뛴다. */
+  refresh?: boolean;
 }
