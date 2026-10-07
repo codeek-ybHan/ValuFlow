@@ -14,6 +14,9 @@ from app.dart.client import DartHttpClient
 from app.dart.company import parse_company
 from app.dart.corp_codes import CorpCodeCache, search_companies
 from app.dart.financials import FinancialsService
+from app.db.session import create_db_engine, make_session_factory
+from app.services.financial_store import FinancialStore
+from app.services.historical import HistoricalService
 from app.dart.models import DartApiError, ERROR_MESSAGES, HTTP_STATUS, CompanyDetail, CorpRecord, FinancialAccount, FinancialsQuality
 
 CORP_CODE_PATTERN = re.compile(r"^\d{8}$")
@@ -65,11 +68,15 @@ def _error(code: str, message: str) -> JSONResponse:
     return JSONResponse({"error": {"code": code, "message": message}}, status_code=HTTP_STATUS.get(code, 502))  # type: ignore[arg-type]
 
 
-def create_app(settings: Settings | None = None, dart: DartHttpClient | None = None, cache: CorpCodeCache | None = None, financials: FinancialsService | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, dart: DartHttpClient | None = None, cache: CorpCodeCache | None = None, financials: FinancialsService | None = None,
+               store: FinancialStore | None = None, historical: HistoricalService | None = None) -> FastAPI:
     settings = settings or load_settings()
     dart = dart or DartHttpClient(settings)
     cache = cache or CorpCodeCache(dart.fetch_corp_code_zip)
     financials = financials or FinancialsService(dart.fetch_financials)
+    if store is None and settings.has_database:
+        store = FinancialStore(make_session_factory(create_db_engine(settings)))  # connect 는 첫 사용 시점
+    historical = historical or HistoricalService(financials, cache, store)
     app = FastAPI(title="ValuFlow Backend")
 
     @app.exception_handler(DartApiError)
@@ -86,7 +93,7 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
-        return {"status": "ok", "dartConfigured": settings.has_api_key, "corpCodesFetchedAt": cache.fetched_at}
+        return {"status": "ok", "dartConfigured": settings.has_api_key, "databaseConfigured": historical.persistence_enabled, "corpCodesFetchedAt": cache.fetched_at}
 
     @app.get("/api/companies")
     def companies(q: str = Query(..., max_length=100), limit: int = Query(20, ge=1, le=MAX_LIMIT)) -> dict[str, Any]:
@@ -103,6 +110,11 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
         if not CORP_CODE_PATTERN.match(corp_code):
             raise DartApiError("invalid-request", "corpCode 는 8자리 숫자여야 합니다.")
         detail = parse_company(dart.fetch_company(corp_code))
+        if store is not None:
+            try:  # 기업 정보는 best effort 로 저장한다 (저장 실패가 조회를 막지 않는다)
+                store.upsert_company(corp_code=detail.corp_code, corp_name=detail.corp_name, stock_code=detail.stock_code, corp_name_eng=detail.corp_name_eng, corp_class=detail.corp_class)
+            except Exception:  # noqa: BLE001
+                pass
         return _detail(detail, datetime.now(timezone.utc).isoformat())
 
     @app.get("/api/companies/{corp_code}/financials")
@@ -120,6 +132,37 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
             raise DartApiError("no-data", "해당 기업의 사업보고서 재무제표가 없습니다.")
         return {"corpCode": corp_code, "accounts": [_account(a) for a in accounts], "quality": _quality(quality),
                 "source": "OpenDART", "fetchedAt": fetched_at, "cached": cached}
+
+    @app.get("/api/companies/{corp_code}/historical")
+    def company_historical(
+        corp_code: str,
+        years: str = Query(..., max_length=60),
+        basis: str = Query("auto", pattern="^(auto|consolidated|separate)$"),
+        refresh: bool = False,
+    ) -> dict[str, Any]:
+        """정규화된 HistoricalData + DataQuality. Database 우선, 없거나 refresh=true 면 OpenDART 재조회 → 정규화 → 저장.
+        지원하지 않는 / 불완전한 기업도 200 으로 status(unsupported | incomplete)와 사유를 돌려준다. HistoricalAnalysis 등 파생값은 포함하지 않는다."""
+        if not CORP_CODE_PATTERN.match(corp_code):
+            raise DartApiError("invalid-request", "corpCode 는 8자리 숫자여야 합니다.")
+        return historical.get(corp_code, _parse_years(years), basis, refresh=refresh)
+
+    @app.post("/api/companies/{corp_code}/historical/renormalize")
+    def company_historical_renormalize(
+        corp_code: str,
+        years: str = Query(..., max_length=60),
+        basis: str = Query("auto", pattern="^(auto|consolidated|separate)$"),
+    ) -> dict[str, Any]:
+        """저장된 Raw 로 다시 정규화한다 (OpenDART 호출 없음)."""
+        if not CORP_CODE_PATTERN.match(corp_code):
+            raise DartApiError("invalid-request", "corpCode 는 8자리 숫자여야 합니다.")
+        return historical.renormalize(corp_code, _parse_years(years), basis)
+
+    @app.get("/api/companies/{corp_code}/fetches")
+    def company_fetches(corp_code: str, limit: int = Query(20, ge=1, le=100)) -> dict[str, Any]:
+        """수집 이력 (source history). DB 가 없으면 빈 목록."""
+        if not CORP_CODE_PATTERN.match(corp_code):
+            raise DartApiError("invalid-request", "corpCode 는 8자리 숫자여야 합니다.")
+        return {"corpCode": corp_code, "items": store.list_fetches(corp_code, limit) if store is not None else []}
 
     return app
 

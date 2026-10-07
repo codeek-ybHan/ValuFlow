@@ -1,0 +1,21 @@
+# 로컬 개발용 PostgreSQL.  docker compose up -d db
+#   DATABASE_URL=postgresql://valuflow:valuflow@localhost:5432/valuflow
+#   테스트용 DB: TEST_DATABASE_URL=postgresql://valuflow:valuflow@localhost:5432/valuflow_test  (docker compose exec db createdb -U valuflow valuflow_test)
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: valuflow
+      POSTGRES_PASSWORD: valuflow
+      POSTGRES_DB: valuflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - valuflow-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U valuflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  valuflow-pg:

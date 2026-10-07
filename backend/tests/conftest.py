@@ -115,3 +115,117 @@ def client(make_client) -> TestClient:
 
 def to_json(response) -> str:
     return json.dumps(response.json(), ensure_ascii=False)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# PostgreSQL 테스트 환경: TEST_DATABASE_URL 이 있으면 그 DB 를, 없으면 pgserver(임시 PostgreSQL)를 쓴다. 둘 다 없으면 DB 테스트를 skip 한다.
+# ---------------------------------------------------------------------------------------------------------------------
+import os
+import tempfile
+from pathlib import Path
+
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+
+from app.db.session import normalize_database_url
+from app.services.financial_store import FinancialStore
+
+BACKEND = Path(__file__).resolve().parents[1]
+FIXTURES = BACKEND.parent / "src" / "data" / "fixtures"
+
+
+def alembic_config(url: str):
+    from alembic.config import Config
+    cfg = Config(str(BACKEND / "alembic.ini"))
+    cfg.set_main_option("script_location", str(BACKEND / "alembic"))
+    cfg.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
+    return cfg
+
+
+@pytest.fixture(scope="session")
+def pg_url():
+    url = os.environ.get("TEST_DATABASE_URL")
+    server = None
+    if not url:
+        try:
+            import pgserver
+        except ImportError:
+            pytest.skip("PostgreSQL 이 없습니다 (TEST_DATABASE_URL 또는 pgserver 필요)")
+        server = pgserver.get_server(tempfile.mkdtemp(prefix="valuflow-pg-"), cleanup_mode="stop")
+        url = server.get_uri()
+    url = normalize_database_url(url)
+    from alembic import command
+    command.upgrade(alembic_config(url), "head")
+    yield url
+    if server is not None:
+        server.cleanup()
+
+
+@pytest.fixture
+def engine(pg_url):
+    e = create_engine(pg_url)
+    with e.begin() as c:
+        c.execute(text("TRUNCATE TABLE unsupported_results, data_quality, normalized_financials, raw_financial_accounts, financial_fetches, companies RESTART IDENTITY CASCADE"))
+    yield e
+    e.dispose()
+
+
+@pytest.fixture
+def store(engine) -> FinancialStore:
+    return FinancialStore(sessionmaker(bind=engine, expire_on_commit=False))
+
+
+DB_CORP_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<result>
+  <list><corp_code>00126380</corp_code><corp_name>삼성전자</corp_name><corp_eng_name>SAMSUNG ELECTRONICS CO,.LTD</corp_eng_name><stock_code>005930</stock_code><modify_date>20240101</modify_date></list>
+  <list><corp_code>00164742</corp_code><corp_name>현대자동차</corp_name><corp_eng_name>HYUNDAI MOTOR CO</corp_eng_name><stock_code>005380</stock_code><modify_date>20240101</modify_date></list>
+  <list><corp_code>00266961</corp_code><corp_name>NAVER</corp_name><corp_eng_name>NAVER Corp</corp_eng_name><stock_code>035420</stock_code><modify_date>20240101</modify_date></list>
+  <list><corp_code>00688996</corp_code><corp_name>KB금융</corp_name><corp_eng_name>KB Financial Group</corp_eng_name><stock_code>105560</stock_code><modify_date>20240101</modify_date></list>
+  <list><corp_code>00999999</corp_code><corp_name>비상장테스트</corp_name><corp_eng_name>Unlisted</corp_eng_name><stock_code> </stock_code><modify_date>20240101</modify_date></list>
+</result>
+""".encode("utf-8")
+
+
+def opendart_rows(fixture_name: str, report_year: int = 2025) -> list[dict]:
+    """프론트 fixture(실제 OpenDART 응답에서 추린 것)를 OpenDART 응답 행 형식(당기/전기/전전기)으로 되돌린다."""
+    accounts = json.loads((FIXTURES / f"{fixture_name}DartFinancials.json").read_text(encoding="utf-8"))["accounts"]
+    grouped: dict[tuple, dict] = {}
+    for a in accounts:
+        key = (a["rawStatementType"], a.get("accountId"), a["accountName"])
+        raw = a.get("raw") or {}
+        row = grouped.setdefault(key, {"sj_div": a["rawStatementType"], "account_id": a.get("accountId") or "-표준계정코드 미사용-", "account_nm": a["accountName"],
+                                       "account_detail": "-", "currency": a.get("currency") or "KRW", "ord": str(raw.get("ord", "1")), "bsns_year": str(report_year)})
+        field = {0: "thstrm", 1: "frmtrm", 2: "bfefrmtrm"}[report_year - a["fiscalYear"]]
+        row[f"{field}_amount"] = None if a["amount"] is None else str(int(a["amount"]))
+    return list(grouped.values())
+
+
+class DbFake(FakeDart):
+    """기업별 재무제표 응답을 돌려주는 FakeDart. 연결(CFS)만 있고 별도(OFS)는 데이터 없음."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.fixture_for: dict[str, str] = {"00126380": "samsung", "00164742": "hyundai", "00266961": "naver", "00688996": "kb"}
+        self.corp_response = lambda: httpx.Response(200, content=make_zip(DB_CORP_XML))
+        self.financials_response = self._respond
+
+    def _respond(self, request: httpx.Request) -> httpx.Response:
+        p = request.url.params
+        if p.get("fs_div") != "CFS":
+            return httpx.Response(200, json={"status": "013", "message": "no data"})
+        name = self.fixture_for.get(p["corp_code"])
+        if name is None:
+            return httpx.Response(200, json={"status": "013", "message": "no data"})
+        return httpx.Response(200, json={"status": "000", "message": "정상", "list": opendart_rows(name, int(p["bsns_year"]))})
+
+
+@pytest.fixture
+def dbfake() -> DbFake:
+    return DbFake()
+
+
+@pytest.fixture
+def db_client(dbfake: DbFake, store: FinancialStore) -> TestClient:
+    settings = Settings(dart_api_key=SECRET)
+    http = httpx.Client(transport=httpx.MockTransport(dbfake))
+    return TestClient(create_app(settings, DartHttpClient(settings, http), store=store), raise_server_exceptions=False)

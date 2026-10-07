@@ -269,6 +269,14 @@ test('추가 기업(현대자동차 · SK하이닉스): 매핑 결과와 기업�
   assert.equal(hx.data.company.basis, 'Consolidated');
 });
 
+// 회귀: 실제 삼성전자 전체 응답의 '예수금'(원천징수) 때문에 금융업으로 오판한 적이 있다
+test('일반 기업의 예수금(원천징수)은 금융업 신호가 아니다', () => {
+  const r = okRun(withRows(BASE, acc('예수금', 'BS', [3, 3, 3], 'dart_ShortTermWithholdings')));
+  assert.equal(r.quality.warnings.some((w) => w.includes('Unsupported')), false);
+  const fin = run([...BASE, ...acc('예수부채', 'BS', [3, 3, 3], 'ifrs-full_DepositsFromCustomers')]);
+  assert.ok(!fin.ok && fin.code === 'unsupported-industry', '예수부채(고객 예수)는 금융업 신호');
+});
+
 // 16. 미지원 구조 / 금융업
 test('금융업과 성격별 비용 구조는 숫자를 만들지 않고 미지원으로 돌려준다', () => {
   const kb = run(FX.kb.accounts);

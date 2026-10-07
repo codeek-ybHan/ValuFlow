@@ -29,6 +29,23 @@ cp .env.example .env            # DART_API_KEY= 에 본인 키를 입력 (.env �
 .venv/bin/python -m pytest      # DART_API_KEY 가 있으면 실제 OpenDART smoke test 도 실행, 없으면 skip
 ```
 
+### 데이터베이스 (PostgreSQL, 선택)
+
+backend 만 DB 에 접근하며 프론트는 DB 를 모릅니다. `DATABASE_URL` 이 없으면 저장 없이 동작합니다 (조회마다 OpenDART → 정규화).
+
+```bash
+docker compose up -d db                                   # 로컬 PostgreSQL (또는 직접 설치한 PostgreSQL 사용)
+# backend/.env 에 DATABASE_URL=postgresql://valuflow:valuflow@localhost:5432/valuflow
+cd backend && .venv/bin/alembic upgrade head              # migration
+.venv/bin/uvicorn app.main:get_app --factory --port 8000
+.venv/bin/python -m pytest                                # DB 테스트: TEST_DATABASE_URL 이 없으면 pgserver(임시 PostgreSQL)를 사용
+```
+
+- 저장: 기업 · 수집 기록(`financial_fetches`) · Raw(`raw_financial_accounts`) · 정규화 값(`normalized_financials`) · 품질/매핑 추적(`data_quality`) · 미지원 결과(`unsupported_results`). HistoricalAnalysis · Forecast · Valuation 결과는 저장하지 않고 입력에서 다시 계산합니다.
+- 조회 순서: Database → (없거나 `refresh=true`) OpenDART → 정규화 → Database 저장. `GET /api/companies/{corpCode}/historical?years=2023,2024,2025&basis=auto&refresh=false`
+- 정규화 규칙의 source of truth 는 TS(`src/data/normalization`)이고 backend(Python)는 `npm run export:normalization` 으로 내보낸 `rules.json` 을 읽습니다. 규칙을 바꾸면 다시 내보낸 뒤 `POST /api/companies/{corpCode}/historical/renormalize` 로 저장된 Raw 를 재정규화할 수 있습니다.
+- 배포(serverless): connection pool 은 기본 2개(overflow 0)로 제한되며 외부 pooler 를 쓰면 `DB_POOL=null` 로 pool 을 끕니다. DB 는 `DATABASE_URL` 만으로 지정하므로 특정 vendor 에 묶이지 않습니다. credential 은 환경변수로만 주입합니다.
+
 기업 검색과 재무제표 수집(`GET /api/companies/{corpCode}/financials?years=2023,2024,2025&basis=auto`)은 backend 가 켜져 있어야 동작합니다. 실제 응답의 계정명 조사는 `.venv/bin/python -m scripts.inspect_raw_accounts` 로 다시 실행할 수 있습니다 (dev 서버가 `/api` 를 8000 포트로 전달).
 
 ```bash
@@ -101,7 +118,7 @@ LEARN 은 STEP 01~04 만 포함합니다. STEP 05 이후는 아래 PROJECT 로�
 
 ```text
 STEP 05 Valuation Engine v1       Forecast · FCFF · CAPM · WACC · DCF · EV · Equity · 주당가치 · Sensitivity · Scenario · 상대가치   ✅
-STEP 06 Financial Data Pipeline   OpenDART → 파서 → 정규화 → PostgreSQL → Historical 테이블   (06-1 구조 · 06-2 기업 검색 · 06-3 재무제표 Raw 수집 · 06-4 계정 매핑 검증 · 06-5 Historical Analysis 엔진 완료 · 06-6 DB 저장 다음)
+STEP 06 Financial Data Pipeline   OpenDART → 파서 → 정규화 → PostgreSQL → Historical 테이블   (06-1 구조 · 06-2 기업 검색 · 06-3 재무제표 Raw 수집 · 06-4 계정 매핑 검증 · 06-5 Historical Analysis 엔진 · 06-6 PostgreSQL 저장 완료 · 06-7 Workspace 연결 다음)
 STEP 07 Valuation Workspace       Historical → Forecast → WACC → DCF/Equity → Result → Validation   ✅
 STEP 08 AI Valuation Analyst      Agent + Tool Calling + RAG (계산은 엔진, LLM 은 해석)
 STEP 09 Report Automation         보고서 생성 · 미리보기 · PDF 내보내기

@@ -5,6 +5,14 @@ import type { DartBasis } from '../dart/types.ts';
 import type { DataQuality } from '../normalization/quality.ts';
 import type { DartFetchQuality } from '../dart/types.ts';
 
+/** 결과의 출처: database 에서 읽었는지, 방금 OpenDART 에서 가져왔는지, DB 에 저장되었는지 (DatabaseFinancialRepository 가 채운다). */
+export interface Provenance {
+  source: 'database' | 'opendart';
+  persisted: boolean;
+  fetchedAt: string;
+  fetchId: number | null;
+}
+
 export interface CompanyProfile {
   name: string;
   corpCode?: string;
@@ -26,14 +34,16 @@ export interface CompanyRef {
 export interface HistoricalFinancialsRequest extends CompanyRef {
   /** HistoricalData.company.name 에 쓸 이름. 없으면 corpCode 를 쓴다. */
   companyName?: string;
+  /** true 면 저장된 결과를 건너뛰고 원천(OpenDART)을 다시 조회한다 (DatabaseFinancialRepository). */
+  refresh?: boolean;
   /** 비우면 저장소가 가진 최신 3개년. */
   fiscalYears?: number[];
   preferredBasis?: DartBasis;
 }
 
 export type HistoricalFinancialsResult =
-  | { ok: true; data: HistoricalData; quality: DataQuality; fetch?: DartFetchQuality }
-  | { ok: false; reason: 'not-found' | 'incomplete' | 'unavailable' | 'not-implemented' | 'unsupported'; message: string; quality?: DataQuality; fetch?: DartFetchQuality; /** unsupported 일 때 구분 */ code?: 'unsupported-industry' | 'unsupported-structure' };
+  | { ok: true; data: HistoricalData; quality: DataQuality; fetch?: DartFetchQuality; provenance?: Provenance }
+  | { ok: false; reason: 'not-found' | 'incomplete' | 'unavailable' | 'not-implemented' | 'unsupported'; message: string; quality?: DataQuality; fetch?: DartFetchQuality; /** unsupported 일 때 구분 */ code?: 'unsupported-industry' | 'unsupported-structure'; provenance?: Provenance };
 
 export interface FinancialRepository {
   searchCompanies(query: string): Promise<CompanyProfile[]>;

@@ -1,0 +1,1019 @@
+{
+ "name": "hynix",
+ "inputFile": "src/data/fixtures/hynixDartFinancials.json",
+ "options": {
+  "company": {
+   "name": "t",
+   "corpCode": "00000001",
+   "stockCode": "000001"
+  },
+  "fiscalYears": [
+   2023,
+   2024,
+   2025
+  ],
+  "fetchedAt": "2026-01-01T00:00:00.000Z"
+ },
+ "expected": {
+  "ok": true,
+  "data": {
+   "meta": {
+    "corpCode": "00000001",
+    "stockCode": "000001",
+    "source": "DART Annual Report",
+    "fetchedAt": "2026-01-01T00:00:00.000Z"
+   },
+   "company": {
+    "name": "t",
+    "ticker": "000001",
+    "basis": "Consolidated",
+    "currency": "KRW",
+    "unit": "million",
+    "period": [
+     "2023A",
+     "2024A",
+     "2025A"
+    ]
+   },
+   "incomeStatement": {
+    "revenue": [
+     32765719,
+     66192960,
+     97146675
+    ],
+    "cogs": [
+     33299167,
+     34364814,
+     38455885
+    ],
+    "grossProfit": [
+     -533448,
+     31828146,
+     58690790
+    ],
+    "sga": [
+     7196865,
+     8360827,
+     11484471
+    ],
+    "operatingProfit": [
+     -7730313,
+     23467319,
+     47206319
+    ],
+    "netIncome": [
+     -9137547,
+     19796902,
+     42947902
+    ]
+   },
+   "balanceSheet": {
+    "accountsReceivable": [
+     6600273,
+     13019006,
+     18199078
+    ],
+    "inventory": [
+     13480659,
+     13313937,
+     14289390
+    ],
+    "accountsPayable": [
+     1845537,
+     2277347,
+     2848455
+    ],
+    "cash": [
+     7587329,
+     11205117,
+     14923766
+    ],
+    "interestBearingDebt": [
+     29468632,
+     22683733,
+     22247905
+    ],
+    "leaseLiabilities": [
+     3029874,
+     2768376,
+     2509943
+    ],
+    "totalAssets": [
+     100330165,
+     119855209,
+     176107659
+    ],
+    "totalLiabilities": [
+     46826413,
+     45939505,
+     55440908
+    ],
+    "totalEquity": [
+     53503752,
+     73915704,
+     120666751
+    ]
+   },
+   "cashFlow": {
+    "cfo": [
+     4278191,
+     29795885,
+     53373126
+    ],
+    "ppeAcquisition": [
+     8325138,
+     15945534,
+     27518924
+    ],
+    "intangibleAcquisition": [
+     454710,
+     717106,
+     1060419
+    ]
+   }
+  },
+  "quality": {
+   "basisRequested": "Consolidated",
+   "basisUsed": "Consolidated",
+   "basisFallback": false,
+   "fields": {
+    "revenue": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "매출액"
+     ]
+    },
+    "cogs": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "매출원가"
+     ]
+    },
+    "grossProfit": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "매출총이익(손실)"
+     ]
+    },
+    "sga": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "판매비와관리비"
+     ]
+    },
+    "operatingProfit": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "영업이익(손실)"
+     ]
+    },
+    "netIncome": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "당기순이익(손실)"
+     ]
+    },
+    "accountsReceivable": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "매출채권"
+     ]
+    },
+    "inventory": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "재고자산"
+     ]
+    },
+    "accountsPayable": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "매입채무"
+     ]
+    },
+    "totalAssets": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "자산총계"
+     ]
+    },
+    "totalLiabilities": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "부채총계"
+     ]
+    },
+    "totalEquity": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "자본총계"
+     ]
+    },
+    "cash": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "현금및현금성자산"
+     ]
+    },
+    "interestBearingDebt": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "sum",
+     "missingYears": [],
+     "sources": [
+      "차입금"
+     ]
+    },
+    "leaseLiabilities": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "sum",
+     "missingYears": [],
+     "sources": [
+      "리스부채"
+     ]
+    },
+    "cfo": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "영업활동 현금흐름"
+     ]
+    },
+    "ppeAcquisition": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "유형자산의 취득"
+     ]
+    },
+    "intangibleAcquisition": {
+     "status": "available",
+     "source": "OpenDART Financial Statement",
+     "matchType": "account-id",
+     "missingYears": [],
+     "sources": [
+      "무형자산의 취득"
+     ]
+    },
+    "depreciationAmortization": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    }
+   },
+   "warnings": [
+    "D&A not available from current OpenDART financial statement source.",
+    "Lease liabilities found but not included in interest-bearing debt (kept separately as leaseLiabilities)."
+   ],
+   "trace": [
+    {
+     "canonicalField": "revenue",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": 32765719,
+     "sourceAccountName": "매출액",
+     "sourceAccountId": "ifrs-full_Revenue",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "revenue",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 66192960,
+     "sourceAccountName": "매출액",
+     "sourceAccountId": "ifrs-full_Revenue",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "revenue",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 97146675,
+     "sourceAccountName": "매출액",
+     "sourceAccountId": "ifrs-full_Revenue",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "cogs",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": 33299167,
+     "sourceAccountName": "매출원가",
+     "sourceAccountId": "ifrs-full_CostOfSales",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "cogs",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 34364814,
+     "sourceAccountName": "매출원가",
+     "sourceAccountId": "ifrs-full_CostOfSales",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "cogs",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 38455885,
+     "sourceAccountName": "매출원가",
+     "sourceAccountId": "ifrs-full_CostOfSales",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "grossProfit",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": -533448,
+     "sourceAccountName": "매출총이익(손실)",
+     "sourceAccountId": "ifrs-full_GrossProfit",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "grossProfit",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 31828146,
+     "sourceAccountName": "매출총이익(손실)",
+     "sourceAccountId": "ifrs-full_GrossProfit",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "grossProfit",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 58690790,
+     "sourceAccountName": "매출총이익(손실)",
+     "sourceAccountId": "ifrs-full_GrossProfit",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "sga",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": 7196865,
+     "sourceAccountName": "판매비와관리비",
+     "sourceAccountId": "dart_TotalSellingGeneralAdministrativeExpenses",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "sga",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 8360827,
+     "sourceAccountName": "판매비와관리비",
+     "sourceAccountId": "dart_TotalSellingGeneralAdministrativeExpenses",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "sga",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 11484471,
+     "sourceAccountName": "판매비와관리비",
+     "sourceAccountId": "dart_TotalSellingGeneralAdministrativeExpenses",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "operatingProfit",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": -7730313,
+     "sourceAccountName": "영업이익(손실)",
+     "sourceAccountId": "dart_OperatingIncomeLoss",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "operatingProfit",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 23467319,
+     "sourceAccountName": "영업이익(손실)",
+     "sourceAccountId": "dart_OperatingIncomeLoss",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "operatingProfit",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 47206319,
+     "sourceAccountName": "영업이익(손실)",
+     "sourceAccountId": "dart_OperatingIncomeLoss",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "netIncome",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": -9137547,
+     "sourceAccountName": "당기순이익(손실)",
+     "sourceAccountId": "ifrs-full_ProfitLoss",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "netIncome",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 19796902,
+     "sourceAccountName": "당기순이익(손실)",
+     "sourceAccountId": "ifrs-full_ProfitLoss",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "netIncome",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 42947902,
+     "sourceAccountName": "당기순이익(손실)",
+     "sourceAccountId": "ifrs-full_ProfitLoss",
+     "matchType": "account-id",
+     "rawStatementType": "CIS"
+    },
+    {
+     "canonicalField": "accountsReceivable",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": 6600273,
+     "sourceAccountName": "매출채권",
+     "sourceAccountId": "ifrs-full_CurrentTradeReceivables",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "accountsReceivable",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 13019006,
+     "sourceAccountName": "매출채권",
+     "sourceAccountId": "ifrs-full_CurrentTradeReceivables",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "accountsReceivable",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 18199078,
+     "sourceAccountName": "매출채권",
+     "sourceAccountId": "ifrs-full_CurrentTradeReceivables",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "inventory",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": 13480659,
+     "sourceAccountName": "재고자산",
+     "sourceAccountId": "ifrs-full_Inventories",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "inventory",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 13313937,
+     "sourceAccountName": "재고자산",
+     "sourceAccountId": "ifrs-full_Inventories",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "inventory",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 14289390,
+     "sourceAccountName": "재고자산",
+     "sourceAccountId": "ifrs-full_Inventories",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "accountsPayable",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": 1845537,
+     "sourceAccountName": "매입채무",
+     "sourceAccountId": "ifrs-full_TradeAndOtherCurrentPayablesToTradeSuppliers",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "accountsPayable",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 2277347,
+     "sourceAccountName": "매입채무",
+     "sourceAccountId": "ifrs-full_TradeAndOtherCurrentPayablesToTradeSuppliers",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "accountsPayable",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 2848455,
+     "sourceAccountName": "매입채무",
+     "sourceAccountId": "ifrs-full_TradeAndOtherCurrentPayablesToTradeSuppliers",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "totalAssets",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": 100330165,
+     "sourceAccountName": "자산총계",
+     "sourceAccountId": "ifrs-full_Assets",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "totalAssets",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 119855209,
+     "sourceAccountName": "자산총계",
+     "sourceAccountId": "ifrs-full_Assets",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "totalAssets",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 176107659,
+     "sourceAccountName": "자산총계",
+     "sourceAccountId": "ifrs-full_Assets",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "totalLiabilities",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": 46826413,
+     "sourceAccountName": "부채총계",
+     "sourceAccountId": "ifrs-full_Liabilities",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "totalLiabilities",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 45939505,
+     "sourceAccountName": "부채총계",
+     "sourceAccountId": "ifrs-full_Liabilities",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "totalLiabilities",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 55440908,
+     "sourceAccountName": "부채총계",
+     "sourceAccountId": "ifrs-full_Liabilities",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "totalEquity",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": 53503752,
+     "sourceAccountName": "자본총계",
+     "sourceAccountId": "ifrs-full_Equity",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "totalEquity",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 73915704,
+     "sourceAccountName": "자본총계",
+     "sourceAccountId": "ifrs-full_Equity",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "totalEquity",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 120666751,
+     "sourceAccountName": "자본총계",
+     "sourceAccountId": "ifrs-full_Equity",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "cash",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": 7587329,
+     "sourceAccountName": "현금및현금성자산",
+     "sourceAccountId": "ifrs-full_CashAndCashEquivalents",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "cash",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 11205117,
+     "sourceAccountName": "현금및현금성자산",
+     "sourceAccountId": "ifrs-full_CashAndCashEquivalents",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "cash",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 14923766,
+     "sourceAccountName": "현금및현금성자산",
+     "sourceAccountId": "ifrs-full_CashAndCashEquivalents",
+     "matchType": "account-id",
+     "rawStatementType": "BS"
+    },
+    {
+     "canonicalField": "interestBearingDebt",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": 29468632,
+     "sourceAccountName": "차입금 + 차입금",
+     "sourceAccountId": null,
+     "matchType": "sum",
+     "rawStatementType": "BS",
+     "components": [
+      {
+       "accountName": "차입금",
+       "accountId": "ifrs-full_CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings",
+       "value": 9857189,
+       "matchType": "account-id"
+      },
+      {
+       "accountName": "차입금",
+       "accountId": "ifrs-full_LongtermBorrowings",
+       "value": 19611443,
+       "matchType": "account-id"
+      }
+     ]
+    },
+    {
+     "canonicalField": "interestBearingDebt",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 22683733,
+     "sourceAccountName": "차입금 + 차입금",
+     "sourceAccountId": null,
+     "matchType": "sum",
+     "rawStatementType": "BS",
+     "components": [
+      {
+       "accountName": "차입금",
+       "accountId": "ifrs-full_CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings",
+       "value": 5252238,
+       "matchType": "account-id"
+      },
+      {
+       "accountName": "차입금",
+       "accountId": "ifrs-full_LongtermBorrowings",
+       "value": 17431495,
+       "matchType": "account-id"
+      }
+     ]
+    },
+    {
+     "canonicalField": "interestBearingDebt",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 22247905,
+     "sourceAccountName": "차입금 + 차입금",
+     "sourceAccountId": null,
+     "matchType": "sum",
+     "rawStatementType": "BS",
+     "components": [
+      {
+       "accountName": "차입금",
+       "accountId": "ifrs-full_CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings",
+       "value": 8161757,
+       "matchType": "account-id"
+      },
+      {
+       "accountName": "차입금",
+       "accountId": "ifrs-full_LongtermBorrowings",
+       "value": 14086148,
+       "matchType": "account-id"
+      }
+     ]
+    },
+    {
+     "canonicalField": "leaseLiabilities",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": 3029874,
+     "sourceAccountName": "리스부채 + 리스부채",
+     "sourceAccountId": null,
+     "matchType": "sum",
+     "rawStatementType": "BS",
+     "components": [
+      {
+       "accountName": "리스부채",
+       "accountId": "ifrs-full_CurrentLeaseLiabilities",
+       "value": 631497,
+       "matchType": "account-id"
+      },
+      {
+       "accountName": "리스부채",
+       "accountId": "ifrs-full_NoncurrentLeaseLiabilities",
+       "value": 2398377,
+       "matchType": "account-id"
+      }
+     ]
+    },
+    {
+     "canonicalField": "leaseLiabilities",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 2768376,
+     "sourceAccountName": "리스부채 + 리스부채",
+     "sourceAccountId": null,
+     "matchType": "sum",
+     "rawStatementType": "BS",
+     "components": [
+      {
+       "accountName": "리스부채",
+       "accountId": "ifrs-full_CurrentLeaseLiabilities",
+       "value": 588355,
+       "matchType": "account-id"
+      },
+      {
+       "accountName": "리스부채",
+       "accountId": "ifrs-full_NoncurrentLeaseLiabilities",
+       "value": 2180021,
+       "matchType": "account-id"
+      }
+     ]
+    },
+    {
+     "canonicalField": "leaseLiabilities",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 2509943,
+     "sourceAccountName": "리스부채 + 리스부채",
+     "sourceAccountId": null,
+     "matchType": "sum",
+     "rawStatementType": "BS",
+     "components": [
+      {
+       "accountName": "리스부채",
+       "accountId": "ifrs-full_CurrentLeaseLiabilities",
+       "value": 547296,
+       "matchType": "account-id"
+      },
+      {
+       "accountName": "리스부채",
+       "accountId": "ifrs-full_NoncurrentLeaseLiabilities",
+       "value": 1962647,
+       "matchType": "account-id"
+      }
+     ]
+    },
+    {
+     "canonicalField": "cfo",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": 4278191,
+     "sourceAccountName": "영업활동 현금흐름",
+     "sourceAccountId": "ifrs-full_CashFlowsFromUsedInOperatingActivities",
+     "matchType": "account-id",
+     "rawStatementType": "CF"
+    },
+    {
+     "canonicalField": "cfo",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 29795885,
+     "sourceAccountName": "영업활동 현금흐름",
+     "sourceAccountId": "ifrs-full_CashFlowsFromUsedInOperatingActivities",
+     "matchType": "account-id",
+     "rawStatementType": "CF"
+    },
+    {
+     "canonicalField": "cfo",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 53373126,
+     "sourceAccountName": "영업활동 현금흐름",
+     "sourceAccountId": "ifrs-full_CashFlowsFromUsedInOperatingActivities",
+     "matchType": "account-id",
+     "rawStatementType": "CF"
+    },
+    {
+     "canonicalField": "ppeAcquisition",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": 8325138,
+     "sourceAccountName": "유형자산의 취득",
+     "sourceAccountId": "ifrs-full_PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities",
+     "matchType": "account-id",
+     "rawStatementType": "CF"
+    },
+    {
+     "canonicalField": "ppeAcquisition",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 15945534,
+     "sourceAccountName": "유형자산의 취득",
+     "sourceAccountId": "ifrs-full_PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities",
+     "matchType": "account-id",
+     "rawStatementType": "CF"
+    },
+    {
+     "canonicalField": "ppeAcquisition",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 27518924,
+     "sourceAccountName": "유형자산의 취득",
+     "sourceAccountId": "ifrs-full_PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities",
+     "matchType": "account-id",
+     "rawStatementType": "CF"
+    },
+    {
+     "canonicalField": "intangibleAcquisition",
+     "fiscalYear": 2023,
+     "basis": "CFS",
+     "value": 454710,
+     "sourceAccountName": "무형자산의 취득",
+     "sourceAccountId": "ifrs-full_PurchaseOfIntangibleAssetsClassifiedAsInvestingActivities",
+     "matchType": "account-id",
+     "rawStatementType": "CF"
+    },
+    {
+     "canonicalField": "intangibleAcquisition",
+     "fiscalYear": 2024,
+     "basis": "CFS",
+     "value": 717106,
+     "sourceAccountName": "무형자산의 취득",
+     "sourceAccountId": "ifrs-full_PurchaseOfIntangibleAssetsClassifiedAsInvestingActivities",
+     "matchType": "account-id",
+     "rawStatementType": "CF"
+    },
+    {
+     "canonicalField": "intangibleAcquisition",
+     "fiscalYear": 2025,
+     "basis": "CFS",
+     "value": 1060419,
+     "sourceAccountName": "무형자산의 취득",
+     "sourceAccountId": "ifrs-full_PurchaseOfIntangibleAssetsClassifiedAsInvestingActivities",
+     "matchType": "account-id",
+     "rawStatementType": "CF"
+    }
+   ],
+   "checks": [
+    {
+     "name": "assets = liabilities + equity",
+     "fiscalYear": 2023,
+     "status": "pass",
+     "message": "ok"
+    },
+    {
+     "name": "gross profit = revenue - cogs",
+     "fiscalYear": 2023,
+     "status": "pass",
+     "message": "ok"
+    },
+    {
+     "name": "operating margin in range",
+     "fiscalYear": 2023,
+     "status": "pass",
+     "message": "ok"
+    },
+    {
+     "name": "nwc computable",
+     "fiscalYear": 2023,
+     "status": "pass",
+     "message": "NWC = AR + Inventory - AP"
+    },
+    {
+     "name": "assets = liabilities + equity",
+     "fiscalYear": 2024,
+     "status": "pass",
+     "message": "ok"
+    },
+    {
+     "name": "gross profit = revenue - cogs",
+     "fiscalYear": 2024,
+     "status": "pass",
+     "message": "ok"
+    },
+    {
+     "name": "operating margin in range",
+     "fiscalYear": 2024,
+     "status": "pass",
+     "message": "ok"
+    },
+    {
+     "name": "nwc computable",
+     "fiscalYear": 2024,
+     "status": "pass",
+     "message": "NWC = AR + Inventory - AP"
+    },
+    {
+     "name": "assets = liabilities + equity",
+     "fiscalYear": 2025,
+     "status": "pass",
+     "message": "ok"
+    },
+    {
+     "name": "gross profit = revenue - cogs",
+     "fiscalYear": 2025,
+     "status": "pass",
+     "message": "ok"
+    },
+    {
+     "name": "operating margin in range",
+     "fiscalYear": 2025,
+     "status": "pass",
+     "message": "ok"
+    },
+    {
+     "name": "nwc computable",
+     "fiscalYear": 2025,
+     "status": "pass",
+     "message": "NWC = AR + Inventory - AP"
+    }
+   ]
+  }
+ }
+}

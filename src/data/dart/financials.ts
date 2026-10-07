@@ -11,3 +11,11 @@ export interface DartFinancialsRequest {
   /** true 면 backend cache 를 건너뛴다. */
   refresh?: boolean;
 }
+
+export interface DartHistoricalRequest {
+  corpCode: string;
+  years: number[];
+  basis?: DartBasisMode;
+  /** true 면 DB 를 건너뛰고 OpenDART 를 다시 조회한다 (새 수집 기록이 남는다). */
+  refresh?: boolean;
+}

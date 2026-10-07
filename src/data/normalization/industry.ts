@@ -12,9 +12,12 @@ export interface Unsupported {
   message: string;
 }
 
-const FINANCIAL_BS_IDS = ['ifrs-full_DepositsFromCustomers', 'ifrs-full_InsuranceContractsIssuedThatAreLiabilities', 'ifrs-full_InsuranceContractLiabilities'];
-const FINANCIAL_BS_NAMES = ['예수부채', '보험계약부채', '투자계약부채', '예수금'].map(normalizeAccountName);
-const FINANCIAL_IS_NAMES = ['순이자손익', '이자수익', '보험료수익', '수수료수익', '보험손익'].map(normalizeAccountName);
+export const FINANCIAL_BS_IDS = ['ifrs-full_DepositsFromCustomers', 'ifrs-full_InsuranceContractsIssuedThatAreLiabilities', 'ifrs-full_InsuranceContractLiabilities'];
+// '예수금' 은 일반 기업의 원천징수 · 단기 예수금(dart_ShortTermWithholdings, 삼성전자 등)이라 금융업 신호가 아니다. 금융업은 '예수부채' 같은 계정으로 판별한다.
+export const FINANCIAL_BS_NAME_LIST = ['예수부채', '보험계약부채', '투자계약부채'];
+const FINANCIAL_BS_NAMES = FINANCIAL_BS_NAME_LIST.map(normalizeAccountName);
+export const FINANCIAL_IS_NAME_LIST = ['순이자손익', '이자수익', '보험료수익', '수수료수익', '보험손익'];
+const FINANCIAL_IS_NAMES = FINANCIAL_IS_NAME_LIST.map(normalizeAccountName);
 
 export interface StructureFacts {
   hasRevenue: boolean;

@@ -36,3 +36,29 @@ def test_samsung_financials_three_years():
         years = {a["fiscalYear"] for a in accounts if a["accountName"] == name and a["amount"] is not None}
         assert years >= {2023, 2024, 2025}, name
     assert settings.dart_api_key not in r.text
+
+
+def test_live_historical_persists_and_reuses_database(pg_url):
+    """실제 OpenDART → backend 정규화 → PostgreSQL 저장 → 두 번째 조회는 DB. (DART_API_KEY 와 PostgreSQL 이 있을 때만)"""
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.orm import sessionmaker
+
+    from app.services.financial_store import FinancialStore
+
+    engine = create_engine(pg_url)
+    with engine.begin() as c:
+        c.execute(text("TRUNCATE TABLE unsupported_results, data_quality, normalized_financials, raw_financial_accounts, financial_fetches, companies RESTART IDENTITY CASCADE"))
+    store = FinancialStore(sessionmaker(bind=engine, expire_on_commit=False))
+    client = TestClient(create_app(settings, store=store))
+    years = {"years": "2023,2024,2025"}
+    first = client.get("/api/companies/00126380/historical", params=years).json()
+    assert first["status"] == "ok" and first["source"] == "opendart" and first["persisted"] is True
+    assert first["data"]["incomeStatement"]["revenue"] == [258935494, 300870903, 333605938]
+    assert first["data"]["balanceSheet"]["interestBearingDebt"] == [12685944, 19330184, 25239139]
+    second = client.get("/api/companies/00126380/historical", params=years).json()
+    assert second["source"] == "database" and second["data"] == first["data"] and second["quality"] == first["quality"]
+    assert settings.dart_api_key not in str(first) and settings.dart_api_key not in str(second)
+    kb = client.get("/api/companies/00688996/historical", params=years).json()
+    assert kb["status"] == "unsupported" and kb["code"] == "unsupported-industry"
+    assert client.get("/api/companies/00688996/historical", params=years).json()["source"] == "database"
+    engine.dispose()

@@ -57,6 +57,27 @@ export interface DartFinancialsResponse {
   cached: boolean;
 }
 
+/** backend 가 정규화해서 돌려주는 Historical 응답 (GET /api/companies/{corpCode}/historical). 정규화는 backend 가 한다. */
+export interface DartHistoricalResponse<TData = unknown, TQuality = unknown> {
+  status: 'ok' | 'unsupported' | 'incomplete';
+  corpCode: string;
+  /** database: 저장된 결과 · opendart: 방금 OpenDART 에서 가져와 정규화한 결과 */
+  source: 'database' | 'opendart';
+  /** 이번 결과가 DB 에 저장되었는가 (저장 실패 시 false) */
+  persisted: boolean;
+  fetchId: number | null;
+  fetchedAt: string;
+  /** HistoricalData (backend 가 정규화한 값). dart/ 계층은 domain 타입을 모르므로 repository 에서 타입을 입힌다. */
+  data?: TData;
+  /** DataQuality */
+  quality: TQuality;
+  fetch: DartFetchQuality;
+  code?: 'unsupported-industry' | 'unsupported-structure' | 'incomplete';
+  reason?: string;
+  missingRequired?: string[];
+  persistError?: string;
+}
+
 /** backend 가 돌려주는 검색 결과 한 건. OpenDART 원본이 아니라 backend 가 변환한 구조다. */
 export interface DartCompanySummary {
   corpCode: string;

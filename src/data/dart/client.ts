@@ -1,12 +1,14 @@
 // External API 의 경계. 프론트는 OpenDART URL 도 API Key 도 모른다: ValuFlow backend(/api/...)만 호출한다.
 import type { DartCompanyQuery } from './company.ts';
-import type { DartFinancialsRequest } from './financials.ts';
-import type { DartCompanyDetail, DartCompanySummary, DartErrorCode, DartFinancialsResponse, DartRawAccount } from './types.ts';
+import type { DartFinancialsRequest, DartHistoricalRequest } from './financials.ts';
+import type { DartCompanyDetail, DartCompanySummary, DartErrorCode, DartFinancialsResponse, DartHistoricalResponse, DartRawAccount } from './types.ts';
 
 export interface DartClient {
   searchCompanies(query: DartCompanyQuery): Promise<DartCompanySummary[]>;
   getCompany(corpCode: string): Promise<DartCompanyDetail>;
   fetchFinancials(request: DartFinancialsRequest): Promise<DartFinancialsResponse>;
+  /** backend 가 정규화(+DB 저장)한 Historical. 프론트에서 다시 정규화하지 않는다. */
+  getHistorical(request: DartHistoricalRequest): Promise<DartHistoricalResponse>;
 }
 
 /** backend 가 오류를 돌려줬거나 backend 에 닿지 못했을 때. message 는 사용자에게 보여 줘도 되는 정제된 문구다. */
@@ -73,6 +75,17 @@ export class BackendDartClient implements DartClient {
 
   getCompany(corpCode: string): Promise<DartCompanyDetail> {
     return this.request<DartCompanyDetail>(`/api/companies/${encodeURIComponent(corpCode)}`);
+  }
+
+  async getHistorical(request: DartHistoricalRequest): Promise<DartHistoricalResponse> {
+    const params = new URLSearchParams({ years: [...request.years].sort((a, b) => a - b).join(','), basis: request.basis ?? 'auto' });
+    if (request.refresh) params.set('refresh', 'true');
+    const body = await this.request<Partial<DartHistoricalResponse>>(`/api/companies/${encodeURIComponent(request.corpCode)}/historical?${params.toString()}`);
+    if ((body.status !== 'ok' && body.status !== 'unsupported' && body.status !== 'incomplete') || !body.quality || !body.fetch || typeof body.fetchedAt !== 'string') {
+      throw new DartClientError('unknown', '서버 응답을 해석할 수 없습니다.');
+    }
+    if (body.status === 'ok' && !body.data) throw new DartClientError('unknown', '서버 응답을 해석할 수 없습니다.');
+    return body as DartHistoricalResponse;
   }
 
   /** Raw 재무제표 행을 가져온다 (사업보고서 기준). 값은 어떤 기본값으로도 채우지 않는다. */

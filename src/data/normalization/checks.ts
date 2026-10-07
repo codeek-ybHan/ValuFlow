@@ -7,9 +7,9 @@ export interface CheckInput {
   series: Partial<Record<string, (number | null)[]>>;
 }
 
-const REL_TOL = 0.001;     // 0.1%
-const ABS_TOL = 1;         // 1 KRW million
-const UNIT_JUMP = 100;     // 연도 간 100배 이상 차이면 단위 불일치 의심
+export const REL_TOL = 0.001;     // 0.1%
+export const ABS_TOL = 1;         // 1 KRW million
+export const UNIT_JUMP = 100;     // 연도 간 100배 이상 차이면 단위 불일치 의심
 
 const within = (a: number, b: number) => Math.abs(a - b) <= Math.max(ABS_TOL, REL_TOL * Math.max(Math.abs(a), Math.abs(b)));
 

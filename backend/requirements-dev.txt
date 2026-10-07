@@ -1,2 +1,4 @@
 -r requirements.txt
 pytest>=8
+# DB 테스트용 임시 PostgreSQL (TEST_DATABASE_URL 을 주면 필요 없음)
+pgserver

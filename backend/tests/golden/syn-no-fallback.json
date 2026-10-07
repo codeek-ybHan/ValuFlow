@@ -1,0 +1,833 @@
+{
+ "name": "syn-no-fallback",
+ "accounts": [
+  {
+   "accountName": "매출액",
+   "accountId": "ifrs-full_Revenue",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2023,
+   "amount": 100000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 91
+   }
+  },
+  {
+   "accountName": "매출액",
+   "accountId": "ifrs-full_Revenue",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2024,
+   "amount": 110000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 92
+   }
+  },
+  {
+   "accountName": "매출액",
+   "accountId": "ifrs-full_Revenue",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2025,
+   "amount": 120000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 93
+   }
+  },
+  {
+   "accountName": "매출원가",
+   "accountId": "ifrs-full_CostOfSales",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2023,
+   "amount": 60000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 94
+   }
+  },
+  {
+   "accountName": "매출원가",
+   "accountId": "ifrs-full_CostOfSales",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2024,
+   "amount": 65000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 95
+   }
+  },
+  {
+   "accountName": "매출원가",
+   "accountId": "ifrs-full_CostOfSales",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2025,
+   "amount": 70000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 96
+   }
+  },
+  {
+   "accountName": "매출총이익",
+   "accountId": "ifrs-full_GrossProfit",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2023,
+   "amount": 40000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 97
+   }
+  },
+  {
+   "accountName": "매출총이익",
+   "accountId": "ifrs-full_GrossProfit",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2024,
+   "amount": 45000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 98
+   }
+  },
+  {
+   "accountName": "매출총이익",
+   "accountId": "ifrs-full_GrossProfit",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2025,
+   "amount": 50000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 99
+   }
+  },
+  {
+   "accountName": "판매비와관리비",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2023,
+   "amount": 20000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 100
+   }
+  },
+  {
+   "accountName": "판매비와관리비",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2024,
+   "amount": 21000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 101
+   }
+  },
+  {
+   "accountName": "판매비와관리비",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2025,
+   "amount": 22000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 102
+   }
+  },
+  {
+   "accountName": "영업이익",
+   "accountId": "dart_OperatingIncomeLoss",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2023,
+   "amount": 20000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 103
+   }
+  },
+  {
+   "accountName": "영업이익",
+   "accountId": "dart_OperatingIncomeLoss",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2024,
+   "amount": 24000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 104
+   }
+  },
+  {
+   "accountName": "영업이익",
+   "accountId": "dart_OperatingIncomeLoss",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2025,
+   "amount": 28000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 105
+   }
+  },
+  {
+   "accountName": "당기순이익",
+   "accountId": "ifrs-full_ProfitLoss",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2023,
+   "amount": 15000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 106
+   }
+  },
+  {
+   "accountName": "당기순이익",
+   "accountId": "ifrs-full_ProfitLoss",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2024,
+   "amount": 18000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 107
+   }
+  },
+  {
+   "accountName": "당기순이익",
+   "accountId": "ifrs-full_ProfitLoss",
+   "statementType": "IS",
+   "rawStatementType": "IS",
+   "basis": "Separate",
+   "fiscalYear": 2025,
+   "amount": 21000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 108
+   }
+  },
+  {
+   "accountName": "매출채권",
+   "accountId": "ifrs-full_CurrentTradeReceivables",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2023,
+   "amount": 10000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 109
+   }
+  },
+  {
+   "accountName": "매출채권",
+   "accountId": "ifrs-full_CurrentTradeReceivables",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2024,
+   "amount": 11000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 110
+   }
+  },
+  {
+   "accountName": "매출채권",
+   "accountId": "ifrs-full_CurrentTradeReceivables",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2025,
+   "amount": 12000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 111
+   }
+  },
+  {
+   "accountName": "재고자산",
+   "accountId": "ifrs-full_Inventories",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2023,
+   "amount": 8000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 112
+   }
+  },
+  {
+   "accountName": "재고자산",
+   "accountId": "ifrs-full_Inventories",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2024,
+   "amount": 9000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 113
+   }
+  },
+  {
+   "accountName": "재고자산",
+   "accountId": "ifrs-full_Inventories",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2025,
+   "amount": 10000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 114
+   }
+  },
+  {
+   "accountName": "매입채무",
+   "accountId": "ifrs-full_TradeAndOtherCurrentPayablesToTradeSuppliers",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2023,
+   "amount": 5000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 115
+   }
+  },
+  {
+   "accountName": "매입채무",
+   "accountId": "ifrs-full_TradeAndOtherCurrentPayablesToTradeSuppliers",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2024,
+   "amount": 6000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 116
+   }
+  },
+  {
+   "accountName": "매입채무",
+   "accountId": "ifrs-full_TradeAndOtherCurrentPayablesToTradeSuppliers",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2025,
+   "amount": 7000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 117
+   }
+  },
+  {
+   "accountName": "자산총계",
+   "accountId": "ifrs-full_Assets",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2023,
+   "amount": 300000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 118
+   }
+  },
+  {
+   "accountName": "자산총계",
+   "accountId": "ifrs-full_Assets",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2024,
+   "amount": 320000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 119
+   }
+  },
+  {
+   "accountName": "자산총계",
+   "accountId": "ifrs-full_Assets",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2025,
+   "amount": 340000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 120
+   }
+  },
+  {
+   "accountName": "부채총계",
+   "accountId": "ifrs-full_Liabilities",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2023,
+   "amount": 100000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 121
+   }
+  },
+  {
+   "accountName": "부채총계",
+   "accountId": "ifrs-full_Liabilities",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2024,
+   "amount": 110000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 122
+   }
+  },
+  {
+   "accountName": "부채총계",
+   "accountId": "ifrs-full_Liabilities",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2025,
+   "amount": 120000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 123
+   }
+  },
+  {
+   "accountName": "자본총계",
+   "accountId": "ifrs-full_Equity",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2023,
+   "amount": 200000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 124
+   }
+  },
+  {
+   "accountName": "자본총계",
+   "accountId": "ifrs-full_Equity",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2024,
+   "amount": 210000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 125
+   }
+  },
+  {
+   "accountName": "자본총계",
+   "accountId": "ifrs-full_Equity",
+   "statementType": "BS",
+   "rawStatementType": "BS",
+   "basis": "Separate",
+   "fiscalYear": 2025,
+   "amount": 220000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 126
+   }
+  },
+  {
+   "accountName": "영업활동현금흐름",
+   "statementType": "CF",
+   "rawStatementType": "CF",
+   "basis": "Separate",
+   "fiscalYear": 2023,
+   "amount": 30000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 127
+   }
+  },
+  {
+   "accountName": "영업활동현금흐름",
+   "statementType": "CF",
+   "rawStatementType": "CF",
+   "basis": "Separate",
+   "fiscalYear": 2024,
+   "amount": 33000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 128
+   }
+  },
+  {
+   "accountName": "영업활동현금흐름",
+   "statementType": "CF",
+   "rawStatementType": "CF",
+   "basis": "Separate",
+   "fiscalYear": 2025,
+   "amount": 36000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 129
+   }
+  },
+  {
+   "accountName": "유형자산의 취득",
+   "statementType": "CF",
+   "rawStatementType": "CF",
+   "basis": "Separate",
+   "fiscalYear": 2023,
+   "amount": -12000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 130
+   }
+  },
+  {
+   "accountName": "유형자산의 취득",
+   "statementType": "CF",
+   "rawStatementType": "CF",
+   "basis": "Separate",
+   "fiscalYear": 2024,
+   "amount": -13000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 131
+   }
+  },
+  {
+   "accountName": "유형자산의 취득",
+   "statementType": "CF",
+   "rawStatementType": "CF",
+   "basis": "Separate",
+   "fiscalYear": 2025,
+   "amount": -14000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 132
+   }
+  },
+  {
+   "accountName": "무형자산의 취득",
+   "statementType": "CF",
+   "rawStatementType": "CF",
+   "basis": "Separate",
+   "fiscalYear": 2023,
+   "amount": 2000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 133
+   }
+  },
+  {
+   "accountName": "무형자산의 취득",
+   "statementType": "CF",
+   "rawStatementType": "CF",
+   "basis": "Separate",
+   "fiscalYear": 2024,
+   "amount": 3000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 134
+   }
+  },
+  {
+   "accountName": "무형자산의 취득",
+   "statementType": "CF",
+   "rawStatementType": "CF",
+   "basis": "Separate",
+   "fiscalYear": 2025,
+   "amount": 4000000,
+   "unit": "KRW",
+   "raw": {
+    "k": 135
+   }
+  }
+ ],
+ "options": {
+  "company": {
+   "name": "t",
+   "corpCode": "00000001",
+   "stockCode": "000001"
+  },
+  "fiscalYears": [
+   2023,
+   2024,
+   2025
+  ],
+  "fetchedAt": "2026-01-01T00:00:00.000Z",
+  "allowBasisFallback": false
+ },
+ "expected": {
+  "ok": false,
+  "code": "incomplete",
+  "reason": "필수 계정을 찾지 못했습니다: revenue, cogs, grossProfit, sga, operatingProfit, netIncome, accountsReceivable, inventory, accountsPayable, totalAssets, totalLiabilities, totalEquity, cfo, ppeAcquisition, intangibleAcquisition",
+  "missingRequired": [
+   "revenue",
+   "cogs",
+   "grossProfit",
+   "sga",
+   "operatingProfit",
+   "netIncome",
+   "accountsReceivable",
+   "inventory",
+   "accountsPayable",
+   "totalAssets",
+   "totalLiabilities",
+   "totalEquity",
+   "cfo",
+   "ppeAcquisition",
+   "intangibleAcquisition"
+  ],
+  "quality": {
+   "basisRequested": "Consolidated",
+   "basisUsed": "Consolidated",
+   "basisFallback": false,
+   "fields": {
+    "revenue": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "cogs": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "grossProfit": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "sga": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "operatingProfit": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "netIncome": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "accountsReceivable": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "inventory": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "accountsPayable": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "totalAssets": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "totalLiabilities": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "totalEquity": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "cash": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "interestBearingDebt": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "leaseLiabilities": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "cfo": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "ppeAcquisition": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "intangibleAcquisition": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    },
+    "depreciationAmortization": {
+     "status": "missing",
+     "source": "OpenDART Financial Statement",
+     "missingYears": [
+      2023,
+      2024,
+      2025
+     ],
+     "sources": []
+    }
+   },
+   "warnings": [
+    "Cash account not found",
+    "Interest-bearing Debt account not found",
+    "D&A not available from current OpenDART financial statement source.",
+    "Revenue account not found or incomplete",
+    "COGS account not found or incomplete",
+    "Gross Profit account not found or incomplete",
+    "SG&A account not found or incomplete",
+    "Operating Profit account not found or incomplete",
+    "Net Income account not found or incomplete",
+    "Accounts Receivable account not found or incomplete",
+    "Inventory account not found or incomplete",
+    "Accounts Payable account not found or incomplete",
+    "Total Assets account not found or incomplete",
+    "Total Liabilities account not found or incomplete",
+    "Total Equity account not found or incomplete",
+    "CFO account not found or incomplete",
+    "PPE Acquisition account not found or incomplete",
+    "Intangible Acquisition account not found or incomplete"
+   ],
+   "trace": [],
+   "checks": []
+  }
+ }
+}
