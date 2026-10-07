@@ -53,7 +53,7 @@ export class DartFinancialRepository implements FinancialRepository {
     });
     const warnings = [...new Set([...n.quality.warnings, ...res.quality.warnings])];
     const quality = { ...n.quality, warnings };
-    if (!n.ok) return { ok: false, reason: 'incomplete', message: n.reason, quality, fetch: res.quality };
+    if (!n.ok) return { ok: false, reason: n.code === 'incomplete' ? 'incomplete' : 'unsupported', message: n.reason, quality, fetch: res.quality };
     return { ok: true, data: n.data, quality, fetch: res.quality };
   }
 }

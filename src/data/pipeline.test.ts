@@ -75,7 +75,7 @@ test('유사 계정(매입채무및기타채무)은 weak 매핑이며 warning �
   const specs = FULL.map(([n, st, v]) => (n === '매입채무' ? ['매입채무 및 기타채무', st, v] : [n, st, v]) as Spec);
   const r = normalizeFinancials(input(rows(specs)));
   assert.ok(r.ok);
-  assert.ok(r.quality.warnings.includes('Accounts Payable mapped from trade and other payables'));
+  assert.ok(r.quality.warnings.includes('Accounts Payable mapped from broader trade and other payables account.'));
   // strong 후보가 있으면 weak 는 쓰지 않는다
   const both = normalizeFinancials(input(rows([...FULL, ['매입채무및기타채무', 'BS', [999, 999, 999]]])));
   assert.ok(both.ok && both.data.balanceSheet.accountsPayable[0] === 5);
@@ -101,7 +101,7 @@ test('취득 계정은 부호와 상관없이 크기로 저장하고, CAPEX 는 
 });
 
 test('같은 계정에 서로 다른 값이 있으면 ambiguous 로 표시한다', () => {
-  const r = normalizeFinancials(input(rows([...FULL, ['영업수익', 'IS', [1, 1, 1]]])));
+  const r = normalizeFinancials(input(rows([...FULL, ['매출액', 'IS', [1, 1, 1], 'ifrs-full_Revenue']])));
   assert.ok(r.ok);
   assert.equal(r.quality.fields.revenue?.status, 'ambiguous');
   assert.ok(r.quality.warnings.some((w) => w.includes('multiple different values')));

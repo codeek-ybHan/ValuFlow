@@ -56,6 +56,8 @@ export interface HistoricalData {
     cash?: number[];
     /** 이자부부채(차입금 + 사채 등의 합). 계정 구성은 normalization 의 quality 에 기록된다. */
     interestBearingDebt?: number[];
+    /** 리스부채(유동 + 비유동). 이자부부채에는 포함하지 않고 따로 보존한다 (포함 여부는 Valuation 단계의 정책). */
+    leaseLiabilities?: number[];
     totalAssets: number[];
     totalLiabilities: number[];
     totalEquity: number[];

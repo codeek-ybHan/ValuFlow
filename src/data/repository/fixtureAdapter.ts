@@ -8,7 +8,7 @@ import type { DataQuality, FieldQuality } from '../normalization/quality.ts';
 const SECTION_OF: Record<CanonicalField, 'incomeStatement' | 'balanceSheet' | 'cashFlow'> = {
   revenue: 'incomeStatement', cogs: 'incomeStatement', grossProfit: 'incomeStatement', sga: 'incomeStatement', operatingProfit: 'incomeStatement', netIncome: 'incomeStatement',
   accountsReceivable: 'balanceSheet', inventory: 'balanceSheet', accountsPayable: 'balanceSheet', totalAssets: 'balanceSheet', totalLiabilities: 'balanceSheet', totalEquity: 'balanceSheet',
-  cash: 'balanceSheet', interestBearingDebt: 'balanceSheet',
+  cash: 'balanceSheet', interestBearingDebt: 'balanceSheet', leaseLiabilities: 'balanceSheet',
   cfo: 'cashFlow', ppeAcquisition: 'cashFlow', intangibleAcquisition: 'cashFlow', depreciationAmortization: 'cashFlow',
 };
 
@@ -25,10 +25,11 @@ export function assessHistoricalQuality(data: HistoricalData): DataQuality {
       ? { status: 'missing', missingYears: [], sources: [] }
       : arr.length === n ? { status: 'available', missingYears: [], sources: [] } : { status: 'partial', missingYears: [], sources: [] };
     fields[f] = q;
+    if (f === 'leaseLiabilities') continue;
     if (q.status !== 'available') warnings.push(`${LABEL[f] ?? f} ${q.status === 'missing' ? 'account not found' : 'series length mismatch'}`);
   }
   const basis = data.company.basis;
-  return { basisRequested: basis, basisUsed: basis, basisFallback: false, fields, warnings };
+  return { basisRequested: basis, basisUsed: basis, basisFallback: false, fields, warnings, trace: [], checks: [] };
 }
 
 /** fixture → HistoricalData (깊은 복사 + meta). fixture 객체는 바꾸지 않는다. */
