@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test:engine": "node --test src/engine/*.test.ts"
+    "test:engine": "node --test src/engine/*.test.ts src/valuation/*.test.ts"
   },
   "dependencies": {
     "react": "^18.3.1",

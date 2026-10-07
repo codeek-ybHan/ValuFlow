@@ -34,23 +34,5 @@ export interface HistoricalData {
   };
 }
 
-/** Valuation 입력 가정. 비율은 소수(0.08 = 8%), 금액은 억원 기준 (기획서 8절). */
-export interface ValuationAssumptions {
-  currentRevenue: number;
-  revenueGrowth: number[];
-  operatingMargin: number[];
-  taxRate: number;
-  depreciation: number[];
-  capex: number[];
-  deltaNwc: number[];
-  riskFreeRate: number;
-  beta: number;
-  marketRiskPremium: number;
-  preTaxCostOfDebt: number;
-  equityMarketValue: number;
-  debtMarketValue: number;
-  terminalGrowth: number;
-  interestBearingDebt: number;
-  cash: number;
-  sharesOutstanding: number;
-}
+/** Valuation 입력 가정. 엔진의 입력 모델(valuation/models.ts)과 같은 타입이다. */
+export type { ValuationInput as ValuationAssumptions } from '../valuation/models';
