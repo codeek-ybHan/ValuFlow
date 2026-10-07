@@ -195,7 +195,7 @@ function SamsungLoader({ mode, onFill }: { mode: 'form' | 'dataset'; onFill: (v:
     <section className="card">
       <div className="row between">
         <h3>삼성전자 학습 데이터 불러오기</h3>
-        <span className="badge badge-complete">공시 기반</span>
+        <span className="badge badge-in-progress">공시 기반</span>
       </div>
       <p className="small muted">2025 사업보고서 연결재무제표 기준, 단위 백만원. 직접 찾아 입력하는 것이 원칙이며, 막힐 때나 내 값을 검증할 때 사용하세요.</p>
       <div className="row action-row">

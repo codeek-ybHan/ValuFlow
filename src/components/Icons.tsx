@@ -1,5 +1,5 @@
 // 단순 라인 아이콘 (의존성 없음). 장식용이므로 aria-hidden.
-const p = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const;
+const p = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const;
 
 export const IconDashboard = () => <svg {...p}><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>;
 export const IconRoadmap = () => <svg {...p}><circle cx="6" cy="19" r="2" /><circle cx="18" cy="5" r="2" /><path d="M8 19h5a3 3 0 0 0 0-6h-2a3 3 0 0 1 0-6h5" /></svg>;
@@ -16,3 +16,4 @@ export const IconValuation = () => <svg {...p}><path d="M4 20V10M10 20V4M16 20v-
 export const IconAnalysis = () => <svg {...p}><path d="M3 3v18h18" /><path d="m7 15 4-4 3 3 5-6" /></svg>;
 export const IconAi = () => <svg {...p}><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /><rect x="7" y="7" width="10" height="10" rx="2" /></svg>;
 export const IconLearn = () => <svg {...p}><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z" /><path d="M4 21V5" /></svg>;
+export const IconMenu = () => <svg {...p} width={20} height={20}><path d="M4 7h16M4 12h16M4 17h16" /></svg>;

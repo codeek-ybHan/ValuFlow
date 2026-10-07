@@ -1,0 +1,81 @@
+/* ===== Design tokens =====
+   방향: 회계법인 내부 업무도구 + 현대적 금융 SaaS. 중립 웜그레이 + 차콜 단일 액센트.
+   색은 의미로만 쓴다. 강조/선택/주요 동작은 차콜(명도 대비), 완료·체크는 회색,
+   퀴즈 정오답과 오류/주의에만 초록·빨강·앰버를 쓴다. */
+:root {
+  --bg: #f6f6f4;
+  --surface: #ffffff;
+  --surface-2: #fafaf8;
+  --sunken: #efefec;
+
+  --line: #e5e5e1;
+  --line-strong: #d0d0cb;
+
+  --ink: #1c1e22;
+  --ink-2: #44484f;
+  --muted: #666b73;
+  --faint: #8f939a;
+
+  --accent: #2a2e35;
+  --accent-hover: #111316;
+  --accent-soft: #eeeeeb;
+  --accent-line: #d6d6d1;
+  --accent-ink: #ffffff;
+  --focus-ring: rgba(42, 46, 53, .16);
+
+  /* 정오답·오류·주의 전용 */
+  --pos: #2d6b4c;  --pos-soft: #e7f0ea;
+  --neg: #a8352b;  --neg-soft: #f8e9e6;
+  --warn: #7a5a12; --warn-soft: #f6eed8;
+
+  /* Sidebar */
+  --side-bg: #f1f1ee;
+  --side-ink: #50555d;
+  --side-ink-strong: #16181b;
+  --side-label: #8b8f96;
+  --side-hover: rgba(0, 0, 0, .045);
+  --side-active: rgba(0, 0, 0, .075);
+  --side-line: rgba(0, 0, 0, .1);
+  --side-accent: #2a2e35;
+
+  /* Charts */
+  --c1: #2a2e35; --c2: #9aa0aa; --c3: #6a717d; --c4: #c6cad1;
+
+  --shadow-1: 0 1px 2px rgba(28, 30, 34, .04);
+  --shadow-2: 0 8px 24px rgba(28, 30, 34, .12);
+  --radius: 12px;
+  --radius-sm: 8px;
+
+  --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Segoe UI', sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #141517; --surface: #1d1f23; --surface-2: #23262b; --sunken: #181a1d;
+    --line: #2e3137; --line-strong: #434751;
+    --ink: #ececee; --ink-2: #bcbfc6; --muted: #959aa3; --faint: #6f747d;
+    --accent: #e6e7ea; --accent-hover: #ffffff; --accent-soft: #2a2d33; --accent-line: #3d414a; --accent-ink: #17181b;
+    --focus-ring: rgba(230, 231, 234, .2);
+    --pos: #7fc4a0; --pos-soft: #1c2b24; --neg: #ef9a90; --neg-soft: #33201f; --warn: #e2b95a; --warn-soft: #2f2812;
+    --side-bg: #101113; --side-ink: #a3a8b1; --side-ink-strong: #ffffff; --side-label: #6f747d;
+    --side-hover: rgba(255, 255, 255, .06); --side-active: rgba(255, 255, 255, .1); --side-line: rgba(255, 255, 255, .1); --side-accent: #e6e7ea;
+    --c1: #e6e7ea; --c2: #8b919c; --c3: #b3b8c1; --c4: #5d636e;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 8px 24px rgba(0, 0, 0, .5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme='dark'] {
+  --bg: #141517; --surface: #1d1f23; --surface-2: #23262b; --sunken: #181a1d;
+  --line: #2e3137; --line-strong: #434751;
+  --ink: #ececee; --ink-2: #bcbfc6; --muted: #959aa3; --faint: #6f747d;
+  --accent: #e6e7ea; --accent-hover: #ffffff; --accent-soft: #2a2d33; --accent-line: #3d414a; --accent-ink: #17181b;
+  --focus-ring: rgba(230, 231, 234, .2);
+  --pos: #7fc4a0; --pos-soft: #1c2b24; --neg: #ef9a90; --neg-soft: #33201f; --warn: #e2b95a; --warn-soft: #2f2812;
+  --side-bg: #101113; --side-ink: #a3a8b1; --side-ink-strong: #ffffff; --side-label: #6f747d;
+  --side-hover: rgba(255, 255, 255, .06); --side-active: rgba(255, 255, 255, .1); --side-line: rgba(255, 255, 255, .1); --side-accent: #e6e7ea;
+  --c1: #e6e7ea; --c2: #8b919c; --c3: #b3b8c1; --c4: #5d636e;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 8px 24px rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}

@@ -91,6 +91,7 @@ src/
 ├── data/         fixture: 삼성전자 Historical(공시 기반), STEP 04 학습용 가정(가상값)
 ├── store/        LEARN 상태(state.tsx) / PROJECT 상태(project.tsx: historicalData · valuationAssumptions · valuationResult)
 ├── engine/       재무분석·FCFF·WACC·DCF·민감도 순수 함수 + 단위 테스트
+├── styles/       디자인 토큰(tokens.css) · 기반 · 레이아웃 · 컴포넌트 · 페이지 CSS
 ├── routes.ts     LEARN 라우트 헬퍼 (step-01 ↔ stepId)
 ├── build/        STEP별 Project Build 위젯
 ├── pages/        라우트 페이지 (Dashboard, Valuation, Learn 계열)
@@ -113,7 +114,3 @@ src/
 학습 기록(Lesson 완료, 메모, Quiz 답안, Practice, 재무 데이터셋)과 계산기 입력값은 브라우저 `localStorage` 에만 저장됩니다. 서버로 전송되지 않으며, 브라우저를 바꾸거나 사이트 데이터를 지우면 사라집니다. 초기화는 Learn의 Project Report 페이지 "학습 기록 초기화"에서 할 수 있습니다.
 
 초기 상태에서는 STEP 01 이 IN PROGRESS 이고 Lesson 01~06 과 Quiz 가 완료로 표시됩니다. Quiz 는 완료 표시만 있고 답안 기록은 없습니다.
-
-## 문서
-
-`docs/ValuFlow v2 기획서.md` 가 현행 기준 문서이고, `docs/archive/` 는 이전 기획 문서입니다.

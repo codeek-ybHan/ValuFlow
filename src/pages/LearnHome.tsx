@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
-import { stepPath } from '../routes';
 import { steps, BRAND, finalArchitecture } from '../content';
+import { stepPath } from '../routes';
 import { useApp } from '../store/state';
 import { currentStep, nextAction, overallProgress, stepProgress } from '../store/progress';
-import { Kpi, ProgressBar, StatusBadge, fmtPct } from '../components/ui';
+import { Kpi, PageHeader, ProgressBar, StatusBadge, fmtPct } from '../components/ui';
 import { IconBook, IconCheck, IconLayers, IconPen } from '../components/Icons';
 
 export function LearnHome() {
@@ -23,16 +23,16 @@ export function LearnHome() {
 
   return (
     <>
-      <div className="row between page-top">
-        <div>
-          <h1 className="hero-title">{BRAND.hero}</h1>
-          {BRAND.sub.map((t) => <p key={t} className="hero-sub">{t}</p>)}
-        </div>
-        <div className="row">
+      <PageHeader
+        eyebrow="Learn"
+        title={BRAND.hero}
+        actions={<>
           <Link className="btn" to="/learn/roadmap">Roadmap</Link>
-          <Link className="btn primary" to={next.to}>+ 이어서 학습</Link>
-        </div>
-      </div>
+          <Link className="btn primary" to={next.to}>이어서 학습</Link>
+        </>}
+      >
+        {BRAND.sub.map((t) => <p key={t} className="lead">{t}</p>)}
+      </PageHeader>
 
       <section className="kpi-row">
         <Kpi label="Overall Progress" value={fmtPct(overall.ratio, 0)} icon={<IconCheck />} />
@@ -46,8 +46,7 @@ export function LearnHome() {
           <div className="panel-head"><h3>Current Step</h3><StatusBadge label={cp.status} /></div>
           <p className="step-title">{cur.code} — {cur.title}</p>
           <p className="muted small">{cur.subtitle}</p>
-          <ProgressBar ratio={cp.ratio} label="현재 STEP 진행률" />
-          <p className="small num">{cp.done} / {cp.total} 완료</p>
+          <div className="row"><ProgressBar ratio={cp.ratio} label="현재 STEP 진행률" /><span className="small num muted">{cp.done} / {cp.total}</span></div>
           <ul className="mini-checklist">
             {cp.items.filter((i) => !i.done).slice(0, 5).map((i) => (
               <li key={i.id}><Link to={i.to}>{i.label}</Link></li>
@@ -72,10 +71,10 @@ export function LearnHome() {
       </section>
 
       <section className="panel">
-        <div className="panel-head"><h3>Project Evolution</h3><span className="small muted">단계별 자동화 내용 · 수작업/문제 상세는 각 STEP 과 Project Report</span></div>
+        <div className="panel-head"><h3>Project Evolution</h3><span className="small muted">단계별 자동화 내용</span></div>
         <div className="evo-table" role="table">
           {steps.map((s) => (
-            <Link key={s.id} to={`${stepPath(s.id)}`} className="evo-row" role="row">
+            <Link key={s.id} to={stepPath(s.id)} className="evo-row" role="row">
               <span className="evo-step"><strong>{s.code}</strong>{s.short}</span>
               <span>{s.evolution.automated}</span>
               <StatusBadge label={stepProgress(s, state).status} />

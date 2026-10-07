@@ -15,11 +15,12 @@ export function ProgressBar({ ratio, label }: { ratio: number; label?: string })
 }
 
 export function Kpi({ label, value, sub, icon }: { label: string; value: ReactNode; sub?: ReactNode; icon?: ReactNode }) {
+  const empty = value === '—';
   return (
     <div className="kpi">
       <div className="kpi-main">
         <div className="kpi-label">{label}</div>
-        <div className="kpi-value num">{value}</div>
+        <div className={`kpi-value num${empty ? ' empty' : ''}`}>{value}</div>
         {sub && <div className="kpi-sub">{sub}</div>}
       </div>
       {icon && <div className="kpi-tile">{icon}</div>}
@@ -27,11 +28,17 @@ export function Kpi({ label, value, sub, icon }: { label: string; value: ReactNo
   );
 }
 
-export function PageHeader({ eyebrow, title, children }: { eyebrow?: string; title: string; children?: ReactNode }) {
+/** 페이지 제목 영역. actions 는 제목 오른쪽(좁은 화면에서는 아래)에 놓인다. */
+export function PageHeader({ eyebrow, title, children, actions }: { eyebrow?: string; title: string; children?: ReactNode; actions?: ReactNode }) {
   return (
     <header className="page-header">
-      {eyebrow && <div className="eyebrow">{eyebrow}</div>}
-      <h1>{title}</h1>
+      <div className="page-header-row">
+        <div>
+          {eyebrow && <div className="eyebrow">{eyebrow}</div>}
+          <h1>{title}</h1>
+        </div>
+        {actions && <div className="row">{actions}</div>}
+      </div>
       {children}
     </header>
   );

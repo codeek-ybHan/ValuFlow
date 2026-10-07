@@ -20,7 +20,7 @@ export function Valuation() {
       <ValuationStepper current={id} />
       {id === 'forecast' && (
         <section className="panel basis-panel">
-          <div className="panel-head"><h3>Historical Basis</h3>{h ? <span className="badge badge-complete">공시 기반</span> : <span className="badge badge-not-started">NO DATA</span>}</div>
+          <div className="panel-head"><h3>Historical Basis</h3>{h ? <span className="badge badge-in-progress">공시 기반</span> : <span className="badge badge-not-started">NO DATA</span>}</div>
           {h ? (
             <p>{h.company.name} FY{h.company.period[0].replace('A', '')}–FY{h.company.period[h.company.period.length - 1].replace('A', '')} · {h.company.basis} · {h.company.currency} {h.company.unit}</p>
           ) : (
