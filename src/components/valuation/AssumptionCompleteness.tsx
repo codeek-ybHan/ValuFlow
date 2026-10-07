@@ -26,7 +26,7 @@ export function AssumptionCompleteness({ assumptions }: { assumptions: Assumptio
         <p className="hint">
           Run Valuation 을 하려면 모든 가정이 준비되어야 합니다. 비어 있는 값은 기본값으로 채우지 않습니다.
           {' '}필요한 입력: {open.map((s) => `${LABEL[s]} (${c.missing[s].map((k) => FIELD_LABEL[k] ?? k).join(', ')})`).join(' · ')}
-          {c.dcf === 'INCOMPLETE' && ' — DCF 입력 화면은 07-5 에서 추가됩니다. 지금은 [학습용 DCF 가정 적용] 으로 채울 수 있습니다.'}
+          {c.dcf === 'INCOMPLETE' && ' — DCF 단계에서 입력하거나 [학습용 DCF 가정 적용] 으로 채울 수 있습니다.'}
         </p>
       )}
     </div>

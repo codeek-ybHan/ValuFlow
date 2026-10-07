@@ -14,6 +14,7 @@ import type { SensitivityResult, ValuationInput, ValuationResult } from '../valu
 import type { HistoricalData } from '../data/types.ts';
 import type { ForecastInputs } from '../engine/forecastForm.ts';
 import type { WaccInputs } from '../engine/waccForm.ts';
+import type { DcfInputs } from '../engine/dcfForm.ts';
 import { isCompleteAssumptions, type AssumptionsDraft } from './assumptions.ts';
 import { samsungHistoricalData } from '../data/samsungHistorical.ts';
 import { step04PracticeAssumptions } from '../data/step04PracticeAssumptions.ts';
@@ -85,6 +86,14 @@ export function withForecastInputs(state: ProjectState, forecast: ForecastInputs
  */
 export function withWaccInputs(state: ProjectState, wacc: WaccInputs): ProjectState {
   return withAssumptions(state, { ...(state.valuationAssumptions ?? {}), ...wacc });
+}
+
+/**
+ * DCF / Equity 입력(Terminal Growth, 이자부부채, 현금, 발행주식수)만 가정에 반영한다.
+ * Forecast / WACC 가정은 그대로 유지한다. 이전 결과는 stale 이므로 비운다.
+ */
+export function withDcfInputs(state: ProjectState, dcf: DcfInputs): ProjectState {
+  return withAssumptions(state, { ...(state.valuationAssumptions ?? {}), ...dcf });
 }
 
 /** 입력이 유효하지 않은 상태로 바뀌었을 때: 가정은 그대로 두고 어긋난(stale) 결과와 오류만 비운다. */

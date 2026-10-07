@@ -1,18 +1,16 @@
 import { Navigate, useParams } from 'react-router-dom';
-import { useProject } from '../store/project';
 import { PageHeader } from '../components/ui';
 import { ValuationStepper } from '../components/valuation/ValuationStepper';
 import { ValuationControls } from '../components/valuation/ValuationControls';
-import { StageSlot } from '../components/valuation/StageSlot';
 import { HistoricalStage } from '../components/valuation/HistoricalStage';
 import { ForecastStage } from '../components/valuation/ForecastStage';
 import { WaccStage } from '../components/valuation/WaccStage';
+import { DcfStage } from '../components/valuation/DcfStage';
 import { ResultStage } from '../components/valuation/ResultStage';
 import { DEFAULT_STAGE, stageIndex, stages, type StageId } from '../components/valuation/workflow';
 
 export function Valuation() {
   const { stage } = useParams();
-  const { project } = useProject();
   if (stage && stageIndex(stage) < 0) return <Navigate to="/valuation" replace />;
   const id = (stage ?? DEFAULT_STAGE) as StageId;
   const cur = stages[stageIndex(id)];
@@ -24,7 +22,7 @@ export function Valuation() {
       <ValuationControls />
       <ValuationStepper current={id} />
       <h2 className="stage-title">{cur.no}. {cur.label}</h2>
-      {id === 'historical' ? <HistoricalStage /> : id === 'forecast' ? <ForecastStage /> : id === 'wacc' ? <WaccStage /> : id === 'result' ? <ResultStage /> : <StageSlot stage={cur} calculated={!!project.valuationResult} />}
+      {id === 'historical' ? <HistoricalStage /> : id === 'forecast' ? <ForecastStage /> : id === 'wacc' ? <WaccStage /> : id === 'dcf' ? <DcfStage /> : <ResultStage />}
     </>
   );
 }

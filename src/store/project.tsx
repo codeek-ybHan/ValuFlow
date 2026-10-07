@@ -3,9 +3,10 @@ import type { AssumptionsDraft } from './assumptions';
 import type { HistoricalData } from '../data/types';
 import type { ForecastInputs } from '../engine/forecastForm';
 import type { WaccInputs } from '../engine/waccForm';
+import type { DcfInputs } from '../engine/dcfForm';
 import {
   emptyProjectState, restoreProjectState, toPersisted, withAssumptions, withForecastInputs, withHistoricalData, withPracticeAssumptions,
-  withResultsCleared, withWaccInputs, withSamsungHistorical, withSensitivityRun, withValuationReset, withValuationRun, type ProjectState,
+  withResultsCleared, withWaccInputs, withDcfInputs, withSamsungHistorical, withSensitivityRun, withValuationReset, withValuationRun, type ProjectState,
 } from './projectModel';
 
 // PROJECT 영역 상태 (LEARN 상태 store/state.tsx 와 분리). 상태 전이는 projectModel.ts 의 순수 함수가 담당하고,
@@ -35,6 +36,8 @@ interface Ctx {
   setForecastInputs: (f: ForecastInputs) => void;
   /** WACC 입력만 가정에 반영 (Forecast/DCF 가정은 유지, 이전 결과는 비워짐) */
   setWaccInputs: (w: WaccInputs) => void;
+  /** DCF / Equity 입력만 가정에 반영 (Forecast/WACC 가정은 유지, 이전 결과는 비워짐) */
+  setDcfInputs: (d: DcfInputs) => void;
   /** 입력이 유효하지 않을 때 어긋난 결과만 비움 (가정은 유지) */
   clearStaleResults: () => void;
   /** valuationAssumptions 로 runValuation 실행 */
@@ -69,6 +72,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const setValuationAssumptions = useCallback((a: AssumptionsDraft | null) => setProject((p) => withAssumptions(p, a)), []);
   const setForecastInputs = useCallback((f: ForecastInputs) => setProject((p) => withForecastInputs(p, f)), []);
   const setWaccInputs = useCallback((w: WaccInputs) => setProject((p) => withWaccInputs(p, w)), []);
+  const setDcfInputs = useCallback((d: DcfInputs) => setProject((p) => withDcfInputs(p, d)), []);
   const clearStaleResults = useCallback(() => setProject(withResultsCleared), []);
   const runCurrentValuation = useCallback(() => setProject(withValuationRun), []);
   const runCurrentSensitivity = useCallback(() => setProject(withSensitivityRun), []);
@@ -78,8 +82,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const reset = useCallback(() => setProject(emptyProjectState), []);
 
   const value = useMemo(
-    () => ({ project, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, loadSamsung, applyPracticeAssumptions, reset }),
-    [project, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, loadSamsung, applyPracticeAssumptions, reset],
+    () => ({ project, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, setDcfInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, loadSamsung, applyPracticeAssumptions, reset }),
+    [project, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, setDcfInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, loadSamsung, applyPracticeAssumptions, reset],
   );
   return <ProjectCtx.Provider value={value}>{children}</ProjectCtx.Provider>;
 }
