@@ -1,6 +1,6 @@
 // ReportModel: Renderer / Export 가 받는 유일한 입력. 각 section 은 독립 타입이다.
 // 숫자는 모두 Cell(원본 값 + 정책 단위 표시 + Actual/Estimate/Calculated + 출처 id)이고, 서술은 AI(Grounded Claim)가 쓴 것과 deterministic 한 것을 구분한다.
-import type { Cell, Narrative, PeriodLabel, ReportSchemaVersion, SectionState, SourceRef } from './types.ts';
+import type { Cell, Narrative, NarrativeItem, PeriodLabel, ReportSchemaVersion, SectionState, SourceRef } from './types.ts';
 import type { ReportIssue } from './validation/validate.ts';
 
 export interface ReportMetadata {
@@ -23,6 +23,8 @@ export interface ReportMetadata {
 export interface ExecutiveSummary {
   headline: { enterpriseValue: Cell; equityValue: Cell; perShareValue: Cell; wacc: Cell; terminalGrowth: Cell; tvContribution: Cell };
   range: SectionState<ValuationRangeSection>;
+  /** AI 가 있을 때: Grounded Claim 을 역할별로 나눈 것 (새 문장 없음). conclusion=사실 · judgment=해석 · risk=위험 */
+  highlights: { conclusion: NarrativeItem[]; judgment: NarrativeItem[]; risk: NarrativeItem[] };
   /** 데이터 성격에 대한 고지 (학습용 가정 · fixture) */
   notices: string[];
   narrative: SectionState<Narrative>;
@@ -67,11 +69,20 @@ export interface WaccSection {
   note: string;
 }
 
+/** Equity Bridge: EV − Net Debt = Equity Value (순부채) / EV + Net Cash = Equity Value (순현금). 부호에 따른 표기 분류일 뿐 값은 엔진 결과다. */
+export interface EquityBridge {
+  kind: 'net-debt' | 'net-cash' | 'neutral';
+  lines: { key: string; label: string; operator: '-' | '+' | '=' | null; cell: Cell }[];
+  sharesOutstanding: Cell;
+  perShareValue: Cell;
+}
+
 export interface DcfSection {
   periods: PeriodLabel[];
   rows: TableRow[];
   terminal: { key: string; label: string; cell: Cell }[];
   bridge: { key: string; label: string; cell: Cell }[];
+  equityBridge: EquityBridge;
   tvContribution: Cell;
 }
 
@@ -79,14 +90,15 @@ export interface SensitivitySection {
   /** 행 = Terminal Growth, 열 = WACC */
   waccAxis: Cell[];
   growthAxis: Cell[];
-  rows: { terminalGrowth: Cell; cells: { wacc: Cell; enterpriseValue: Cell; perShareValue: Cell; isBaseCase: boolean }[] }[];
+  /** valid: WACC > g 인 조합만 true (엔진은 WACC <= g 조합을 계산하지 않는다). Renderer 는 이 flag 로 invalid 를 구분한다. */
+  rows: { terminalGrowth: Cell; cells: { wacc: Cell; enterpriseValue: Cell; perShareValue: Cell; isBaseCase: boolean; valid: boolean }[] }[];
   base: { wacc: Cell; terminalGrowth: Cell; inGrid: boolean };
   enterpriseValueRange: { min: Cell; max: Cell; widthRatio: Cell };
   directionNotes: string[];
 }
 
 export interface ScenarioSection {
-  columns: { id: string; label: string; description: string; ok: boolean; error: string | null; wacc: Cell; enterpriseValue: Cell; equityValue: Cell; perShareValue: Cell; assumptionNotes: string[] }[];
+  columns: { id: string; label: string; description: string; ok: boolean; error: string | null; wacc: Cell; enterpriseValue: Cell; equityValue: Cell; perShareValue: Cell; assumptions: { revenueGrowth: Cell[]; operatingMargin: Cell[]; marketRiskPremium: Cell; terminalGrowth: Cell } }[];
   equityRange: SectionState<{ min: Cell; max: Cell }>;
   note: string;
 }

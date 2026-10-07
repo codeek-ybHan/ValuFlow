@@ -173,7 +173,9 @@ Agent 가 만든 분석 문장의 핵심 claim 을 **Claim → Evidence → Sour
 
 ### Report Architecture (STEP 09-1)
 
-`src/report/` 는 Valuation Report 의 **데이터 계약**이다: `Project State → ReportInput(snapshot) → ReportModel → Renderer / Export`. Report 는 UI state 를 읽지 않고, 숫자를 새로 계산하지 않으며(엔진 · 분석 결과를 옮김), AI 서술은 STEP 08 의 검증된 Grounded Claim 만 재사용한다. 모든 숫자는 Actual / Estimate / Calculated, 정책 단위(억원 · 원 · % · 주), 출처 id 를 가진 `Cell` 이고 값이 없으면 missing / unavailable / not-applicable 로 구분한다. `schemaVersion: "1.0"`. 자세한 내용은 `docs/STEP09-1_report_architecture.md`. Renderer(HTML · PDF)는 STEP 09-2.
+`src/report/` 는 Valuation Report 의 **데이터 계약**이다: `Project State → ReportInput(snapshot) → ReportModel → Renderer / Export`. Report 는 UI state 를 읽지 않고, 숫자를 새로 계산하지 않으며(엔진 · 분석 결과를 옮김), AI 서술은 STEP 08 의 검증된 Grounded Claim 만 재사용한다. 모든 숫자는 Actual / Estimate / Calculated, 정책 단위(억원 · 원 · % · 주), 출처 id 를 가진 `Cell` 이고 값이 없으면 missing / unavailable / not-applicable 로 구분한다. `schemaVersion: "1.0"`. 자세한 내용은 `docs/STEP09-1_report_architecture.md`. Renderer(HTML · PDF)는 STEP 09-3 이후.
+
+**Template (STEP 09-2)**: `src/report/templates/` 가 ReportModel 을 보고서 구조로 연결한다 — section 순서 · 제목 · 필수/선택 · 가시성 · 번호 · layout 힌트 · footnote marker(`[S1]`) contract · 학습용 데이터 고지. 기본 template `valuation-standard-v1`(Cover → … → Sources → Appendix), 모델에는 template 정보가 없고 숫자는 다시 계산하지 않는다. `docs/STEP09-2_report_templates.md`.
 
 ### Credential 정책
 

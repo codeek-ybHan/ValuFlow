@@ -61,6 +61,11 @@ export function buildReport(input: ReportInput, options: BuildReportOptions = {}
       tvContribution: cell(input.reviewMetrics?.terminalValueContribution, 'ratio', 'calculated', SRC_ENGINE, { state: 'unavailable', reason: 'PV(TV) / EV 를 구할 수 없습니다.' }),
     },
     range, notices, narrative: summaryNarrative,
+    highlights: {
+      conclusion: summaryNarrative.status === 'ok' ? summaryNarrative.data.items.filter((i) => i.claimType === 'fact' || i.claimType === 'calculation') : [],
+      judgment: summaryNarrative.status === 'ok' ? summaryNarrative.data.items.filter((i) => i.claimType === 'interpretation') : [],
+      risk: riskNarrative.status === 'ok' ? riskNarrative.data.items.slice(0, 2) : [],
+    },
   };
 
   const companyOverview: CompanyOverview = {

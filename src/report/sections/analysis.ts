@@ -1,6 +1,5 @@
 // Sensitivity · Scenario · 상대가치 · Valuation Range section: ReportInput 에 수집된 엔진 view 를 Cell 로 옮긴다 (평균 · 중앙값으로 하나의 "정답 가치"를 만들지 않는다).
 import { DIRECTION_NOTES, RANGE_DISCLAIMER } from '../../engine/validationView.ts';
-import { formatPercent } from '../../ai/tools/display.ts';
 import type { ReportInput } from '../input.ts';
 import type { RelativeSection, ScenarioSection, SensitivitySection, ValuationRangeSection } from '../model.ts';
 import { SRC_ENGINE, SRC_RELATIVE } from '../sources.ts';
@@ -19,7 +18,7 @@ export function buildSensitivity(input: ReportInput): SectionState<SensitivitySe
       growthAxis: s.terminalGrowthValues.map((v) => cell(v, 'ratio', 'estimate', E)),
       rows: s.rows.map((row) => ({
         terminalGrowth: cell(row.terminalGrowth, 'ratio', 'estimate', E),
-        cells: row.cells.map((c) => ({ wacc: cell(c.wacc, 'ratio', 'estimate', E), enterpriseValue: cell(c.enterpriseValue, 'eok', 'calculated', E), perShareValue: cell(c.perShareValue, 'won', 'calculated', E), isBaseCase: c.isBaseCase })),
+        cells: row.cells.map((c) => ({ wacc: cell(c.wacc, 'ratio', 'estimate', E), enterpriseValue: cell(c.enterpriseValue, 'eok', 'calculated', E), perShareValue: cell(c.perShareValue, 'won', 'calculated', E), isBaseCase: c.isBaseCase, valid: c.wacc > row.terminalGrowth })),
       })),
       base: { wacc: cell(s.base.wacc, 'ratio', 'calculated', E), terminalGrowth: cell(s.base.terminalGrowth, 'ratio', 'estimate', E), inGrid: s.base.inGrid },
       enterpriseValueRange: { min: cell(s.enterpriseValueRange.min, 'eok', 'calculated', E), max: cell(s.enterpriseValueRange.max, 'eok', 'calculated', E), widthRatio: cell(s.enterpriseValueRange.widthRatio, 'ratio', 'calculated', E, { state: 'not-applicable', reason: 'Base EV 가 0 이하라 폭 비율을 정의할 수 없습니다.' }) },
@@ -39,7 +38,10 @@ export function buildScenario(input: ReportInput): SectionState<ScenarioSection>
         id: c.id, label: c.label, description: c.description, ok: c.ok, error: c.error,
         wacc: cell(c.wacc, 'ratio', 'calculated', E, fail(c.error)), enterpriseValue: cell(c.enterpriseValue, 'eok', 'calculated', E, fail(c.error)),
         equityValue: cell(c.equityValue, 'eok', 'calculated', E, fail(c.error)), perShareValue: cell(c.perShareValue, 'won', 'calculated', E, fail(c.error)),
-        assumptionNotes: [`MRP ${formatPercent(c.assumptions.marketRiskPremium)}`, `g ${formatPercent(c.assumptions.terminalGrowth)}`],
+        assumptions: {
+          revenueGrowth: c.assumptions.revenueGrowth.map((v) => cell(v, 'ratio', 'estimate', E)), operatingMargin: c.assumptions.operatingMargin.map((v) => cell(v, 'ratio', 'estimate', E)),
+          marketRiskPremium: cell(c.assumptions.marketRiskPremium, 'ratio', 'estimate', E), terminalGrowth: cell(c.assumptions.terminalGrowth, 'ratio', 'estimate', E),
+        },
       })),
       equityRange: s.equityRange ? { status: 'ok', data: { min: cell(s.equityRange.min, 'eok', 'calculated', E), max: cell(s.equityRange.max, 'eok', 'calculated', E) } } : { status: 'unavailable', reason: '계산된 시나리오가 2개 미만입니다.' },
       note: 'Bear / Bull 은 현재 가정에서 파생한 가정 묶음이며 예측이 아닙니다.',

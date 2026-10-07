@@ -10,3 +10,5 @@ export type { ReportModel } from './model.ts';
 export { REPORT_SCHEMA_VERSION } from './types.ts';
 export type { Cell, DataKind, CellState, SourceRef, Narrative, NarrativeItem } from './types.ts';
 export { REPORT_UNIT_POLICY } from './units.ts';
+export { buildReportDocument, validateTemplate, valuationStandardV1, getTemplate, markersOf, markerText } from './templates/index.ts';
+export type { ReportDocument, ReportTemplate, SectionTemplate, ResolvedSection, SectionId, SourceEntry } from './templates/index.ts';
