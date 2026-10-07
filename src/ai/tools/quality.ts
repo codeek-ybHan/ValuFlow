@@ -41,7 +41,7 @@ export function getMappingTrace(ctx: AiValuationContext, input: { field?: string
     .filter((t) => t.canonicalField === field && (input.fiscalYear === undefined || t.fiscalYear === input.fiscalYear))
     .sort((a, b) => a.fiscalYear - b.fiscalYear)
     .map((t) => ({
-      fiscalYear: t.fiscalYear, value: t.value, sourceAccountName: t.sourceAccountName, sourceAccountId: t.sourceAccountId, matchType: t.matchType,
+      fiscalYear: t.fiscalYear, value: t.value, unit: 'KRW million', valueEok: t.value / 100, sourceAccountName: t.sourceAccountName, sourceAccountId: t.sourceAccountId, matchType: t.matchType,
       rawStatementType: t.rawStatementType, basis: t.basis,
       ...(t.selection ? { selection: t.selection } : {}), ...(t.components ? { components: t.components.map((c) => ({ ...c })) } : {}),
     }));

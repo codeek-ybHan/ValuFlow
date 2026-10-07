@@ -46,6 +46,20 @@ cd backend && .venv/bin/alembic upgrade head              # migration
 - 정규화 규칙의 source of truth 는 TS(`src/data/normalization`)이고 backend(Python)는 `npm run export:normalization` 으로 내보낸 `rules.json` 을 읽습니다. 규칙을 바꾸면 다시 내보낸 뒤 `POST /api/companies/{corpCode}/historical/renormalize` 로 저장된 Raw 를 재정규화할 수 있습니다.
 - 배포(serverless): connection pool 은 기본 2개(overflow 0)로 제한되며 외부 pooler 를 쓰면 `DB_POOL=null` 로 pool 을 끕니다. DB 는 `DATABASE_URL` 만으로 지정하므로 특정 vendor 에 묶이지 않습니다. credential 은 환경변수로만 주입합니다.
 
+### AI Analyst (STEP 08-2)
+
+LLM 호출은 backend 에서만 합니다 (`backend/.env` 의 `OPENAI_API_KEY`, 선택 `OPENAI_MODEL` — 기본 `gpt-4.1-mini`; 브라우저 번들에는 Key 가 없습니다). Tool Runtime(`src/ai`, `executeTool`)은 frontend 에 있고, backend 는 계산을 하지 않습니다.
+
+```text
+질문 → POST /api/ai/query → 모델 → {status:'tool-call'} → frontend executeTool(같은 context snapshot)
+     → POST /api/ai/tool-result → 모델 → … → {status:'final', answer: AiAnalystAnswer}  (또는 tool-limit)
+```
+
+- 대화 상태는 서버에 저장하지 않고 서명된 token 으로 주고받습니다 (serverless 호환). Tool 호출은 한 번에 하나, 최대 5회(`AI_MAX_TOOL_CALLS`).
+- Tool 카탈로그 · system instruction 의 source of truth 는 TS 이고 `npm run export:ai` 로 `backend/app/ai/tool_catalog.json` 에 내보냅니다 (backend 가 허용 Tool 을 스스로 검증).
+- 최종 답변은 JSON schema(structured output)를 따라야 하며, 어기면 `invalid-model-output` 입니다. frontend 는 `enforceGrounding` 으로 경고 · 출처 · 지원 불가 공개를 점검 · 보정하고 audit event 를 남깁니다.
+- 주의: 모델마다 Tool 호출 습관이 다릅니다. `gpt-4o-mini` 는 불필요한 Tool 을 반복 호출해 한도(5회)에 걸리는 경우가 있었고, `gpt-4.1-mini` 는 안정적이었습니다.
+
 기업 검색과 재무제표 수집(`GET /api/companies/{corpCode}/financials?years=2023,2024,2025&basis=auto`)은 backend 가 켜져 있어야 동작합니다. 실제 응답의 계정명 조사는 `.venv/bin/python -m scripts.inspect_raw_accounts` 로 다시 실행할 수 있습니다 (dev 서버가 `/api` 를 8000 포트로 전달).
 
 ```bash

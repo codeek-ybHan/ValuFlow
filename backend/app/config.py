@@ -33,10 +33,20 @@ class Settings:
     db_pool_size: int = 2
     db_max_overflow: int = 0
     db_pool: str = "queue"
+    # AI Analyst (LLM Gateway). Key 는 서버 환경변수에서만 읽고 응답 / 로그 / 오류에 싣지 않는다 (VITE_ 접두사 금지).
+    openai_api_key: str = field(default="", repr=False)
+    openai_model: str = "gpt-4.1-mini"
+    openai_base_url: str = "https://api.openai.com/v1"
+    ai_state_secret: str = field(default="", repr=False)
+    ai_max_tool_calls: int = 5
 
     @property
     def has_api_key(self) -> bool:
         return bool(self.dart_api_key)
+
+    @property
+    def has_ai(self) -> bool:
+        return bool(self.openai_api_key)
 
     @property
     def has_database(self) -> bool:
@@ -52,5 +62,10 @@ def load_settings(env: dict[str, str] | None = None, dotenv_path: Path | None = 
     return Settings(
         dart_api_key=key.strip(), dart_base_url=source.get("DART_BASE_URL") or DEFAULT_DART_BASE_URL,
         database_url=db_url.strip(),
+        openai_api_key=(source.get("OPENAI_API_KEY") or dotenv.get("OPENAI_API_KEY", "")).strip(),
+        openai_model=source.get("OPENAI_MODEL") or dotenv.get("OPENAI_MODEL", "") or "gpt-4.1-mini",
+        openai_base_url=(source.get("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/"),
+        ai_state_secret=(source.get("AI_STATE_SECRET") or dotenv.get("AI_STATE_SECRET", "")).strip(),
+        ai_max_tool_calls=int(source.get("AI_MAX_TOOL_CALLS") or 5),
         db_pool_size=int(source.get("DB_POOL_SIZE") or 2), db_max_overflow=int(source.get("DB_MAX_OVERFLOW") or 0), db_pool=(source.get("DB_POOL") or "queue").lower(),
     )

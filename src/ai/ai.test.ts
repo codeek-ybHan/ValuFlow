@@ -290,7 +290,7 @@ test('경고와 출처 · 기준이 Tool 결과로 전파된다', () => {
   const results = [executeTool('getHistoricalAnalysis', hy), executeTool('getHistoricalQuality', hy)];
   const answer: AiAnalystAnswer = {
     mode: 'quality', summary: '현대자동차 Historical 의 품질을 요약합니다.',
-    evidence: [{ label: 'Revenue 2025', value: '186,254,472', unit: 'KRW million', period: '2025A', tool: 'getHistoricalAnalysis' }], warnings: [], sources: [], suggestedNextActions: [],
+    evidence: [{ label: 'Operating Margin 2025', value: '6.2%', period: '2025A', tool: 'getHistoricalAnalysis' }], warnings: [], sources: [], suggestedNextActions: [],
   };
   const codes = auditAnswer(answer, results).map((v) => v.code);
   assert.ok(codes.includes('missing-warning') && codes.includes('missing-sources'));
@@ -315,7 +315,10 @@ test('AI 코드는 valuation 내부 파일을 직접 import 하지 않는다 (�
       assert.ok(!/engine\/(dcf|analysis)\.ts$/.test(target), `${f}: LEARN 계산기를 직접 쓰지 않는다 (${target})`);
       assert.ok(!/opendart|fnltt|sqlalchemy|DATABASE_URL/i.test(target), `${f}: ${target}`);
     }
-    assert.ok(!/fetch\(|XMLHttpRequest|api\.openai|anthropic/i.test(src.replace(/\/\/.*$/gm, '')), `${f}: 이 단계에는 네트워크 / LLM 호출이 없다`);
+    // 네트워크는 backend AI Gateway 를 부르는 client.ts 에만 있다. LLM provider 는 어디에도 직접 호출하지 않는다 (API Key 는 backend 에만).
+    const code = src.replace(/\/\/.*$/gm, '');
+    assert.ok(!/api\.openai|anthropic|OPENAI|sk-[A-Za-z0-9]/i.test(code), `${f}: LLM provider 를 직접 부르지 않는다`);
+    if (!f.endsWith('/client.ts')) assert.ok(!/fetch\(|XMLHttpRequest/.test(code), `${f}: 네트워크 호출은 client.ts 에만 있다`);
   }
 });
 

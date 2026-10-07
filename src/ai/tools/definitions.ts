@@ -99,7 +99,7 @@ export const TOOL_CATALOG: readonly AiToolDefinition[] = [
     outputSchema: obj({
       field: { type: 'string' }, label: { type: 'string' }, status: { enum: ['available', 'partial', 'missing', 'ambiguous'] },
       matchType: { oneOf: [{ type: 'string' }, { type: 'null' }] },
-      entries: { type: 'array', items: obj({ fiscalYear: { type: 'integer' }, value: Num, sourceAccountName: { type: 'string' }, sourceAccountId: { oneOf: [{ type: 'string' }, { type: 'null' }] }, matchType: { type: 'string' }, rawStatementType: { type: 'string' }, basis: { type: 'string' } }) },
+      entries: { type: 'array', items: obj({ fiscalYear: { type: 'integer' }, value: Num, unit: { type: 'string', description: 'KRW million' }, valueEok: { type: 'number', description: '억원 환산 값 (직접 환산하지 말고 이 값을 쓴다)' }, sourceAccountName: { type: 'string' }, sourceAccountId: { oneOf: [{ type: 'string' }, { type: 'null' }] }, matchType: { type: 'string' }, rawStatementType: { type: 'string' }, basis: { type: 'string' } }) },
       missing: { oneOf: [Missing, { type: 'null' }] },
     }, ['field', 'label', 'status', 'matchType', 'entries', 'missing']),
   },

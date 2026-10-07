@@ -1,0 +1,15 @@
+{
+  "toolCall": { "status": "tool-call", "conversationId": "0123456789abcdef", "state": "signed.state", "callId": "call_1", "tool": "getHistoricalAnalysis", "input": {}, "toolCalls": 1 },
+  "toolResultRequest": { "conversationId": "0123456789abcdef", "state": "signed.state", "callId": "call_1", "toolResult": { "status": "ok", "tool": "getHistoricalAnalysis", "data": {}, "sources": [], "warnings": [] } },
+  "final": {
+    "status": "final", "conversationId": "0123456789abcdef", "toolCalls": 1,
+    "answer": {
+      "mode": "explain", "summary": "영업이익률이 개선되었습니다.",
+      "evidence": [{ "label": "Operating Margin 2025", "value": "13.1%", "period": "2025A", "unit": "ratio", "tool": "getHistoricalAnalysis" }],
+      "warnings": ["D&A unavailable"],
+      "sources": [{ "kind": "actual", "origin": "database", "basis": "Consolidated", "fetchedAt": "2026-10-07T00:00:00+00:00" }],
+      "suggestedNextActions": ["Forecast 가정을 검토하세요."]
+    }
+  },
+  "toolLimit": { "status": "tool-limit", "conversationId": "0123456789abcdef", "toolCalls": 1, "message": "Tool 호출 한도(1회)에 도달해 안전하게 종료했습니다." }
+}

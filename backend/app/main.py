@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import FastAPI, Query, Request
+from pydantic import BaseModel, Field
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -17,12 +18,30 @@ from app.dart.financials import FinancialsService
 from app.db.session import create_db_engine, make_session_factory
 from app.services.financial_store import FinancialStore
 from app.services.historical import HistoricalService
+from app.ai.errors import AiGatewayError, MESSAGES as AI_MESSAGES
+from app.ai.gateway import AiGateway
+from app.ai.provider import OpenAiProvider
+from app.ai.state import derive_secret
 from app.dart.models import DartApiError, ERROR_MESSAGES, HTTP_STATUS, CompanyDetail, CorpRecord, FinancialAccount, FinancialsQuality
 
 CORP_CODE_PATTERN = re.compile(r"^\d{8}$")
 MAX_LIMIT = 50
 MAX_YEARS = 5
 MIN_YEAR = 2015  # OpenDART 전체 재무제표 제공 범위 이내의 보수적 하한
+
+
+class AiQueryRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+    minimalContext: dict[str, Any] | None = None
+    toolNames: list[str] | None = None
+    classification: dict[str, Any] | None = None  # routing hint (기록용). 모델 선택을 대체하지 않는다
+
+class AiToolResultRequest(BaseModel):
+    conversationId: str = Field(min_length=1, max_length=64)
+    state: str = Field(min_length=1, max_length=600_000)
+    callId: str = Field(min_length=1, max_length=128)
+    toolResult: dict[str, Any]
+
 
 
 def _summary(r: CorpRecord) -> dict[str, Any]:
@@ -69,7 +88,7 @@ def _error(code: str, message: str) -> JSONResponse:
 
 
 def create_app(settings: Settings | None = None, dart: DartHttpClient | None = None, cache: CorpCodeCache | None = None, financials: FinancialsService | None = None,
-               store: FinancialStore | None = None, historical: HistoricalService | None = None) -> FastAPI:
+               store: FinancialStore | None = None, historical: HistoricalService | None = None, ai: AiGateway | None = None) -> FastAPI:
     settings = settings or load_settings()
     dart = dart or DartHttpClient(settings)
     cache = cache or CorpCodeCache(dart.fetch_corp_code_zip)
@@ -77,11 +96,18 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
     if store is None and settings.has_database:
         store = FinancialStore(make_session_factory(create_db_engine(settings)))  # connect 는 첫 사용 시점
     historical = historical or HistoricalService(financials, cache, store)
+    if ai is None and settings.has_ai:
+        ai = AiGateway(OpenAiProvider(settings.openai_api_key, settings.openai_model, settings.openai_base_url),
+                       derive_secret(settings.ai_state_secret, settings.openai_api_key), max_tool_calls=settings.ai_max_tool_calls)
     app = FastAPI(title="ValuFlow Backend")
 
     @app.exception_handler(DartApiError)
     async def _dart_error(_: Request, exc: DartApiError) -> JSONResponse:
         return _error(exc.code, exc.message)
+
+    @app.exception_handler(AiGatewayError)
+    async def _ai_error(_: Request, exc: AiGatewayError) -> JSONResponse:
+        return JSONResponse({"error": {"code": exc.code, "message": exc.message}}, status_code=exc.status)
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_: Request, __: RequestValidationError) -> JSONResponse:
@@ -93,7 +119,7 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
-        return {"status": "ok", "dartConfigured": settings.has_api_key, "databaseConfigured": historical.persistence_enabled, "corpCodesFetchedAt": cache.fetched_at}
+        return {"status": "ok", "dartConfigured": settings.has_api_key, "databaseConfigured": historical.persistence_enabled, "aiConfigured": ai is not None, "corpCodesFetchedAt": cache.fetched_at}
 
     @app.get("/api/companies")
     def companies(q: str = Query(..., max_length=100), limit: int = Query(20, ge=1, le=MAX_LIMIT)) -> dict[str, Any]:
@@ -163,6 +189,22 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
         if not CORP_CODE_PATTERN.match(corp_code):
             raise DartApiError("invalid-request", "corpCode 는 8자리 숫자여야 합니다.")
         return {"corpCode": corp_code, "items": store.list_fetches(corp_code, limit) if store is not None else []}
+
+    def _require_ai() -> AiGateway:
+        if ai is None:
+            raise AiGatewayError("ai-not-configured", AI_MESSAGES["ai-not-configured"], 503)
+        return ai
+
+    @app.post("/api/ai/query")
+    def ai_query(body: AiQueryRequest) -> dict[str, Any]:
+        """질문을 받아 모델을 호출한다. 응답: tool-call(frontend 가 Tool 실행) | final(AiAnalystAnswer) | tool-limit."""
+        return _require_ai().query(body.question, body.minimalContext, body.toolNames)
+
+    @app.post("/api/ai/tool-result")
+    def ai_tool_result(body: AiToolResultRequest) -> dict[str, Any]:
+        """frontend 가 실행한 Tool 결과를 받아 모델을 이어서 호출한다."""
+        result = _require_ai().tool_result(body.state, body.callId, body.toolResult, body.conversationId)
+        return result
 
     return app
 
