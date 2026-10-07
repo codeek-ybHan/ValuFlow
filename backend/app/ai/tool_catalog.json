@@ -411,7 +411,18 @@
     "searchCompanyNews",
     "searchDisclosures",
     "getValuationResult",
-    "getForecastAssumptions"
+    "getForecastAssumptions",
+    "getHistoricalAnalysis",
+    "getMarketData"
+   ]
+  },
+  {
+   "type": "disclosure-review",
+   "label": "Disclosure Review",
+   "tools": [
+    "searchDisclosures",
+    "getHistoricalAnalysis",
+    "searchKnowledge"
    ]
   },
   {

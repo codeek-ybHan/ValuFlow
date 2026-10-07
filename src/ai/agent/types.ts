@@ -3,10 +3,11 @@ import type { CapabilityId } from '../capabilities.ts';
 import type { ToolName } from '../tools/definitions.ts';
 import type { AiAnalystAnswer, AnswerViolation } from '../answer.ts';
 import type { ToolResult } from '../tools/result.ts';
+import type { Evidence, GroundedClaim, GroundingAuditEvent, GroundingReport } from '../grounding/types.ts';
 
 export type WorkflowType =
   | 'historical-review' | 'forecast-review' | 'wacc-review' | 'dcf-review' | 'sensitivity-scenario-review'
-  | 'comparable-review' | 'event-review' | 'full-valuation-review';
+  | 'comparable-review' | 'event-review' | 'disclosure-review' | 'full-valuation-review';
 
 export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
 
@@ -51,7 +52,10 @@ export interface Observation {
   nextHints: { tool: ToolName; reason: string }[];
 }
 
-export type CheckpointKind = 'change-wacc' | 'change-forecast-assumption' | 'apply-peer-multiple' | 'save-scenario';
+/** WACC 는 구성요소의 결과다: 구성요소 변경(무위험수익률 · 베타 …)과 WACC 직접 변경을 구분한다. */
+export type CheckpointKind =
+  | 'change-risk-free-rate' | 'change-beta' | 'change-market-risk-premium' | 'change-cost-of-debt' | 'change-tax-rate' | 'change-capital-structure' | 'change-wacc-directly'
+  | 'change-forecast-assumption' | 'apply-peer-multiple' | 'save-scenario';
 
 /** 사람의 판단이 필요한 변경 제안. 승인 전에는 아무것도 바뀌지 않으며, 이 단계에는 실제 write Tool 이 없다. */
 export interface HumanCheckpoint {
@@ -66,11 +70,8 @@ export interface HumanCheckpoint {
   applied: false;
 }
 
-export interface EvidenceClaim {
-  claim: string;
-  /** 이 주장을 뒷받침하는, 실제로 성공 실행된 Tool */
-  tools: string[];
-}
+/** @deprecated STEP 08-6 부터 claim 은 GroundedClaim (Evidence ID · 상태 · 신뢰도)이다. */
+export type EvidenceClaim = GroundedClaim;
 
 export interface WorkflowState {
   workflowId: string;
@@ -95,7 +96,11 @@ export interface WorkflowAnswer extends AiAnalystAnswer {
   reviewedAreas: string[];
   limitations: string[];
   judgmentItems: string[];
-  claims: EvidenceClaim[];
+  /** 검증을 거친 핵심 claim: Evidence ID · 상태 · 신뢰도 · fact(객관) / judgment(해석 · 위험 · 권고) 구분 */
+  claims: GroundedClaim[];
+  /** claims · summary 에서 실제 쓰인 근거 (Claim → Evidence → Source 추적용 Evidence Map) */
+  evidenceMap: Evidence[];
+  grounding: GroundingReport | null;
   proposedActions: { type: CheckpointKind; target: string; currentValue: string | null; proposedValue: string | null; rationale: string }[];
 }
 
@@ -117,6 +122,8 @@ export interface WorkflowAuditEvent {
   durationMs: number;
   violations: AnswerViolation['code'][];
   corrections: string[];
+  /** grounding 요약 (개수 · 코드만) */
+  grounding: GroundingAuditEvent | null;
 }
 
 export interface WorkflowOutcome {

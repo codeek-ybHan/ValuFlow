@@ -132,6 +132,20 @@ autonomous agent 가 아니라 **분석 업무를 계획 → Tool 실행 → 관
 - **Audit** (`WorkflowAuditEvent`): workflowId · 종류 · 계획 / 실행 단계 · Tool 상태 · 출처 종류 · 경고 · 체크포인트 · 상태 · 소요 시간 · 위반. Tool 결과 본문 · 문서 · 기사 · Raw 재무 · Key 는 저장하지 않습니다.
 - 실제 LLM 확인: backend 를 띄운 뒤 `node scripts/agent-live.ts` (WACC · Full · Event 3종).
 
+### Grounded Analysis (STEP 08-6)
+
+Agent 가 만든 분석 문장의 핵심 claim 을 **Claim → Evidence → Source** 로 추적하고, 근거 없는 숫자 · 출처 · 해석을 탐지 · 보정합니다 (`src/ai/grounding/`). workflow 최종 답변에 적용됩니다.
+
+- **Evidence** (`extractEvidence`): Tool 결과에서 grounding 에 필요한 것만 뽑습니다 — 숫자 하나 = Evidence 하나(`getHistoricalAnalysis:metrics.operatingMargin.values[2]`: 값 · 단위 · 기간 · 출처 종류 · DataQuality), 검색 문단 / 뉴스 한 건(문서 id · page · section · url · 짧은 발췌 · 검색 순위), 값 없음 표시(missing). LLM 이 계산한 값은 Evidence 가 아닙니다.
+- **Claim** (`claims: [{claimId, text, type, evidenceRefs:[{tool, fieldPath}]}]`): `fact` · `calculation` · `interpretation` · `risk` · `recommendation`. fact / calculation 은 수치 · 문서 근거가 있어야 하고(`objective`), 나머지는 근거가 있어도 **judgment** 로 구분되며 신뢰도가 high 가 될 수 없습니다. 모델이 인용하지 않아도 숫자 · 용어("영업이익률", "무위험수익률" …)로 근거를 연결합니다.
+- **검증**: 인용한 Tool 이 실행됐는가 · fieldPath 가 존재하는가 · 값이 일치하는가(비율↔퍼센트, 원 · KRW million · 억원 · 조원 환산, 적힌 소수 자릿수 기준 반올림, 같은 문장의 두 퍼센트로 계산되는 `%p` 파생 수치 — 모두 deterministic) · 숫자가 문장이 말하는 **지표**의 근거인가(다른 지표에 우연히 같은 값이 있어도 불인정) · calculation 은 deterministic Tool 값 · valuation 숫자는 엔진 결과 · 문서 claim 은 검색된 발췌에 핵심 단어 · 값이 없는(missing) 항목을 채우지 않았는가(한국어 라벨 포함).
+- **WACC 의미 모델**: WACC 는 구성요소(무위험수익률 · 베타 · 시장위험프리미엄 · 타인자본비용 · 세율 · 자본구조)의 결과입니다. 변경 제안 type 은 `change-risk-free-rate` · `change-beta` · … · `change-wacc-directly`. 모델이 Rf(3.0%) 변경을 `change-wacc-directly` 로 분류하면 의미 오류로 기록하고, 현재 값으로 구성요소가 분명하면 type 을 바로잡습니다.
+- **우선순위 · 충돌**: ValuFlow 엔진 > OpenDART 정규화 실적 > 공시 > 업로드 문서 > 공식 provider > 개발용 provider > 뉴스. 같은 지표를 provider 가 크게 다르게 말하면(예: 영업이익률 13% vs 52%) 충돌을 `limitations` 에 밝히고 provider 값은 재무 Actual 로 쓰지 않습니다.
+- **신뢰도**: high = deterministic 직접 값 · medium = 공시 / 업로드 문서 / 공식 provider · low = 개발용 provider · 뉴스. DataQuality(partial · ambiguous · …)와 검색 품질(낮은 순위 · 같은 검색 안에서 낮은 점수 · 근거 문단 하나뿐)이 한 단계씩 낮춥니다. 서로 다른 시점(FY · 시장 asOf · 뉴스 발행일)을 섞고 시점을 밝히지 않으면 표시하고 시점 요약(`timeBasis`)을 만듭니다.
+- **보정**: 막아야 할 위반(근거 없는 claim · 숫자, 값 없음 채우기, 충돌 값, 의미 오류 제안)이 있으면 위반 목록 + 허용 Evidence 목록만 backend(`/api/ai/regenerate`, Tool 없음)에 보내 **1회 교정 재생성**합니다 (Tool 결과 원문은 보내지 않음). 그래도 위반이면 근거 없는 claim · 숫자를 제거하고 검증된 사실로 **fallback** 답변을 만듭니다. 모델이 지어낸 출처는 제거하고 위반으로 기록합니다.
+- **Coverage / Audit**: `coverage = supported claims / 핵심 claims` (모든 문장을 claim 으로 세지 않음). `GroundingAuditEvent`: totalClaims · groundedClaims · violations · unsupportedNumbers · hallucinatedSources · contradictions · corrections · fallbackUsed · regenerated — 개수 · 코드만 저장하고 문서 · Tool 결과 본문은 저장하지 않습니다.
+- 한계: claim ↔ 문서 연결은 핵심 단어 겹침(형태소 분석 없음), 한국어 용어 사전은 주요 valuation 용어만, `runAiQuery`(비 workflow 질문)에는 아직 적용하지 않습니다.
+
 ### Credential 정책
 
 | 환경변수 | 쓰이는 곳 | 없을 때 |

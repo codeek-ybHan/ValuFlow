@@ -51,6 +51,13 @@ class AiQueryRequest(BaseModel):
     classification: dict[str, Any] | None = None  # routing hint (기록용). 모델 선택을 대체하지 않는다
     workflow: dict[str, Any] | None = None        # Agent workflow 계획 (gateway 가 종류 · Tool · 한도를 검증한다)
 
+class AiRegenerateRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+    answer: dict[str, Any]
+    issues: list[dict[str, Any]] = Field(default_factory=list, max_length=30)
+    evidence: list[dict[str, Any]] = Field(default_factory=list, max_length=150)
+
+
 class AiToolResultRequest(BaseModel):
     conversationId: str = Field(min_length=1, max_length=64)
     state: str = Field(min_length=1, max_length=600_000)
@@ -320,6 +327,11 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
         """frontend 가 실행한 Tool 결과를 받아 모델을 이어서 호출한다."""
         result = _require_ai().tool_result(body.state, body.callId, body.toolResult, body.conversationId, body.workflowObservation)
         return result
+
+    @app.post("/api/ai/regenerate")
+    def ai_regenerate(body: AiRegenerateRequest) -> dict[str, Any]:
+        """Grounding 검증에 실패한 workflow 답변을 위반 목록과 허용 근거만으로 1회 교정 재생성한다 (Tool 결과 원문 전체는 보내지 않는다)."""
+        return _require_ai().regenerate(body.question, body.answer, body.issues, body.evidence)
 
     return app
 

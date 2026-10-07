@@ -46,7 +46,10 @@ ANSWER_SCHEMA: dict[str, Any] = {
 }
 
 
-PROPOSAL_TYPES = ["change-wacc", "change-forecast-assumption", "apply-peer-multiple", "save-scenario"]
+# WACC 는 구성요소(무위험수익률 · 베타 · 시장위험프리미엄 · 타인자본비용 · 세율 · 자본구조)의 결과이므로, 구성요소 변경을 WACC 직접 변경으로 표기하지 않는다.
+PROPOSAL_TYPES = ["change-risk-free-rate", "change-beta", "change-market-risk-premium", "change-cost-of-debt", "change-tax-rate", "change-capital-structure", "change-wacc-directly",
+                  "change-forecast-assumption", "apply-peer-multiple", "save-scenario"]
+CLAIM_TYPES = ["fact", "calculation", "interpretation", "risk", "recommendation"]
 _STR_LIST = {"type": "array", "items": {"type": "string"}}
 
 # Agent workflow 최종 답변: 기본 답변 + 검토 범위 · 한계 · 판단 대상 · claim → Tool 증거 연결 · 변경 제안(사람의 승인 대기). 내부 추론(chain-of-thought)은 담지 않는다.
@@ -56,7 +59,12 @@ WORKFLOW_ANSWER_SCHEMA: dict[str, Any] = {
     "properties": {
         **ANSWER_SCHEMA["properties"],
         "reviewedAreas": _STR_LIST, "limitations": _STR_LIST, "judgmentItems": _STR_LIST,
-        "claims": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["claim", "tools"], "properties": {"claim": {"type": "string"}, "tools": _STR_LIST}}},
+        # claim → 근거: evidenceRefs 는 Tool 이름과 그 결과 data 안의 fieldPath (문서 · 뉴스 근거는 results[i]). 검증은 frontend 의 Grounding Validator 가 한다.
+        "claims": {"type": "array", "items": {
+            "type": "object", "additionalProperties": False, "required": ["claimId", "text", "type", "evidenceRefs"],
+            "properties": {"claimId": {"type": "string"}, "text": {"type": "string"}, "type": {"type": "string", "enum": CLAIM_TYPES},
+                           "evidenceRefs": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["tool", "fieldPath"],
+                                                                      "properties": {"tool": {"type": "string"}, "fieldPath": _NULLABLE_STR}}}}}},
         "proposedActions": {"type": "array", "items": {
             "type": "object", "additionalProperties": False, "required": ["type", "target", "currentValue", "proposedValue", "rationale"],
             "properties": {"type": {"type": "string", "enum": PROPOSAL_TYPES}, "target": {"type": "string"}, "currentValue": _NULLABLE_STR, "proposedValue": _NULLABLE_STR, "rationale": {"type": "string"}}}},

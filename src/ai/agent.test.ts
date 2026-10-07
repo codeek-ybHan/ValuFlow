@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   TOOL_CATALOG, UNSUPPORTED_DISCLOSURE, buildAiContext, classifyWorkflow, executeTool, observe, operationOf, planWorkflow, resolveCheckpoint, runWorkflow, snapshotId, MAX_WORKFLOW_STEPS, AGENT_MAX_TOOL_CALLS,
-  AiClientError, type AiGatewayClient, type AiQueryRequest, type AiToolResultRequest, type GatewayResponse, type ToolResult, type WorkflowAnswer,
+  AiClientError, type AiGatewayClient, type AiQueryRequest, type AiRegenerateRequest, type AiToolResultRequest, type GatewayResponse, type ToolResult, type WorkflowAnswer,
 } from './index.ts';
 import { emptyProjectState, withHistoricalLoaded, withPracticeAssumptions, withRelativeInputs, withSelectedCompany, type ProjectState } from '../store/projectModel.ts';
 
@@ -50,6 +50,9 @@ const tools = (p: { steps: { tool: string }[] }) => p.steps.map((s) => s.tool);
 test('workflow 분류: 8개 업무를 구분하고 일반 질문 · 민감도 계산 질문은 workflow 가 아니다', () => {
   const cls = (q: string) => classifyWorkflow(q)?.type ?? null;
   assert.equal(cls('삼성전자 최근 실적을 분석해줘.'), 'historical-review');
+  assert.equal(cls('삼성전자 최근 영업이익률을 분석해줘.'), 'historical-review');
+  assert.equal(cls('삼성전자가 설비투자 확대 이유를 뭐라고 설명했어?'), 'disclosure-review');
+  assert.equal(cls('최근 실적과 시장 상황을 같이 고려해서 valuation risk를 정리해줘.'), 'event-review');
   assert.equal(cls('현재 Forecast가 과도한지 봐줘.'), 'forecast-review');
   assert.equal(cls('현재 WACC 8.1% 적절해?'), 'wacc-review');
   assert.equal(cls('현재 삼성전자 WACC 가정을 검토해줘.'), 'wacc-review');
@@ -71,7 +74,8 @@ test('계획: workflow 별 단계 · 순서 · optional · 예산 (Tool 이름�
   assert.deepEqual(tools(plan('현재 WACC 8.1% 적절해?')), ['getForecastAssumptions', 'getValuationResult', 'getMarketAssumptions', 'getComparableCompanies']);
   assert.deepEqual(tools(plan('현재 DCF가 어떤 가정에 가장 민감해?')), ['getValuationResult', 'getForecastAssumptions', 'getSensitivityAnalysis', 'getScenarioAnalysis']);
   assert.deepEqual(tools(plan('DCF와 Peer valuation이 왜 차이나?')), ['getValuationResult', 'getComparableCompanies', 'getRelativeValuation', 'getHistoricalAnalysis']);
-  assert.deepEqual(tools(plan('최근 valuation에 영향을 줄 이벤트가 있어?')), ['searchCompanyNews', 'searchDisclosures', 'getValuationResult', 'getForecastAssumptions']);
+  assert.deepEqual(tools(plan('최근 valuation에 영향을 줄 이벤트가 있어?')), ['searchCompanyNews', 'searchDisclosures', 'getValuationResult', 'getForecastAssumptions', 'getHistoricalAnalysis', 'getMarketData']);
+  assert.deepEqual(tools(plan('삼성전자가 설비투자 확대 이유를 뭐라고 설명했어?')), ['searchDisclosures', 'getHistoricalAnalysis', 'searchKnowledge']);
   const f = plan('삼성전자 Valuation 전체 검토해줘.');
   assert.ok(f.steps.length >= 10 && f.steps[0].tool === 'getCompanyOverview' && f.steps.some((s) => s.optional) && f.steps.some((s) => !s.optional));
   assert.deepEqual([f.maxToolCalls, f.blocked, f.workflowType], [AGENT_MAX_TOOL_CALLS, null, 'full-valuation-review']);
@@ -199,31 +203,67 @@ test('immutable context snapshot: workflow 도중 Project State 가 바뀌어도
   assert.notEqual(next.state.contextSnapshotId, before, '다음 workflow 는 새 snapshot');
 });
 
-test('출처 · 경고 전파와 claim → Tool 증거 연결 (실행되지 않은 Tool 을 근거로 든 claim 은 걸러진다)', async () => {
+test('출처 · 경고 전파와 claim → Evidence 연결 (실행되지 않은 Tool 을 근거로 든 claim 은 걸러진다)', async () => {
   const marketSource = { kind: 'external' as const, type: 'market-data' as const, origin: 'yahoo-finance', basis: null, fetchedAt: AT, persisted: false, note: null, asOf: AT };
   const market = ok('getMarketData', { asOf: AT, marketCap: { value: 1e15, unit: 'KRW', valueTrillion: 1000, asOf: AT, source: 'Yahoo Finance' } }, [marketSource], [{ code: 'provider-reliability', text: 'unofficial provider', level: 'review' }]);
+  const ref = (tool: string, fieldPath: string | null) => ({ tool, fieldPath });
   const client = new Gateway([() => call('getHistoricalAnalysis', {}, 1), () => done({
     summary: '시가총액과 영업이익률을 함께 보았습니다.',
-    claims: [{ claim: '영업이익률이 개선되었다', tools: ['getHistoricalAnalysis'] }, { claim: '시총은 약 1,000조원이다', tools: ['getMarketData'] }, { claim: '회사가 HBM 투자를 언급했다', tools: ['searchDisclosures'] }],
+    claims: [
+      { claimId: 'c1', text: '영업이익률이 개선되었다', type: 'interpretation', evidenceRefs: [ref('getHistoricalAnalysis', 'metrics.operatingMargin.values[2]')] },
+      { claimId: 'c2', text: '2026-10-07 기준 시총은 약 1,000조원이다', type: 'fact', evidenceRefs: [ref('getMarketData', 'marketCap.value')] },
+      { claimId: 'c3', text: '회사가 HBM 투자를 언급했다', type: 'fact', evidenceRefs: [ref('searchDisclosures', 'results[0]')] },
+    ] as never,
   }, [market], [{ tool: 'getHistoricalAnalysis', runtime: 'frontend', status: 'ok' }, { tool: 'getMarketData', runtime: 'backend', status: 'ok' }])]);
   const out = (await run('삼성전자 최근 실적을 분석해줘.', full(), client))!;
-  assert.deepEqual(out.answer!.claims.map((c) => c.tools), [['getHistoricalAnalysis'], ['getMarketData']]);
-  assert.ok(out.violations.some((v) => v.code === 'claim-without-evidence' && v.detail.includes('searchDisclosures')) && out.corrections.includes('claims-filtered'));
+  assert.deepEqual(out.answer!.claims.map((c) => [c.claimId, c.status]), [['c1', 'supported'], ['c2', 'supported']], '실행되지 않은 Tool(searchDisclosures)을 근거로 든 claim 은 제거');
+  assert.deepEqual(out.answer!.claims.map((c) => c.basis), ['judgment', 'objective']);
+  assert.ok(out.violations.some((v) => v.code === 'ungrounded-claim' && v.detail.includes('c3')) && out.corrections.includes('fallback-used') && out.corrections.includes('unsupported-claims-removed'));
+  assert.equal(out.answer!.summary, '시가총액과 영업이익률을 함께 보았습니다.', '요약에 문제가 없으면 모델의 요약은 유지한다');
+  assert.ok(out.answer!.claims[0].evidenceIds.some((id) => id.startsWith('getHistoricalAnalysis:metrics.operatingMargin')) && out.answer!.claims[1].evidenceIds.includes('getMarketData:marketCap.value'));
+  assert.ok(out.answer!.evidenceMap.length >= 2 && out.answer!.grounding!.graph.length >= 2);
   assert.deepEqual(out.answer!.sources.map((s) => `${s.type}`).sort(), ['financial-data', 'market-data']);
   assert.ok(out.state.sources.includes('market-data:yahoo-finance') && out.state.sources.some((s) => s.startsWith('financial-data')));
   assert.ok(out.state.warnings.includes('unofficial provider') && out.answer!.warnings.includes('unofficial provider'), '경고 전파');
+  assert.equal(out.audit.grounding!.totalClaims, 3);
+  assert.equal(out.audit.grounding!.fallbackUsed, true);
+});
+
+test('Workflow 통합: claim → Evidence → Tool → Source, Rf 변경을 WACC 직접 변경으로 잘못 분류한 제안은 바로잡고, 교정 재생성 결과를 채택한다', async () => {
+  const ref = (tool: string, fieldPath: string | null) => ({ tool, fieldPath });
+  const rf = ok('getMarketAssumptions', { asOf: AT, riskFreeRate: { rate: 0.04286, unit: 'ratio (decimal)', maturity: '10Y', asOf: '2026-08-01', source: 'FRED' }, beta: { value: 1.545, asOf: AT } }, [{ kind: 'external', type: 'market-data', origin: 'fred', basis: null, fetchedAt: AT, persisted: false, note: null, asOf: '2026-08-01' }]);
+  const bad = { summary: '현재 WACC 는 8.1%이고 시장 무위험수익률은 9.9%입니다.', claims: [
+    { claimId: 'c1', text: '현재 ValuFlow WACC 는 8.1%다.', type: 'fact', evidenceRefs: [ref('getValuationResult', 'wacc')] },
+    { claimId: 'c2', text: '시장 무위험수익률은 9.9%다.', type: 'fact', evidenceRefs: [ref('getMarketAssumptions', 'riskFreeRate.rate')] },
+  ], proposedActions: [{ type: 'change-wacc-directly', target: 'WACC', currentValue: '3.0%', proposedValue: '4.286%', rationale: '시장 무위험수익률이 더 높다' }] };
+  const good = { ...bad, summary: '현재 WACC 는 8.1%이고 시장 무위험수익률은 4.29%입니다.', claims: [bad.claims[0], { ...bad.claims[1], text: '시장 무위험수익률은 4.29%다.' }] };
+  const regen: AiRegenerateRequest[] = [];
+  const client = new Gateway([() => call('getValuationResult', {}, 1), () => call('getForecastAssumptions', {}, 2, [rf]), () => done(bad as never, [rf], [{ tool: 'getValuationResult', runtime: 'frontend', status: 'ok' }, { tool: 'getMarketAssumptions', runtime: 'backend', status: 'ok' }, { tool: 'getForecastAssumptions', runtime: 'frontend', status: 'ok' }])]);
+  (client as unknown as { regenerate: unknown }).regenerate = async (req: AiRegenerateRequest) => { regen.push(req); return { status: 'final', answer: { mode: 'explain', evidence: [], warnings: [], sources: [], suggestedNextActions: [], reviewedAreas: ['WACC'], limitations: [], judgmentItems: ['최종 WACC'], ...good } }; };
+  const out = (await run('현재 삼성전자 WACC 가정을 검토해줘.', full(), client))!;
+  assert.equal(regen.length, 1);
+  assert.ok(regen[0].issues.some((i) => i.target === 'c2') && !JSON.stringify(regen[0]).includes('"data"'));
+  assert.deepEqual(out.answer!.claims.map((c) => [c.claimId, c.status, c.basis]), [['c1', 'supported', 'objective'], ['c2', 'supported', 'objective']]);
+  assert.equal(out.answer!.summary, good.summary);
+  assert.deepEqual(out.answer!.claims[0].evidenceIds, ['getValuationResult:wacc']);
+  assert.ok(out.corrections.includes('regenerated') && out.corrections.includes('proposal-retyped') && !out.corrections.includes('fallback-used'));
+  assert.deepEqual(out.answer!.proposedActions.map((a) => [a.type, a.target]), [['change-risk-free-rate', '무위험수익률']], 'Rf 변경은 WACC 직접 변경이 아니다');
+  assert.deepEqual(out.state.checkpoints.map((c) => [c.kind, c.status, c.applied]), [['change-risk-free-rate', 'pending', false]]);
+  assert.equal(out.state.status, 'waiting-for-user');
+  assert.deepEqual([out.audit.grounding!.regenerated, out.audit.grounding!.fallbackUsed, out.audit.grounding!.unsupportedNumbers], [true, false, 0]);
+  assert.ok(out.violations.some((v) => v.code === 'proposal-semantic-mismatch') && out.audit.grounding!.violations.includes('ungrounded-number'));
 });
 
 test('human checkpoint: 변경 제안은 waiting-for-user 로 멈추고, 승인 · 거절 어느 쪽도 값을 적용하지 않는다', async () => {
   const project = full();
   const before = JSON.stringify(project);
-  const proposal = { type: 'change-wacc' as const, target: 'WACC', currentValue: '8.1%', proposedValue: '7.8%', rationale: '관찰된 무위험수익률과 베타 기준으로 더 낮은 WACC 를 검토할 수 있습니다.' };
+  const proposal = { type: 'change-wacc-directly' as const, target: 'WACC', currentValue: '8.1%', proposedValue: '7.8%', rationale: '관찰된 무위험수익률과 베타 기준으로 더 낮은 WACC 를 검토할 수 있습니다.' };
   const client = new Gateway([() => call('getValuationResult', {}, 1), () => done({ summary: '7.8% 로 변경해서 다시 계산할까요?', proposedActions: [proposal] }, [], [{ tool: 'getValuationResult', runtime: 'frontend', status: 'ok' }])]);
   const out = (await run('현재 WACC 8.1% 적절해?', project, client))!;
   assert.equal(out.state.status, 'waiting-for-user');
-  assert.deepEqual(out.state.checkpoints.map((c) => [c.kind, c.target, c.currentValue, c.proposedValue, c.status, c.applied]), [['change-wacc', 'WACC', '8.1%', '7.8%', 'pending', false]]);
+  assert.deepEqual(out.state.checkpoints.map((c) => [c.kind, c.target, c.currentValue, c.proposedValue, c.status, c.applied]), [['change-wacc-directly', 'WACC', '8.1%', '7.8%', 'pending', false]]);
   assert.match(out.state.message!, /사용자 승인/);
-  assert.deepEqual(out.audit.humanCheckpoint, { count: 1, kinds: ['change-wacc'], pending: 1 });
+  assert.deepEqual(out.audit.humanCheckpoint, { count: 1, kinds: ['change-wacc-directly'], pending: 1 });
   assert.equal(JSON.stringify(project), before, '승인 전에는 아무것도 바뀌지 않는다');
   const approved = resolveCheckpoint(out.state, out.state.checkpoints[0].id, 'approved');
   assert.equal(approved.status, 'completed');
@@ -258,9 +298,9 @@ test('audit: workflow 단위 이벤트에는 이름 · 상태 · 개수만 있�
   const client = new Gateway([() => call('getHistoricalAnalysis', {}, 1), () => done({ summary: '요약' }, [news, doc], [{ tool: 'getHistoricalAnalysis', runtime: 'frontend', status: 'ok' }, { tool: 'searchCompanyNews', runtime: 'backend', status: 'ok' }, { tool: 'searchDisclosures', runtime: 'backend', status: 'ok' }])]);
   const out = (await run('최근 이벤트까지 고려해서 주요 valuation risk를 검토해줘.', full(), client, { newId: () => 'wf_audit' }))!;
   const a = out.audit;
-  assert.deepEqual(Object.keys(a).sort(), ['contextSnapshotId', 'conversationId', 'corrections', 'durationMs', 'humanCheckpoint', 'question', 'sourcesUsed', 'status', 'stepsExecuted', 'stepsPlanned', 'timestamp', 'toolsExecuted', 'violations', 'warnings', 'workflowId', 'workflowType'].sort());
+  assert.deepEqual(Object.keys(a).sort(), ['contextSnapshotId', 'conversationId', 'corrections', 'durationMs', 'grounding', 'humanCheckpoint', 'question', 'sourcesUsed', 'status', 'stepsExecuted', 'stepsPlanned', 'timestamp', 'toolsExecuted', 'violations', 'warnings', 'workflowId', 'workflowType'].sort());
   assert.deepEqual([a.workflowId, a.workflowType, a.status, a.conversationId], ['wf_audit', 'event-review', 'completed', 'c1']);
-  assert.deepEqual(a.stepsPlanned, ['news', 'disclosure', 'valuation', 'forecast']);
+  assert.deepEqual(a.stepsPlanned, ['news', 'disclosure', 'valuation', 'forecast', 'historical', 'market']);
   assert.ok(a.stepsExecuted.includes('news') && a.stepsExecuted.includes('disclosure'));
   assert.ok(a.durationMs > 0 && a.timestamp.startsWith('2026-10-07'));
   const json = JSON.stringify(a);
@@ -275,4 +315,12 @@ test('backend 오류는 failed 상태로 끝나고 오류 코드만 남는다', 
   assert.equal(out.state.status, 'failed');
   assert.deepEqual(out.error, { code: 'provider-rate-limit', message: '요청 한도' });
   assert.equal(out.audit.status, 'failed');
+});
+
+test('값을 바꾸는 제안은 현재 값 · 제안 값이 숫자여야 한다 (서술형 "재검토 권고"는 제안이 아니다)', async () => {
+  const vague = { type: 'change-wacc-directly' as const, target: 'WACC', currentValue: '0.0814', proposedValue: '시장 상황 반영 재검토 권고', rationale: '시장 변화' };
+  const good = { type: 'change-wacc-directly' as const, target: 'WACC', currentValue: '8.1%', proposedValue: '7.8%', rationale: '시장 관찰값' };
+  const out = (await run('현재 WACC 8.1% 적절해?', full(), new Gateway([() => call('getValuationResult', {}, 1), () => done({ summary: '검토했습니다.', proposedActions: [vague, good] }, [], [{ tool: 'getValuationResult', runtime: 'frontend', status: 'ok' }])])))!;
+  assert.deepEqual(out.state.checkpoints.map((c) => c.proposedValue), ['7.8%']);
+  assert.ok(out.violations.some((v) => v.code === 'proposal-incomplete') && out.corrections.includes('proposals-filtered'));
 });

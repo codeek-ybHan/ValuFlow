@@ -57,12 +57,23 @@ export const WORKFLOWS: readonly WorkflowTemplate[] = [
   },
   {
     type: 'event-review', label: 'Risk / News Review',
-    pattern: /(뉴스|기사|이벤트|사건|\bnews\b|최근\s*(소식|이슈|동향)).{0,30}(valuation|밸류에이션|가치|위험|리스크|영향)|(valuation|밸류에이션|가치|위험|리스크).{0,30}(뉴스|기사|이벤트|사건|최근)/i,
+    pattern: /(뉴스|기사|이벤트|사건|\bnews\b|최근\s*(소식|이슈|동향)).{0,30}(valuation|밸류에이션|가치|위험|리스크|risk|영향)|(valuation|밸류에이션|가치|위험|리스크|risk).{0,30}(뉴스|기사|이벤트|사건|최근)|valuation\s*risk|밸류에이션\s*(위험|리스크)|시장\s*상황.{0,30}(위험|리스크|risk)/i,
     steps: [
       S('news', 'news', 'searchCompanyNews', '최근 기업 뉴스 · 이벤트 확인'),
       S('disclosure', 'disclosure', 'searchDisclosures', '이벤트의 공시 근거 확인', true),
       S('valuation', 'valuation', 'getValuationResult', '현재 DCF 결과와 비교할 맥락'),
       S('forecast', 'forecast', 'getForecastAssumptions', '현재 Forecast 가정 맥락', true),
+      S('historical', 'historical', 'getHistoricalAnalysis', '최근 실적 맥락', true),
+      S('market', 'market', 'getMarketData', '현재 시장 상황 (시가총액 · 주가)', true),
+    ],
+  },
+  {
+    type: 'disclosure-review', label: 'Disclosure Review',
+    pattern: /공시|사업보고서|반기보고서|분기보고서|(회사|경영진).{0,12}(설명|밝혔|밝히|언급|발표)|(이유|배경|계획).{0,10}(설명했|밝혔|언급)/i,
+    steps: [
+      S('disclosure', 'disclosure', 'searchDisclosures', '공시에서 회사의 설명과 근거 확인'),
+      S('historical', 'historical', 'getHistoricalAnalysis', '설명과 비교할 실제 수치 확인', true),
+      S('knowledge', 'disclosure', 'searchKnowledge', '업로드 문서를 함께 확인', true),
     ],
   },
   {
@@ -95,7 +106,7 @@ export const WORKFLOWS: readonly WorkflowTemplate[] = [
   },
   {
     type: 'historical-review', label: 'Historical Performance Review',
-    pattern: /(최근|과거|historical).{0,10}(실적|성과|재무|performance)|실적.{0,10}(분석|검토|정리)|(분석|검토).{0,10}실적/i,
+    pattern: /(최근|과거|historical).{0,10}(실적|성과|재무|performance)|실적.{0,10}(분석|검토|정리)|(분석|검토).{0,10}실적|(영업이익률|매출|성장률|마진|수익성|운전자본|CAPEX).{0,12}(분석|검토|정리)/i,
     steps: [
       S('historical', 'historical', 'getHistoricalAnalysis', '매출 성장 · 영업이익률 · NWC · CAPEX · CFO 추세 확인'),
       S('quality', 'data-quality', 'getHistoricalQuality', '데이터 품질 · 신뢰도 확인'),

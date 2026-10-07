@@ -318,7 +318,7 @@ test('AI 코드는 valuation 내부 파일을 직접 import 하지 않는다 (�
     }
     // 네트워크는 backend AI Gateway 를 부르는 client.ts 에만 있다. LLM provider 는 어디에도 직접 호출하지 않는다 (API Key 는 backend 에만).
     const code = src.replace(/\/\/.*$/gm, '');
-    assert.ok(!/api\.openai|anthropic|OPENAI|sk-[A-Za-z0-9]/i.test(code), `${f}: LLM provider 를 직접 부르지 않는다`);
+    assert.ok(!/api\.openai|anthropic|OPENAI|\bsk-[A-Za-z0-9_-]{20,}/i.test(code), `${f}: LLM provider 를 직접 부르지 않는다`);
     if (!f.endsWith('/client.ts')) assert.ok(!/fetch\(|XMLHttpRequest/.test(code), `${f}: 네트워크 호출은 client.ts 에만 있다`);
   }
 });

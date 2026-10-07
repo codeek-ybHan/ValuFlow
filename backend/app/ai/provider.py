@@ -63,11 +63,12 @@ class OpenAiProvider:
         payload: dict[str, Any] = {
             "model": self._model,
             "messages": _to_openai_messages(messages),
-            "tools": [{"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.parameters}} for t in tools],
-            "tool_choice": "auto",
-            "parallel_tool_calls": False,  # 한 번에 하나의 Tool 만 요청한다 (frontend 가 순서대로 실행)
             "response_format": {"type": "json_schema", "json_schema": {"name": "ai_analyst_answer", "strict": True, "schema": answer_schema}},
         }
+        if tools:   # Tool 이 없으면(교정 재생성) tools / tool_choice 를 보내지 않는다
+            payload["tools"] = [{"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.parameters}} for t in tools]
+            payload["tool_choice"] = "auto"
+            payload["parallel_tool_calls"] = False  # 한 번에 하나의 Tool 만 요청한다 (frontend 가 순서대로 실행)
         try:
             res = self._http.post(f"{self._base}/chat/completions", json=payload, headers={"Authorization": f"Bearer {self._key}"})
         except httpx.HTTPError:

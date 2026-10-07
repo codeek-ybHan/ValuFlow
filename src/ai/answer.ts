@@ -2,6 +2,7 @@
 import type { AnswerMode } from './capabilities.ts';
 import type { SourceInfo, SourceType, ToolResult } from './tools/result.ts';
 import { UNSUPPORTED_DISCLOSURE } from './policy.ts';
+import { koreanAliases } from './grounding/terms.ts';
 
 export interface AnswerEvidence {
   label: string;
@@ -48,7 +49,8 @@ export interface AiAnalystAnswer {
 
 export interface AnswerViolation {
   code: 'unknown-tool' | 'missing-warning' | 'missing-sources' | 'unsupported-not-disclosed' | 'empty-summary' | 'missing-value-fabricated' | 'unsupported-figures' | 'ungrounded-number' | 'evidence-from-failed-tool'
-    | 'claim-without-evidence' | 'applied-change-claimed' | 'proposal-incomplete';
+    | 'claim-without-evidence' | 'applied-change-claimed' | 'proposal-incomplete'
+    | 'ungrounded-claim' | 'ungrounded-text-number' | 'proposal-semantic-mismatch' | 'proposal-ungrounded' | 'hallucinated-source' | 'provider-contradiction' | 'time-basis-not-stated' | 'missing-value-in-text';
   detail: string;
 }
 
@@ -85,6 +87,9 @@ function groundedIn(x: number, tool: number[]): boolean {
 const D_A_LABEL = /D&A|depreciation|amortization|감가상각|상각/i;
 const labelMatches = (key: string, label: string): boolean => {
   if (/depreciation/i.test(key)) return D_A_LABEL.test(label);
+  // 한국어 라벨 ("발행주식수", "시가총액" …): 용어 사전으로 field 이름과 연결한다 (영문 field 이름만 보던 한계 보완)
+  const squashed = label.replace(/\s+/g, '');
+  if (koreanAliases(key).some((a) => squashed.includes(a.replace(/\s+/g, '')))) return true;
   const words = key.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
   return label.toLowerCase().includes(words);
 };
@@ -108,6 +113,15 @@ export function auditAnswer(answer: AiAnalystAnswer, results: ToolResult<unknown
   // 값이 없는 항목에 숫자를 붙인 근거 (예: D&A 가 missing 인데 숫자를 제시)
   const missing = new Set<string>();
   for (const r of results) if (r.status === 'ok') missingKeys(r.data, '', missing);
+  // 다른 Tool 이 같은 이름의 값을 실제로 갖고 있으면(예: 시장 Tool 의 marketRiskPremium 은 missing 이지만 Forecast 가정에는 6.0% 가 있다) 값을 채운 것이 아니다
+  const present = new Set<string>();
+  const walkPresent = (o: unknown, key = ''): void => {
+    if (typeof o === 'number' && Number.isFinite(o) && key) present.add(key);
+    else if (Array.isArray(o)) o.forEach((x) => walkPresent(x, key));
+    else if (o && typeof o === 'object') for (const [k, x] of Object.entries(o as Record<string, unknown>)) walkPresent(x, k);
+  };
+  for (const r of results) if (r.status === 'ok') walkPresent(r.data);
+  for (const k of present) missing.delete(k);
   // 결과가 없거나 실패한 Tool 을 근거로 인용하면 안 된다 (예: 공시 검색 결과가 없는데 "회사는 ~라고 설명했다")
   for (const e of answer.evidence) {
     const r = results.find((x) => x.tool === e.tool);
@@ -144,7 +158,7 @@ export function toAnswerSource(s: SourceInfo): AnswerSource {
   return out;
 }
 
-const sourceKey = (s: AnswerSource) => `${s.kind}|${s.origin}|${s.basis ?? ''}|${s.fetchedAt ?? ''}|${s.receiptNo ?? ''}|${s.documentId ?? ''}|${s.page ?? ''}|${s.section ?? ''}|${s.asOf ?? ''}|${s.url ?? ''}|${s.title ?? ''}`;
+export const sourceKey = (s: AnswerSource) => `${s.kind}|${s.origin}|${s.basis ?? ''}|${s.fetchedAt ?? ''}|${s.receiptNo ?? ''}|${s.documentId ?? ''}|${s.page ?? ''}|${s.section ?? ''}|${s.asOf ?? ''}|${s.url ?? ''}|${s.title ?? ''}`;
 
 /**
  * 모델 답변을 Tool 결과에 맞춰 보정한다 (위반은 그대로 기록한다).

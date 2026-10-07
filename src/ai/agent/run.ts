@@ -15,6 +15,9 @@ import { UNSUPPORTED_DISCLOSURE } from '../policy.ts';
 import { buildMinimalContext } from '../minimalContext.ts';
 import { classifyQuestion } from '../capabilities.ts';
 import { observe } from './observation.ts';
+import { groundWithRepair, type RawWorkflowAnswer } from '../grounding/repair.ts';
+import type { Proposal } from '../grounding/wacc.ts';
+import type { GroundingAuditEvent } from '../grounding/types.ts';
 import { planWorkflow } from './planner.ts';
 import type { HumanCheckpoint, Observation, WorkflowAnswer, WorkflowAuditEvent, WorkflowOutcome, WorkflowPlan, WorkflowState, WorkflowStatus, WorkflowStep } from './types.ts';
 
@@ -87,7 +90,7 @@ function partialAnswer(state: WorkflowState, why: string): WorkflowAnswer {
   const done = state.steps.filter((s) => s.status === 'completed');
   return {
     mode: 'explain', summary: `${why} 지금까지 확인한 영역만 정리합니다.`, evidence: [], warnings: [], sources: [], suggestedNextActions: ['남은 단계는 질문을 나눠서 다시 요청하세요.'],
-    reviewedAreas: done.map((s) => s.purpose), limitations: [why, ...state.steps.filter((s) => s.status === 'pending').map((s) => `${s.tool}: 한도 때문에 실행하지 못했습니다.`)], judgmentItems: [], claims: [], proposedActions: [],
+    reviewedAreas: done.map((s) => s.purpose), limitations: [why, ...state.steps.filter((s) => s.status === 'pending').map((s) => `${s.tool}: 한도 때문에 실행하지 못했습니다.`)], judgmentItems: [], claims: [], evidenceMap: [], grounding: null, proposedActions: [],
   };
 }
 
@@ -106,6 +109,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
   let conversationId: string | null = null;
   let answer: WorkflowAnswer | null = null;
   let error: WorkflowOutcome['error'] = null;
+  const groundingSink: { audit: GroundingAuditEvent | null } = { audit: null };
 
   const finish = (): WorkflowOutcome => {
     const audit: WorkflowAuditEvent = {
@@ -113,7 +117,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
       stepsPlanned: plan.steps.map((s) => s.id), stepsExecuted: state.steps.filter((s) => s.status === 'completed' || s.status === 'failed').map((s) => s.id),
       toolsExecuted: state.toolsExecuted.map((t) => ({ ...t })), sourcesUsed: [...state.sources], warnings: [...state.warnings],
       humanCheckpoint: { count: state.checkpoints.length, kinds: state.checkpoints.map((c) => c.kind), pending: state.checkpoints.filter((c) => c.status === 'pending').length },
-      status: state.status, durationMs: Math.max(0, now().getTime() - t0), violations: violations.map((v) => v.code), corrections: [...corrections],
+      status: state.status, durationMs: Math.max(0, now().getTime() - t0), violations: violations.map((v) => v.code), corrections: [...corrections], grounding: groundingSink.audit,
     };
     return { state, plan, answer, results, violations, corrections, audit, error };
   };
@@ -124,7 +128,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
       const overview = runTool('getCompanyOverview', ctx, undefined);
       results.push(overview);
       state = { ...state, steps: state.steps.map((s) => ({ ...s, status: 'skipped' as const, reason: s.reason ?? '지원하지 않는 기업' })), toolsExecuted: [{ tool: 'getCompanyOverview', status: overview.status }], observations: [observe(overview)], status: 'completed', message: UNSUPPORTED_DISCLOSURE };
-      answer = { mode: 'explain', summary: UNSUPPORTED_DISCLOSURE, evidence: [], warnings: [], sources: [], suggestedNextActions: ['지원되는 기업을 선택하세요.'], reviewedAreas: [], limitations: [UNSUPPORTED_DISCLOSURE], judgmentItems: [], claims: [], proposedActions: [] };
+      answer = { mode: 'explain', summary: UNSUPPORTED_DISCLOSURE, evidence: [], warnings: [], sources: [], suggestedNextActions: ['지원되는 기업을 선택하세요.'], reviewedAreas: [], limitations: [UNSUPPORTED_DISCLOSURE], judgmentItems: [], claims: [], evidenceMap: [], grounding: null, proposedActions: [] };
     } else {
       state = { ...state, steps: state.steps.map((s) => (s.status === 'pending' ? { ...s, status: 'skipped' as const, reason: plan.blocked!.reason } : s)), status: 'failed', message: plan.blocked.reason };
     }
@@ -185,7 +189,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
       if (res.status === 'final') {
         takeBackend(res.backendToolResults, true);
         absorbGateway(res.toolTrace);
-        answer = finalize(res.answer as Partial<WorkflowAnswer> & WorkflowAnswer, state, results, ctx, violations, corrections);
+        answer = await finalize(res.answer as RawWorkflowAnswer, state, results, ctx, violations, corrections, { question: options.question, client: options.client, sink: groundingSink });
         break;
       }
       takeBackend(res.backendToolResults, false);
@@ -221,19 +225,25 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
   return finish();
 }
 
-/** 모델의 workflow 답변을 보정한다: 기본 grounding + claim → Tool 증거 검증, 한계 복원, 변경 완료 주장 감지. 모델의 해석은 바꾸지 않는다. */
-function finalize(raw: Partial<WorkflowAnswer> & WorkflowAnswer, state: WorkflowState, results: ToolResult<unknown>[], ctx: AiValuationContext, violations: AnswerViolation[], corrections: string[]): WorkflowAnswer {
-  const g = enforceGrounding(raw, results, { unsupported: ctx.support.status === 'unsupported' });
-  violations.push(...g.violations);
-  corrections.push(...g.corrections);
-  const ok = new Set(state.toolsExecuted.filter((t) => t.status === 'ok').map((t) => t.tool));
-  const claims = (raw.claims ?? []).filter((c) => {
-    const valid = Array.isArray(c.tools) && c.tools.length > 0 && c.tools.every((t) => ok.has(t));
-    if (!valid) violations.push({ code: 'claim-without-evidence', detail: `claim "${String(c.claim).slice(0, 60)}" cites tools that did not run successfully: ${(c.tools ?? []).join(', ') || 'none'}` });
-    return valid;
+/** 모델의 workflow 답변을 보정한다: Grounded Analysis(claim ↔ evidence 검증 · 교정 재생성 · safe fallback) + 한계 복원 + 변경 완료 주장 감지. 모델의 해석은 바꾸지 않는다. */
+async function finalize(raw: RawWorkflowAnswer, state: WorkflowState, results: ToolResult<unknown>[], ctx: AiValuationContext, violations: AnswerViolation[], corrections: string[],
+  opts: { question: string; client: AiGatewayClient; sink: { audit: GroundingAuditEvent | null } }): Promise<WorkflowAnswer> {
+  // 변경 제안은 구체적일 때만 사람에게 올린다: 대상 · 현재 값 · 제안 값 · 근거가 모두 있어야 한다 (모호한 제안은 판단 대상(judgmentItems)으로만 남는다)
+  const proposed = ((raw.proposedActions ?? []) as Proposal[]).filter((a) => {
+    const text = [a.target, a.currentValue, a.proposedValue, a.rationale].every((x) => typeof x === 'string' && x.trim().length > 0);
+    // 값을 바꾸는 제안은 현재 값과 제안 값이 숫자여야 한다 ("재검토 권고" 같은 서술은 제안 값이 아니라 judgmentItems 다)
+    const numeric = !/^change-/.test(a.type) || (/\d/.test(String(a.currentValue)) && /\d/.test(String(a.proposedValue)));
+    const complete = text && numeric;
+    if (!complete) violations.push({ code: 'proposal-incomplete', detail: `proposal "${a.type} ${String(a.target).slice(0, 40)}" has no concrete current/proposed value and was not sent to the analyst` });
+    return complete;
   });
-  if (claims.length !== (raw.claims ?? []).length) corrections.push('claims-filtered');
-  const limitations = [...(raw.limitations ?? [])];
+  if (proposed.length !== (raw.proposedActions ?? []).length) corrections.push('proposals-filtered');
+  const r = await groundWithRepair({ question: opts.question, raw: { ...raw, proposedActions: proposed }, results, unsupported: ctx.support.status === 'unsupported', client: opts.client });
+  violations.push(...r.violations);
+  corrections.push(...r.corrections);
+  opts.sink.audit = r.audit;
+
+  const limitations = [...(raw.limitations ?? []), ...r.extraLimitations.filter((l) => !(raw.limitations ?? []).includes(l))];
   const restore = (tool: string, why: string) => {
     const word = LIMITATION_LABEL[tool]?.split(' ')[0];
     if (!limitations.some((l) => l.includes(tool) || (word !== undefined && l.includes(word)))) { limitations.push(limitationFor(tool, why)); if (!corrections.includes('limitations-restored')) corrections.push('limitations-restored'); }
@@ -242,17 +252,9 @@ function finalize(raw: Partial<WorkflowAnswer> & WorkflowAnswer, state: Workflow
   for (const s of state.steps) if (s.status === 'skipped' && !s.optional && s.reason && !s.reason.startsWith('지원하지')) restore(s.tool, s.reason === '호출되지 않았습니다.' ? '필수 단계가 실행되지 않았습니다' : s.reason);
   const reviewedAreas = (raw.reviewedAreas ?? []).length > 0 ? [...raw.reviewedAreas!] : state.steps.filter((s) => s.status === 'completed').map((s) => s.purpose);
   if ((raw.reviewedAreas ?? []).length === 0 && reviewedAreas.length > 0) corrections.push('reviewed-areas-filled');
-  // 변경 제안은 구체적일 때만 사람에게 올린다: 대상 · 현재 값 · 제안 값 · 근거가 모두 있어야 한다 (모호한 제안은 판단 대상(judgmentItems)으로만 남는다)
-  const proposedActions = (raw.proposedActions ?? []).filter((a) => {
-    const complete = [a.target, a.currentValue, a.proposedValue, a.rationale].every((x) => typeof x === 'string' && x.trim().length > 0);
-    if (!complete) violations.push({ code: 'proposal-incomplete', detail: `proposal "${a.type} ${String(a.target).slice(0, 40)}" has no concrete current/proposed value and was not sent to the analyst` });
-    return complete;
-  }).slice(0, 6);
-  if (proposedActions.length !== (raw.proposedActions ?? []).length) corrections.push('proposals-filtered');
-  const text = `${raw.summary ?? ''} ${claims.map((c) => c.claim).join(' ')}`;
-  if (APPLIED_CLAIM.test(text) && proposedActions.length === 0 || /(WACC|Forecast|가정|배수).{0,15}(변경|수정|적용|저장)(했|되었|됐)/.test(text)) {
+  const text = `${raw.summary} ${r.answer.summary} ${r.claims.map((c) => c.text).join(' ')}`;   // 보정 전 원문도 검사한다
+  if ((APPLIED_CLAIM.test(text) && r.proposals.length === 0) || /(WACC|Forecast|가정|배수).{0,15}(변경|수정|적용|저장)(했|되었|됐)/.test(text)) {
     violations.push({ code: 'applied-change-claimed', detail: 'the answer states that an assumption was changed/applied, but the agent never changes anything' });
   }
-  return { ...g.answer, reviewedAreas, limitations, judgmentItems: raw.judgmentItems ?? [], claims, proposedActions };
+  return { ...r.answer, reviewedAreas, limitations, judgmentItems: raw.judgmentItems ?? [], claims: r.claims, evidenceMap: r.report.evidenceMap, grounding: r.report, proposedActions: r.proposals };
 }
-

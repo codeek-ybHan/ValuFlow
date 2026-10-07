@@ -11,7 +11,8 @@ const base = withSelectedCompany(emptyProjectState, { corpCode: '00126380', corp
 const project = withRelativeInputs(withPracticeAssumptions(withHistoricalLoaded(base, { data: g.data, quality: g.quality, provenance: { source: 'database', persisted: true, fetchedAt: 'live', fetchId: '1', corpCode: '00126380', fiscalYears: [2023, 2024, 2025] } })), { netIncome: 150, per: 12, bookEquity: 1000, pbr: 1.5, ebitda: 220, evEbitda: 10 });
 const client = new BackendAiClient({ baseUrl: process.argv[2] ?? 'http://127.0.0.1:8000' });
 
-for (const q of ['현재 삼성전자 WACC 가정을 검토해줘.', '현재 삼성전자 Valuation을 전체적으로 검토해줘.', '최근 이벤트까지 고려해서 주요 valuation risk를 검토해줘.']) {
+const questions = process.argv.slice(3).length ? process.argv.slice(3) : ['삼성전자 최근 영업이익률을 분석해줘.', '현재 삼성전자 WACC 가정을 검토해줘.', '삼성전자가 설비투자 확대 이유를 뭐라고 설명했어?', '최근 실적과 시장 상황을 같이 고려해서 valuation risk를 정리해줘.'];
+for (const q of questions) {
   const t = Date.now();
   const out = await runWorkflow({ question: q, project, client });
   if (!out) { console.log('Q:', q, '→ workflow 아님'); continue; }
@@ -25,10 +26,12 @@ for (const q of ['현재 삼성전자 WACC 가정을 검토해줘.', '현재 삼
     console.log('  reviewed:', a.reviewedAreas.slice(0, 5).join(' | '));
     console.log('  limits  :', a.limitations.slice(0, 4).join(' | ') || '-');
     console.log('  judgment:', a.judgmentItems.slice(0, 3).join(' | ') || '-');
-    console.log('  claims  :', a.claims.map((c) => `${c.claim.slice(0, 40)} ← ${c.tools.join('+')}`).join(' ; ').slice(0, 300));
+    for (const c of a.claims) console.log(`  claim ${c.claimId} [${c.type}/${c.basis}] ${c.status} conf=${c.confidence ?? '-'} ← ${c.evidenceIds.slice(0, 3).join(' | ') || '-'}${c.issues.length ? ` issues=${c.issues.join(',')}` : ''}\n        ${c.text.slice(0, 110)}`);
+    const gr = a.grounding;
+    if (gr) console.log(`  grounding: claims=${gr.stats.claims} supported=${gr.stats.supported} partial=${gr.stats.partial} unsupported=${gr.stats.unsupported} coverage=${gr.coverage === null ? '-' : gr.coverage.toFixed(2)} numbers=${gr.stats.numbersChecked}/ungrounded ${gr.stats.numbersUngrounded} evidence=${gr.evidenceCount} contradictions=${gr.contradictions.length} timeBasis=${JSON.stringify(gr.timeBasis)}`);
     console.log('  sources :', [...new Set(a.sources.map((s) => `${s.type}`))].join(', '));
   }
   console.log('  checkpoints:', out.state.checkpoints.map((c) => `${c.kind} ${c.currentValue}→${c.proposedValue} [${c.status}]`).join(' ; ') || '-');
   console.log('  violations:', out.violations.map((v) => v.code).join(',') || '-', '| corrections:', out.corrections.join(',') || '-');
-  console.log('  audit:', JSON.stringify({ steps: out.audit.stepsExecuted.length, tools: out.audit.toolsExecuted.length, ms: out.audit.durationMs }));
+  console.log('  audit:', JSON.stringify({ steps: out.audit.stepsExecuted.length, tools: out.audit.toolsExecuted.length, ms: out.audit.durationMs, grounding: out.audit.grounding && { regenerated: out.audit.grounding.regenerated, fallback: out.audit.grounding.fallbackUsed, unsupportedNumbers: out.audit.grounding.unsupportedNumbers, hallucinatedSources: out.audit.grounding.hallucinatedSources } }));
 }

@@ -33,9 +33,19 @@ export interface FinalResponse { status: 'final'; conversationId: string; answer
 export interface ToolLimitResponse { status: 'tool-limit'; conversationId: string; toolCalls: number; message: string; toolTrace?: ToolTraceEntry[]; backendToolResults?: ToolResult<unknown>[] }
 export type GatewayResponse = ToolCallResponse | FinalResponse | ToolLimitResponse;
 
+/** 교정 재생성(1회): 검증에 실패한 답변 + 위반 목록 + 사용 가능한 근거만 보낸다 (Tool 결과 원문 전체는 보내지 않는다). */
+export interface AiRegenerateRequest {
+  question: string;
+  answer: Record<string, unknown>;
+  issues: { target: string; code: string; detail: string }[];
+  evidence: Record<string, unknown>[];
+}
+
 export interface AiGatewayClient {
   query(request: AiQueryRequest): Promise<GatewayResponse>;
   sendToolResult(request: AiToolResultRequest): Promise<GatewayResponse>;
+  /** 선택: 구현하지 않으면 교정 재생성 없이 safe fallback 으로 간다 */
+  regenerate?(request: AiRegenerateRequest): Promise<{ status: 'final'; answer: unknown }>;
 }
 
 export class AiClientError extends Error {
@@ -59,7 +69,7 @@ export class BackendAiClient implements AiGatewayClient {
     this.baseUrl = options.baseUrl ?? '';
   }
 
-  private async post(path: string, body: unknown): Promise<GatewayResponse> {
+  private async send(path: string, body: unknown): Promise<{ json: unknown; status: number }> {
     let res;
     try {
       res = await this.fetchFn(`${this.baseUrl}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -73,11 +83,16 @@ export class BackendAiClient implements AiGatewayClient {
       if (res.status >= 500 && !err) throw new AiClientError('backend-unreachable', 'ValuFlow backend 에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.', res.status);
       throw new AiClientError(typeof err?.code === 'string' ? err.code : 'unknown', typeof err?.message === 'string' ? err.message : '알 수 없는 오류가 발생했습니다.', res.status);
     }
+    return { json, status: res.status };
+  }
+
+  private async post(path: string, body: unknown): Promise<GatewayResponse> {
+    const { json, status: httpStatus } = await this.send(path, body);
     const r = json as Partial<GatewayResponse> | null;
     const known = r && (r.status === 'tool-call' || r.status === 'final' || r.status === 'tool-limit') && typeof r.conversationId === 'string';
-    if (!known) throw new AiClientError('invalid-response', '서버 응답을 해석할 수 없습니다.', res.status);
-    if (r.status === 'tool-call' && !(typeof (r as ToolCallResponse).callId === 'string' && typeof (r as ToolCallResponse).tool === 'string' && typeof (r as ToolCallResponse).state === 'string')) throw new AiClientError('invalid-response', '서버 응답을 해석할 수 없습니다.', res.status);
-    if (r.status === 'final' && !(r as FinalResponse).answer) throw new AiClientError('invalid-response', '서버 응답을 해석할 수 없습니다.', res.status);
+    if (!known) throw new AiClientError('invalid-response', '서버 응답을 해석할 수 없습니다.', httpStatus);
+    if (r.status === 'tool-call' && !(typeof (r as ToolCallResponse).callId === 'string' && typeof (r as ToolCallResponse).tool === 'string' && typeof (r as ToolCallResponse).state === 'string')) throw new AiClientError('invalid-response', '서버 응답을 해석할 수 없습니다.', httpStatus);
+    if (r.status === 'final' && !(r as FinalResponse).answer) throw new AiClientError('invalid-response', '서버 응답을 해석할 수 없습니다.', httpStatus);
     return r as GatewayResponse;
   }
 
@@ -87,5 +102,11 @@ export class BackendAiClient implements AiGatewayClient {
 
   sendToolResult(request: AiToolResultRequest): Promise<GatewayResponse> {
     return this.post('/api/ai/tool-result', request);
+  }
+
+  async regenerate(request: AiRegenerateRequest): Promise<{ status: 'final'; answer: unknown }> {
+    const r = (await this.send('/api/ai/regenerate', request)).json as { status?: string; answer?: unknown } | null;
+    if (r?.status !== 'final' || !r?.answer) throw new AiClientError('invalid-response', '서버 응답을 해석할 수 없습니다.');
+    return { status: 'final', answer: r.answer };
   }
 }
