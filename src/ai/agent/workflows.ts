@@ -69,7 +69,7 @@ export const WORKFLOWS: readonly WorkflowTemplate[] = [
   },
   {
     type: 'disclosure-review', label: 'Disclosure Review',
-    pattern: /공시|사업보고서|반기보고서|분기보고서|(회사|경영진).{0,12}(설명|밝혔|밝히|언급|발표)|(이유|배경|계획).{0,10}(설명했|밝혔|언급)/i,
+    pattern: /공시|사업보고서|반기보고서|분기보고서|(회사|경영진).{0,12}(설명|밝혔|밝히|언급|발표)|(이유|배경|계획).{0,10}(설명했|밝혔|언급)|(설비투자|CAPEX|투자|증설|확대|축소|감소|증가|하락|상승|개선|악화).{0,12}(이유|배경|원인)/i,
     steps: [
       S('disclosure', 'disclosure', 'searchDisclosures', '공시에서 회사의 설명과 근거 확인'),
       S('historical', 'historical', 'getHistoricalAnalysis', '설명과 비교할 실제 수치 확인', true),

@@ -98,24 +98,26 @@ export function extractEvidence(results: ToolResult<unknown>[]): EvidenceIndex {
     const trends = rec(data.trends);
     if (trends) for (const [k, tv] of Object.entries(trends)) { const dir = rec(tv)?.direction; if (typeof dir === 'string') push({ fieldPath: `trends.${k}.direction`, value: dir, sourceLabel: label, excerpt: `${k} trend: ${dir}`, fullText: `${k} trend: ${dir}` }); }
 
-    const walk = (node: unknown, path: string, unit: string | undefined, asOf: string | undefined, quality: string | undefined) => {
+    /** own: 가장 가까운 상위 객체의 `source`(예: beta.source = 'Yahoo Finance'). Tool 의 첫 출처로 모든 값을 설명하면 값마다 출처가 다른 Tool(시장 가정)에서 틀린 출처가 붙는다. */
+    const walk = (node: unknown, path: string, unit: string | undefined, asOf: string | undefined, quality: string | undefined, own?: string) => {
       if (typeof node === 'number') {
         if (!Number.isFinite(node)) return;
         const m = /\[(\d+)\]$/.exec(path);
-        push({ fieldPath: path, value: node, unit: unitOfKey(lastKey(path)) ?? unit, period: periods && m ? periods[Number(m[1])] : undefined, asOf: asOf ?? topAsOf, sourceLabel: label, provider, quality: quality ?? (histReview ? 'review' : undefined) });
+        push({ fieldPath: path, value: node, unit: unitOfKey(lastKey(path)) ?? unit, period: periods && m ? periods[Number(m[1])] : undefined, asOf: asOf ?? topAsOf, sourceLabel: own ?? label, provider, quality: quality ?? (histReview ? 'review' : undefined) });
         return;
       }
-      if (Array.isArray(node)) { node.forEach((v, i) => walk(v, `${path}[${i}]`, unit, asOf, quality)); return; }
+      if (Array.isArray(node)) { node.forEach((v, i) => walk(v, `${path}[${i}]`, unit, asOf, quality, own)); return; }
       const o = rec(node);
       if (!o) return;
-      if (o.status === 'missing' && o.value === null) { push({ fieldPath: path, missing: true, sourceLabel: label, provider }); return; }
+      if (o.status === 'missing' && o.value === null) { push({ fieldPath: path, missing: true, sourceLabel: own ?? label, provider }); return; }
+      const own2 = typeof o.source === 'string' && o.source.trim() ? o.source : own;
       const u = typeof o.unit === 'string' ? o.unit : unit;
       const a = typeof o.asOf === 'string' ? o.asOf : asOf;
       const q = typeof o.status === 'string' && r.tool.startsWith('getHistorical') ? o.status : quality;
       for (const [k, v] of Object.entries(o)) {
         if (SKIP.has(k) || k === 'unit' || k === 'asOf' || (k === 'status' && typeof v === 'string')) continue;
         const kUnit = u ?? (unitsRec ? (k === 'perShareValue' ? String(unitsRec.perShareValue ?? '') : RATIO_KEYS.has(k) ? 'ratio' : String(unitsRec.amounts ?? '')) || undefined : undefined);
-        walk(v, path ? `${path}.${k}` : k, kUnit, a, q);
+        walk(v, path ? `${path}.${k}` : k, kUnit, a, q, own2);
       }
     };
     for (const [k, v] of Object.entries(data)) {

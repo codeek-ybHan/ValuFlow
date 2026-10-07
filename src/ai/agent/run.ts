@@ -31,6 +31,10 @@ export interface RunWorkflowOptions extends AiContextOptions {
   now?: () => Date;
   newId?: () => string;
   maxToolCalls?: number;
+  /** 단계가 바뀔 때마다 호출된다 (UI 의 진행 표시용). 전달되는 state 는 복사본이라 UI 가 바꿔도 workflow 에 영향이 없다. */
+  onProgress?: (state: WorkflowState) => void;
+  /** 취소 신호: 다음 왕복 전에 확인해 안전하게 멈춘다 (진행 중인 요청 자체는 끊지 못한다). */
+  signal?: { readonly aborted: boolean };
 }
 
 /** Tool 이 실패했을 때 최종 답변에 남길 한계 문구 (사용자에게 보이는 말). */
@@ -145,6 +149,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
       steps.push({ id: `dynamic-${steps.length + 1}`, capability: capabilityOf(tool), tool: tool as ToolName, purpose: `${getToolDefinition(tool)?.description.slice(0, 40) ?? tool} (관찰에 따라 추가)`, optional: true, status: 'pending', dynamic: true, ...patch });
     }
   };
+  const emit = () => options.onProgress?.({ ...state, steps: state.steps.map((s) => ({ ...s })), toolsExecuted: [...state.toolsExecuted], warnings: [...state.warnings], sources: [...state.sources] });
   const record = (result: ToolResult<unknown>, obs: Observation) => {
     results.push(result);
     state.observations.push(obs);
@@ -156,9 +161,11 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
     } else {
       setStep(result.tool, { status: 'failed', reason: obs.findings[0] ?? result.status });
     }
+    emit();
   };
 
   state.status = 'running';
+  emit();
   let backendSeen = 0;
   const pendingHints: Observation['nextHints'] = [];
   const takeBackend = (list: ToolResult<unknown>[] | undefined, cumulative: boolean) => {
@@ -177,6 +184,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
       workflow: { type: plan.workflowType, steps: steps.filter((s) => s.status === 'pending').map((s) => ({ id: s.id, tool: s.tool, purpose: s.purpose, optional: s.optional })), maxToolCalls: plan.maxToolCalls },
     });
     for (let round = 0; round < plan.maxToolCalls + 2; round++) {
+      if (options.signal?.aborted) throw new AiClientError('cancelled', '사용자가 분석을 취소했습니다.');
       conversationId = res.conversationId;
       if (res.status === 'tool-limit') {
         takeBackend(res.backendToolResults, true);
@@ -196,6 +204,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
       const call = res as ToolCallResponse;
       const step = steps.find((s) => s.tool === call.tool && s.status === 'pending');
       if (step) { step.status = 'running'; state.currentStep = step.id; } else state.currentStep = call.tool;
+      emit();
       const result = runTool(call.tool, ctx, call.input);
       const obs = observe(result);
       record(result, obs);

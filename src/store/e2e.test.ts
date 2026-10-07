@@ -245,10 +245,11 @@ test('Valuation Workspace 화면에는 "예정" placeholder 나 오래된 STEP �
   assert.ok(!wf.includes('예정'));
 });
 
-test('남은 placeholder 는 이후 STEP 용 메뉴(AI Analyst / Report)뿐이다', () => {
+test('남은 placeholder 는 이후 STEP 용 메뉴(Report)뿐이다 (AI Analyst 는 실제 페이지)', () => {
   const app = src('../App.tsx');
   const placeholders = [...app.matchAll(/<PlannedPage eyebrow="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(placeholders, ['AI Analyst', 'Report']);
+  assert.deepEqual(placeholders, ['Report']);
+  assert.ok(app.includes('<AiAnalyst />'), 'AI Analyst route 는 실제 페이지다');
 });
 
 test('LEARN BuildPage 에 도달 불가능한 planned 분기가 없다', () => {

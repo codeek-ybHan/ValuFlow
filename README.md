@@ -151,6 +151,18 @@ Agent 가 만든 분석 문장의 핵심 claim 을 **Claim → Evidence → Sour
 - **기술부채**: grounding 계층은 workflow 분석(`runWorkflow`, `groundingLevel: 'claim-evidence'`)에만 적용됩니다. 일반 질문(`runAiQuery`, `groundingLevel: 'tool-guardrails'`)은 출처 · 경고 · 실패한 Tool 근거 · 근거 항목 숫자 검사만 합니다. 통합 지점: `groundWithRepair` 는 claim 이 없어도 summary 숫자를 검증하므로 일반 질문 답변 schema 에 claims 를 추가하거나 summary 검증만 적용하면 됩니다. 08-7 UI 는 `groundingLevel` 로 Workflow Analysis 와 Quick Question 의 수준 차이를 구분해서 보여야 합니다.
 - 한계: claim ↔ 문서 연결은 핵심 단어 겹침(형태소 분석 없음), 한국어 용어 사전은 주요 valuation 용어만, `runAiQuery`(비 workflow 질문)에는 아직 적용하지 않습니다.
 
+### AI Analyst UI (STEP 08-7)
+
+`/ai` 는 "왜 이런 답을 했는지 확인할 수 있는" 분석 화면이다. 좌측 History · Knowledge Documents(PDF 업로드 · 목록 · Re-index · 삭제), 중앙 질문 · 진행 단계 · 답변, 우측 Evidence · Sources · Data Basis · Warnings (좁은 화면에서는 drawer).
+
+- **Quick Answer / Deep Analysis**: 자동은 workflow 질문일 때만 Deep Analysis. Quick 은 Tool Guardrails 수준(문장별 근거 연결 없음), Deep 은 Claim-Evidence 수준임을 화면에서 구분한다 (`groundingLevel`).
+- **Fact / Judgment**: Claim 카드는 FACT(실선 · 진한 막대)와 JUDGMENT(점선 · 이탤릭)로 모양이 다르다. 상태(Supported …)와 Confidence(High/Medium/Low)는 색뿐 아니라 글자 · 기호로도 표시한다.
+- **Human checkpoint**: Keep Current / Review Later / Apply·Continue 는 검토 상태만 기록한다. 어떤 버튼도 Project 가정 · 결과를 바꾸지 않는다 (write Tool 은 이후 STEP). WACC 구성요소(Rf · Beta …) 제안과 WACC 직접 변경은 구분해서 표시한다.
+- **상태 분리**: 대화 state(`store/analyst.tsx`)는 Project state 와 분리되어 있고 읽기 전용이다. 질문마다 새 context snapshot 으로 실행하며, 과거 답변은 그 당시 Evidence snapshot 을 보여 주고 "Based on previous project state" 를 표시한다.
+- **구조**: view-model 은 `src/ai/analyst/view.ts`(순수 함수 · 테스트 대상), 실행은 `ask.ts`, history 는 `session.ts`, PDF 관리 client 는 `src/data/repository/knowledgeRepository.ts`, 화면은 `src/pages/AiAnalyst.tsx` · `src/components/analyst/`.
+- **테스트**: `src/ai/analyst.test.ts`(view-model · 실행 · 오류 · PDF client) · `src/ai/analystRender.test.ts`(esbuild 로 번들해 서버 렌더링한 HTML 검증).
+- **알려진 한계**: 질문 시 source filter(OpenDART / Uploaded) 는 제공하지 않는다(AI 가 선택). 진행 표시는 frontend 가 실행하는 Tool 의 완료 시점에만 갱신된다(backend 검색 Tool 은 gateway 안에서 실행되므로 그 동안은 다음 대기 단계가 표시된다). Cancel 은 진행 중인 요청 자체를 끊지 않고 결과를 버리며, 다음 왕복 전에 workflow 를 멈춘다.
+
 ### Credential 정책
 
 | 환경변수 | 쓰이는 곳 | 없을 때 |
@@ -183,7 +195,7 @@ Node 22.6 이상이 필요합니다. 엔진 테스트가 TypeScript 파일을 �
 /workspace                 기업·재무데이터 (삼성전자 FY2023~2025 불러오기)
 /valuation/:stage          historical | forecast | wacc | dcf | result | validation  ← Workflow Stepper
 /analysis                  → /valuation/validation 으로 이동 (민감도 · 시나리오 · 상대가치는 Validation 단계)
-/ai                        AI Analyst (이후 STEP, placeholder)
+/ai                        AI Analyst (질문 · Workflow 진행 · Claim/Evidence · Knowledge Documents)
 /report                    Valuation Report (이후 STEP, placeholder)
 /learn                     학습 홈
 /learn/roadmap             학습 로드맵
@@ -203,7 +215,8 @@ Node 22.6 이상이 필요합니다. 엔진 테스트가 TypeScript 파일을 �
 | Dashboard | 완료. Workflow Progress 와 KPI 는 실제 PROJECT 상태에서 계산 (결과가 없으면 `—`, stale 결과를 보여주지 않음) |
 | Workspace | 삼성전자 Historical Data 불러오기, 재무제표 탭, 파생지표 |
 | Valuation | 6단계 Workflow: Historical → Forecast → WACC → DCF/Equity → Result → Validation |
-| AI Analyst / Report | 이후 STEP 용 placeholder |
+| Report | 이후 STEP 용 placeholder |
+| AI Analyst | 실제 페이지 (STEP 08-7) |
 
 **Valuation Workspace** (`/valuation/:stage`)
 
