@@ -29,8 +29,15 @@ export type ToolExecution = 'frontend' | 'backend';
 /** Tool 이 의존하는 context 요소. 없으면 'unavailable' 을 돌려준다. */
 export type ToolRequirement = 'none' | 'historical' | 'quality' | 'assumptions' | 'valuation' | 'sensitivity';
 
+/** Tool 의 성격. read: get* (deterministic 조회) · search: search* (문서 · 뉴스 검색) · write: update* / apply* / save* (상태를 바꾸는 Tool: 반드시 사용자 승인이 필요하고 모델이 직접 실행할 수 없다). 현재 write Tool 은 없다. */
+export type ToolOperation = 'read' | 'search' | 'write';
+
+/** 이름 규칙으로 operation 을 정한다 (get* → read, search* → search, 그 밖의 update* / apply* / save* → write). */
+export const operationOf = (name: string): ToolOperation => (name.startsWith('get') ? 'read' : name.startsWith('search') ? 'search' : 'write');
+
 export interface AiToolDefinition {
   name: ToolName;
+  operation: ToolOperation;
   execution: ToolExecution;
   capability: CapabilityId | 'overview';
   description: string;
@@ -88,7 +95,7 @@ const RETRIEVAL_OUTPUT: JsonSchema = obj({
   }) },
 }, ['query', 'company', 'contentType', 'notice', 'results']);
 
-export const TOOL_CATALOG: readonly AiToolDefinition[] = [
+const RAW_CATALOG: readonly Omit<AiToolDefinition, 'operation'>[] = [
   {
     name: 'getCompanyOverview', execution: 'frontend', capability: 'overview', requires: 'none', allowedWhenUnsupported: true,
     description: '현재 분석 대상 기업, 지원 여부, 데이터 출처 구분(Actual / Assumption / Calculated), 어떤 데이터가 준비되어 있는지를 알려 준다. 다른 Tool 을 부르기 전에 먼저 확인한다.',
@@ -247,6 +254,8 @@ export const TOOL_CATALOG: readonly AiToolDefinition[] = [
       results: { type: 'array', items: obj({ title: { type: 'string' }, publisher: { oneOf: [{ type: 'string' }, { type: 'null' }] }, publishedAt: { type: 'string' }, url: { type: 'string' }, snippet: { oneOf: [{ type: 'string' }, { type: 'null' }] } }) } }),
   },
 ];
+
+export const TOOL_CATALOG: readonly AiToolDefinition[] = RAW_CATALOG.map((t) => ({ ...t, operation: operationOf(t.name) }));
 
 export const TOOL_NAMES: readonly ToolName[] = TOOL_CATALOG.map((t) => t.name);
 /** frontend 에서 실행되는 Tool 이름 */

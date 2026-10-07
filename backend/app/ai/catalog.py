@@ -46,6 +46,24 @@ ANSWER_SCHEMA: dict[str, Any] = {
 }
 
 
+PROPOSAL_TYPES = ["change-wacc", "change-forecast-assumption", "apply-peer-multiple", "save-scenario"]
+_STR_LIST = {"type": "array", "items": {"type": "string"}}
+
+# Agent workflow 최종 답변: 기본 답변 + 검토 범위 · 한계 · 판단 대상 · claim → Tool 증거 연결 · 변경 제안(사람의 승인 대기). 내부 추론(chain-of-thought)은 담지 않는다.
+WORKFLOW_ANSWER_SCHEMA: dict[str, Any] = {
+    **ANSWER_SCHEMA,
+    "required": [*ANSWER_SCHEMA["required"], "reviewedAreas", "limitations", "judgmentItems", "claims", "proposedActions"],
+    "properties": {
+        **ANSWER_SCHEMA["properties"],
+        "reviewedAreas": _STR_LIST, "limitations": _STR_LIST, "judgmentItems": _STR_LIST,
+        "claims": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["claim", "tools"], "properties": {"claim": {"type": "string"}, "tools": _STR_LIST}}},
+        "proposedActions": {"type": "array", "items": {
+            "type": "object", "additionalProperties": False, "required": ["type", "target", "currentValue", "proposedValue", "rationale"],
+            "properties": {"type": {"type": "string", "enum": PROPOSAL_TYPES}, "target": {"type": "string"}, "currentValue": _NULLABLE_STR, "proposedValue": _NULLABLE_STR, "rationale": {"type": "string"}}}},
+    },
+}
+
+
 @lru_cache(maxsize=1)
 def load_catalog() -> dict[str, Any]:
     return json.loads(Path(__file__).with_name("tool_catalog.json").read_text(encoding="utf-8"))

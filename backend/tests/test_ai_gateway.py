@@ -35,7 +35,7 @@ class MockProvider:
         self.calls = []
 
     def create_response(self, messages, tools, answer_schema):
-        self.calls.append({"messages": json.loads(json.dumps(messages)), "tools": [t.name for t in tools]})
+        self.calls.append({"messages": json.loads(json.dumps(messages)), "tools": [t.name for t in tools], "schema_required": list(answer_schema.get("required", []))})
         t = self.turns.pop(0)
         if isinstance(t, Exception):
             raise t
@@ -133,7 +133,7 @@ def test_multiple_tool_calls_in_one_question():
 
 # 4. max tool limit
 def test_tool_limit_stops_the_loop_safely():
-    turns = [tool_call(id_=f"c{i}") for i in range(1, 8)]
+    turns = [tool_call("getMappingTrace", {"field": "revenue", "fiscalYear": 2010 + i}, id_=f"c{i}") for i in range(1, 8)]
     client, provider = client_for(turns)
     r = start(client).json()
     seen = 0
@@ -142,7 +142,7 @@ def test_tool_limit_stops_the_loop_safely():
         r = send(client, r).json()
     assert seen == 5 and r["status"] == "tool-limit" and r["toolCalls"] == 5 and "한도" in r["message"]
     assert len(provider.calls) == 6  # 6번째 요청에서 멈춘다 (실행 요청은 보내지 않는다)
-    client2, _ = client_for([tool_call(id_=f"d{i}") for i in range(1, 5)], max_tool_calls=2)
+    client2, _ = client_for([tool_call("getMappingTrace", {"field": "revenue", "fiscalYear": 2010 + i}, id_=f"d{i}") for i in range(1, 5)], max_tool_calls=2)
     r2 = start(client2).json()
     r2 = send(client2, r2).json()
     r2 = send(client2, r2).json()

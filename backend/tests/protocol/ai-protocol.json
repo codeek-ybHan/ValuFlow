@@ -6,7 +6,15 @@
     "callId": "call_1",
     "tool": "getHistoricalAnalysis",
     "input": {},
-    "toolCalls": 1
+    "toolCalls": 1,
+    "toolTrace": [
+      {
+        "tool": "getHistoricalAnalysis",
+        "runtime": "frontend",
+        "status": "requested"
+      }
+    ],
+    "backendToolResults": []
   },
   "toolResultRequest": {
     "conversationId": "0123456789abcdef",

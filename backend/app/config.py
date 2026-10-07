@@ -39,6 +39,7 @@ class Settings:
     openai_base_url: str = "https://api.openai.com/v1"
     ai_state_secret: str = field(default="", repr=False)
     ai_max_tool_calls: int = 5
+    ai_agent_max_tool_calls: int = 10   # Agent workflow 의 Tool 호출 상한 (일반 질문은 ai_max_tool_calls)
     # 공시 Retrieval (embedding 도 backend 에서만 호출한다)
     embedding_model: str = "text-embedding-3-small"
     retrieval_min_score: float = 0.3
@@ -56,6 +57,8 @@ class Settings:
     reranker_cache_dir: str = ""
     # 외부 데이터 Tool (시세 · 금리 · 비교기업 · 뉴스). 키가 필요 없는 provider 를 쓰며, TTL 은 데이터 성격별로 다르다 (초).
     external_data: bool = False
+    # development(기본): 비공식 provider(Yahoo · Google News)를 fallback 으로 허용 · production: development 등급 provider 는 unavailable
+    app_env: str = "development"
     market_ttl: int = 300
     fundamentals_ttl: int = 86400
     rate_ttl: int = 86400
@@ -94,6 +97,7 @@ def load_settings(env: dict[str, str] | None = None, dotenv_path: Path | None = 
         openai_base_url=(source.get("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/"),
         ai_state_secret=(source.get("AI_STATE_SECRET") or dotenv.get("AI_STATE_SECRET", "")).strip(),
         ai_max_tool_calls=int(source.get("AI_MAX_TOOL_CALLS") or 5),
+        ai_agent_max_tool_calls=int(source.get("AI_AGENT_MAX_TOOL_CALLS") or 10),
         embedding_model=source.get("OPENAI_EMBEDDING_MODEL") or dotenv.get("OPENAI_EMBEDDING_MODEL", "") or "text-embedding-3-small",
         retrieval_min_score=float(source.get("RETRIEVAL_MIN_SCORE") or 0.3),
         reranker=(source.get("RERANKER") or dotenv.get("RERANKER", "") or "auto").lower(),
@@ -107,6 +111,7 @@ def load_settings(env: dict[str, str] | None = None, dotenv_path: Path | None = 
         rerank_min_score=float(source["RERANK_MIN_SCORE"]) if source.get("RERANK_MIN_SCORE") else None,
         reranker_cache_dir=source.get("RERANKER_CACHE_DIR") or dotenv.get("RERANKER_CACHE_DIR", ""),
         max_upload_mb=int(source.get("MAX_UPLOAD_MB") or 20),
+        app_env=(source.get("APP_ENV") or dotenv.get("APP_ENV", "") or "development").lower(),
         external_data=(source.get("EXTERNAL_DATA") or dotenv.get("EXTERNAL_DATA", "") or "true").lower() not in ("0", "false", "no", "off"),
         market_ttl=int(source.get("MARKET_TTL_SECONDS") or 300), fundamentals_ttl=int(source.get("FUNDAMENTALS_TTL_SECONDS") or 86400),
         rate_ttl=int(source.get("RATE_TTL_SECONDS") or 86400), news_ttl=int(source.get("NEWS_TTL_SECONDS") or 900),

@@ -9,9 +9,11 @@ from typing import Any, Callable, Literal
 
 from app.external.cache import TTLCache
 from app.external.errors import ProviderError
-from app.external.providers import MarketSnapshot
+from app.external.providers import MarketSnapshot, ProviderInfo
 
 SOURCE = "Yahoo Finance"
+INFO = ProviderInfo(SOURCE, "unofficial", "development", False,
+                    "Unofficial access (yfinance) with no SLA or API contract: development/demo fallback only. Not official market data and not valuation-grade; company financial actuals come from OpenDART / ValuFlow Historical.")
 KOREA_EXCHANGES = ("KSC", "KOE")   # KOSPI, KOSDAQ (Yahoo exchange code)
 SUFFIXES = (".KS", ".KQ")
 
@@ -75,6 +77,7 @@ def to_snapshot(symbol: str, info: dict[str, Any], fetched_at: datetime) -> Mark
 
 class YahooMarketData:
     name = SOURCE
+    info = INFO
 
     def __init__(self, fetch_info: InfoFetcher = default_info, cache: TTLCache | None = None, quote_ttl: float = 300, fundamentals_ttl: float = 86400,
                  clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
@@ -115,6 +118,7 @@ class YahooMarketData:
 
 class YahooComparables:
     name = SOURCE
+    info = INFO
 
     def __init__(self, market: YahooMarketData, screen: Screener = default_screen, cache: TTLCache | None = None, ttl: float = 86400, workers: int = 4):
         self._market, self._screen, self._cache, self._ttl, self._workers = market, screen, cache or TTLCache(), ttl, workers

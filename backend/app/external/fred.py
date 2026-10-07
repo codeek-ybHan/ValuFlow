@@ -12,7 +12,7 @@ import httpx
 
 from app.external.cache import TTLCache
 from app.external.errors import ProviderError
-from app.external.providers import RiskFreeRate
+from app.external.providers import ProviderInfo, RiskFreeRate
 
 URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 SERIES = {"KR": ("IRLTLT01KRM156N", "Republic of Korea 10-year government bond yield (OECD long-term interest rate)")}
@@ -21,6 +21,8 @@ MAX_BYTES = 200_000
 
 class FredRiskFree:
     name = "FRED (OECD)"
+    info = ProviderInfo("FRED (OECD)", "secondary", "development", False,
+                        "Redistribution of OECD monthly long-term rates (US Federal Reserve Bank of St. Louis); monthly lag. Interim source: prefer the Bank of Korea ECOS daily 10-year Treasury yield in production.")
 
     def __init__(self, client: httpx.Client | None = None, cache: TTLCache | None = None, ttl: float = 86400, base_url: str = URL):
         self._http, self._cache, self._ttl, self._url = client or httpx.Client(timeout=15), cache or TTLCache(), ttl, base_url

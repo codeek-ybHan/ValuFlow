@@ -9,6 +9,8 @@ export interface AiQueryRequest {
   toolNames: string[];
   /** routing hint (기록용). 모델의 Tool 선택을 대체하지 않는다 */
   classification?: Record<string, unknown>;
+  /** Agent workflow 계획 (type · 단계의 Tool · 한도). backend 가 종류 · Tool · 한도를 검증하고 한도를 상한으로 제한한다. */
+  workflow?: { type: string; steps: { id: string; tool: string; purpose: string; optional: boolean }[]; maxToolCalls: number };
 }
 
 export interface AiToolResultRequest {
@@ -16,9 +18,11 @@ export interface AiToolResultRequest {
   state: string;
   callId: string;
   toolResult: ToolResult<unknown>;
+  /** workflow: 방금 결과를 요약한 observation (원문 아님) + 관찰에 따른 다음 Tool 제안 */
+  workflowObservation?: { tool: string; status: string; findings: string[]; missing: string[]; warnings: string[]; nextHints: { tool: string; reason: string }[] };
 }
 
-export interface ToolCallResponse { status: 'tool-call'; conversationId: string; state: string; callId: string; tool: string; input: Record<string, unknown>; toolCalls: number }
+export interface ToolCallResponse { status: 'tool-call'; conversationId: string; state: string; callId: string; tool: string; input: Record<string, unknown>; toolCalls: number; toolTrace?: ToolTraceEntry[]; backendToolResults?: ToolResult<unknown>[] }
 /** gateway 가 이 질문에서 실행한 Tool 의 순서와 실행 위치 (frontend Tool 의 status 는 'requested', 결과는 frontend 가 안다). */
 export interface ToolTraceEntry {
   tool: string; runtime: 'frontend' | 'backend' | 'gateway'; status: string;

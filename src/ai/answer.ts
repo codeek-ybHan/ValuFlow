@@ -47,12 +47,13 @@ export interface AiAnalystAnswer {
 }
 
 export interface AnswerViolation {
-  code: 'unknown-tool' | 'missing-warning' | 'missing-sources' | 'unsupported-not-disclosed' | 'empty-summary' | 'missing-value-fabricated' | 'unsupported-figures' | 'ungrounded-number' | 'evidence-from-failed-tool';
+  code: 'unknown-tool' | 'missing-warning' | 'missing-sources' | 'unsupported-not-disclosed' | 'empty-summary' | 'missing-value-fabricated' | 'unsupported-figures' | 'ungrounded-number' | 'evidence-from-failed-tool'
+    | 'claim-without-evidence' | 'applied-change-claimed' | 'proposal-incomplete';
   detail: string;
 }
 
 /** Tool 결과에서 값이 없다고 표시된 항목(`{status:'missing', value:null}`)의 이름들. */
-function missingKeys(o: unknown, key = '', out: Set<string> = new Set()): Set<string> {
+export function missingKeys(o: unknown, key = '', out: Set<string> = new Set()): Set<string> {
   if (Array.isArray(o)) o.forEach((v) => missingKeys(v, key, out));
   else if (o && typeof o === 'object') {
     const r = o as Record<string, unknown>;

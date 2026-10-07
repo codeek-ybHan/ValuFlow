@@ -23,4 +23,12 @@ export type { AiGatewayClient, AiQueryRequest, AiToolResultRequest, GatewayRespo
 export { runAiQuery, MAX_CLIENT_ROUNDS } from './query.ts';
 export type { AiQueryOutcome, RunAiQueryOptions } from './query.ts';
 export { buildMinimalContext } from './minimalContext.ts';
+export { WORKFLOWS, WORKFLOW_BY_TYPE } from './agent/workflows.ts';
+export { planWorkflow, classifyWorkflow, AGENT_MAX_TOOL_CALLS } from './agent/planner.ts';
+export { observe } from './agent/observation.ts';
+export { runWorkflow, resolveCheckpoint, snapshotId, MAX_WORKFLOW_STEPS } from './agent/run.ts';
+export type { RunWorkflowOptions } from './agent/run.ts';
+export type { WorkflowType, WorkflowPlan, WorkflowStep, WorkflowState, WorkflowStatus, WorkflowAnswer, WorkflowAuditEvent, WorkflowOutcome, HumanCheckpoint, Observation, EvidenceClaim, CheckpointKind, StepStatus } from './agent/types.ts';
+export { operationOf } from './tools/definitions.ts';
+export type { ToolOperation } from './tools/definitions.ts';
 export { TOOL_CALLING_INSTRUCTIONS } from './policy.ts';

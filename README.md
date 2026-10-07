@@ -102,17 +102,35 @@ curl -X DELETE localhost:8000/api/knowledge/documents/3               # 문서 +
 
 backend 가 직접 실행하는 외부 데이터 Tool 4종입니다. **계산은 ValuFlow Engine, 근거는 이 Tool, 해석은 LLM** 이며 Tool 은 ValuFlow 가정 · Forecast · Relative Valuation 입력을 바꾸지 않습니다 (`applied: false`).
 
-| Tool | 내용 | provider (Key 불필요) | 기본 TTL |
+> ⚠ **현재 provider 는 모두 개발 · 데모용 fallback 입니다. 공식 시장 데이터가 아닙니다.** Yahoo Finance(yfinance)와 Google News RSS 는 공식 SLA / API 계약이 없는 비공식 접근이고, FRED 는 OECD 월 단위 통계의 재배포입니다. 이 데이터는 Valuation 의 재무 근거(valuation-grade)로 쓰지 않으며, **기업 재무 Actual 의 source of truth 는 OpenDART / ValuFlow Historical** 입니다.
+
+| Tool | 내용 | 현재 provider (신뢰 등급 · tier) | 기본 TTL |
 |---|---|---|---|
-| `getMarketData` | 주가 · 시가총액 · 발행주식수 · 52주 범위 (asOf · 출처 포함) | Yahoo Finance (yfinance, 비공식) | 5분 |
-| `getMarketAssumptions` | 무위험수익률(한국 국채 10Y) · 베타(raw) · 부채 지표. 시장위험프리미엄은 provider 가 없어 missing | FRED(OECD 월평균) · Yahoo Finance | 1일 |
-| `getComparableCompanies` | 같은 산업 분류의 실제 종목 후보 + 배수(PER · PBR · EV/EBITDA, 없으면 null) + selectionReasons. 평균은 계산하지 않음 | Yahoo Finance screener | 1일 |
-| `searchCompanyNews` | 제목 · 언론사 · 발행 시각 · 링크 · 짧은 요약 (본문 아님, 외부 텍스트는 데이터로만 전달) | Google News RSS | 15분 |
+| `getMarketData` | 주가 · 시가총액 · 발행주식수 · 52주 범위 (asOf · 출처 포함) | Yahoo Finance — 비공식 · development | 5분 |
+| `getMarketAssumptions` | 무위험수익률(한국 국채 10Y) · 베타(raw) · 부채 지표. 시장위험프리미엄은 provider 가 없어 missing | FRED(OECD 월평균) — 재배포 · development / Yahoo Finance — 비공식 · development | 1일 |
+| `getComparableCompanies` | 같은 산업 분류의 실제 종목 후보 + 배수(PER · PBR · EV/EBITDA, 없으면 null) + selectionReasons. 평균은 계산하지 않음 | Yahoo Finance screener — 비공식 · development | 1일 |
+| `searchCompanyNews` | 제목 · 언론사 · 발행 시각 · 링크 · 짧은 요약 (본문 아님, 외부 텍스트는 데이터로만 전달) | Google News RSS — 비공식(개인 · 비상업 이용) · development | 15분 |
 
 - 종목은 모델이 지정하지 않고 서버가 DART 기업 목록의 종목코드로 찾습니다. 외부 값은 `asOf` / `publishedAt` 을 가지며 DART 회계연도 값과 시점이 다릅니다.
+- **provider 신뢰 등급:** 모든 Tool 결과에 `data.providers`(official · reliability · tier · valuationGrade)와 `provider-reliability` 경고가 붙고 `/api/health` 의 `externalProviders` 에도 노출됩니다. `APP_ENV=production` 이면 development 등급 provider 는 쓰이지 않고 그 Tool 만 `unavailable` 입니다 (운영용 provider 를 등록해야 풀립니다).
 - 상태: `ok` · `unavailable`(호출 실패) · `no-data`(provider 에 데이터 없음) · `rate-limit`. 없는 값은 `{status:"missing"}` 이며 추정하지 않습니다.
-- provider 는 `backend/app/external/providers.py` 의 Protocol 로 분리되어 있어(Yahoo → 다른 시세 provider · MCP server 등) 교체해도 Tool contract 는 그대로입니다. `EXTERNAL_DATA=false` 로 끌 수 있고 TTL 은 `MARKET_TTL_SECONDS` · `FUNDAMENTALS_TTL_SECONDS` · `RATE_TTL_SECONDS` · `NEWS_TTL_SECONDS`.
-- 주의: Yahoo Finance · Google News 는 비공식 / 개인용 접근이라 지연 · 차단 · 필드 오류가 있을 수 있습니다 (예: provider 의 영업이익률이 DART 기준과 크게 다를 수 있어 Tool 이 경고합니다). 상업 서비스라면 라이선스가 있는 provider 로 교체하세요. `pip install yfinance` 가 필요합니다 (requirements.txt).
+- provider 는 `backend/app/external/providers.py` 의 Protocol 로 분리되어 있어 교체해도 Tool contract 는 그대로입니다 (`docs/STEP08-4_provider_review.md`: 운영 provider 후보와 조건). `EXTERNAL_DATA=false` 로 끌 수 있고 TTL 은 `MARKET_TTL_SECONDS` · `FUNDAMENTALS_TTL_SECONDS` · `RATE_TTL_SECONDS` · `NEWS_TTL_SECONDS`.
+- provider 의 영업이익률 · 매출은 DART 기준과 크게 다를 수 있어 Tool 이 경고합니다. `pip install yfinance` 가 필요합니다 (requirements.txt).
+
+### Agent Workflow (STEP 08-5)
+
+autonomous agent 가 아니라 **분석 업무를 계획 → Tool 실행 → 관찰 → 계속 / 사람 확인 / 완료**로 진행하는 Analyst-support Agent 입니다. 기존 Tool loop(frontend `executeTool` ↔ backend LLM gateway)를 재사용하고, 가정 · Forecast · WACC · Peer 배수 · 시나리오는 절대 바꾸지 않습니다.
+
+- **Workflow 8종** (`src/ai/agent/workflows.ts`): Historical · Forecast · WACC · DCF · Sensitivity/Scenario · Comparable · Event(Risk/News) · Full Valuation Review. 각 단계는 필수 / 선택으로 나뉘고, 모든 Tool 을 무조건 부르지 않습니다. 질문이 workflow 업무가 아니면 기존 `runAiQuery` 를 씁니다.
+- **Planner**: 규칙 기반(`planWorkflow`, `classifyQuestion` 을 routing hint 로 재사용). 계획에는 Tool 이름과 목적뿐이며 값을 만들지 않습니다. 데이터가 없는 단계는 `skipped`(사유 포함), 필수 데이터가 없으면 `failed`, unsupported 기업은 LLM 을 부르지 않고 지원 불가만 알립니다.
+- **실행** (`runWorkflow`): 시작 시 immutable context snapshot 을 만들어 끝까지 씁니다. Tool 결과는 구조화된 **Observation**(요약 · 누락 · 경고 · 출처 종류 · 다음 Tool 힌트; 문서 · 기사 본문 없음)이 되고 다음 판단용으로 gateway 에 전달됩니다(예: 품질 경고 → `getMappingTrace`, 뉴스의 CAPEX 발표 → `searchDisclosures`).
+- **한도**: 일반 질문 5회, workflow 10회(`AI_AGENT_MAX_TOOL_CALLS` 상한, 요청 값은 이 상한으로 제한), 단계 수 14개, **같은 Tool + 같은 입력의 반복 호출 차단**(gateway, 일반 질문에도 적용; 예산에는 포함).
+- **사람 확인 지점**: 모델은 변경을 직접 하지 못하고 `proposedActions`(대상 · 현재 값 · 제안 값 · 근거가 모두 있을 때만)로 제안합니다. 제안이 있으면 workflow 는 `waiting-for-user` 로 멈추고, `resolveCheckpoint` 로 승인 / 거절을 기록해도 값은 적용되지 않습니다 (실제 write Tool 은 아직 없음).
+- **Tool 분류**: `get*` read · `search*` search · `update*` / `apply*` / `save*` write. write Tool 은 gateway 가 모델의 직접 실행을 거부합니다(`approval-required`).
+- **부분 실패**: 한 Tool 이 실패해도 계속하고, 최종 답변의 `limitations` 에 "뉴스 데이터는 현재 확인하지 못했습니다." 같은 한계가 남습니다 (모델이 빠뜨려도 복원). 필수 단계가 실행되지 않은 경우도 한계로 남습니다.
+- **설명 가능성**: 최종 답변에는 내부 추론 대신 `reviewedAreas`(검토한 영역), `limitations`, `judgmentItems`(분석가가 판단할 가정), `claims`(주요 주장 → 성공 실행된 Tool 증거)가 들어갑니다. 실행되지 않은 Tool 을 근거로 든 claim 은 걸러집니다.
+- **Audit** (`WorkflowAuditEvent`): workflowId · 종류 · 계획 / 실행 단계 · Tool 상태 · 출처 종류 · 경고 · 체크포인트 · 상태 · 소요 시간 · 위반. Tool 결과 본문 · 문서 · 기사 · Raw 재무 · Key 는 저장하지 않습니다.
+- 실제 LLM 확인: backend 를 띄운 뒤 `node scripts/agent-live.ts` (WACC · Full · Event 3종).
 
 ### Credential 정책
 
@@ -120,7 +138,7 @@ backend 가 직접 실행하는 외부 데이터 Tool 4종입니다. **계산은
 |---|---|---|
 | `DART_API_KEY` | OpenDART (기업 · 재무 · 공시, 종목코드 조회) | 해당 기능 오류. 외부 Tool 은 종목을 못 찾아 `unavailable` |
 | `OPENAI_API_KEY` | LLM · embedding | AI Analyst / 공시 검색 비활성 (`ai-not-configured`) |
-| `MARKET_DATA_API_KEY` · `NEWS_API_KEY` | Key 가 필요한 시세 · 뉴스 provider 를 고른 경우 (기본 yahoo · google 은 불필요) | **해당 Tool 만** `unavailable` |
+| `MARKET_DATA_API_KEY` · `NEWS_API_KEY` | Key 가 필요한 시세 · 뉴스 provider 를 고른 경우 (현재 기본 provider yahoo · google 은 Key 불필요, 단 개발 · 데모용) | **해당 Tool 만** `unavailable` |
 | `RERANKER_API_KEY` | `RERANKER=cohere` (예전 이름 `COHERE_API_KEY`) | reranking 만 꺼지고 Hybrid 로 동작 |
 
 - 모든 credential 은 backend 환경변수(또는 `backend/.env`)에만 둡니다. frontend 에는 어떤 Key 도 없고 `VITE_` 접두사 변수에 Key 를 두면 안 됩니다 (테스트가 소스 · 빌드 결과를 검사합니다).

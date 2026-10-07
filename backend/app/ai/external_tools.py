@@ -15,7 +15,7 @@ from typing import Any, Callable
 
 from app.ai.runtime import BackendTool, _result
 from app.external.errors import ProviderError
-from app.external.providers import ComparableProvider, MarketDataProvider, MarketSnapshot, NewsItem, NewsProvider, RiskFreeRateProvider
+from app.external.providers import ComparableProvider, MarketDataProvider, MarketSnapshot, NewsItem, NewsProvider, ProviderInfo, RiskFreeRateProvider, provider_info
 
 log = logging.getLogger("valuflow.external")
 
@@ -66,6 +66,22 @@ def source(type_: str, origin: str, as_of: str | None, fetched: datetime | None,
     return s
 
 
+def provider_meta(*providers: object) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Tool 결과에 붙이는 provider 신뢰 등급과, 공식 · 상용이 아닌 provider 에 대한 경고. 비공식 데이터를 "공식 시장 데이터"처럼 말하지 않게 한다."""
+    infos: dict[str, ProviderInfo] = {}
+    for p in providers:
+        i = provider_info(p)
+        infos.setdefault(i.name, i)
+    warns = [{"code": "provider-reliability", "text": f"Data provider '{i.name}' is {i.reliability} ({i.tier} tier, valuation-grade: {str(i.valuation_grade).lower()}): {i.note} Never describe it as official market data.", "level": "note"}
+             for i in infos.values() if i.reliability not in ("official", "commercial")]
+    return [i.to_dict() for i in infos.values()], warns
+
+
+def _src_note(p: object) -> str:
+    i = provider_info(p)
+    return f"{i.reliability} provider ({i.tier} tier)"
+
+
 def _provider_failure(tool: str, e: ProviderError) -> dict[str, Any]:
     return _result(tool, e.kind, reason=e.message)
 
@@ -109,6 +125,7 @@ def make_market_data_tool(market: MarketDataProvider, resolver: Resolver) -> Bac
             return _provider_failure(guard.tool, e)
         if s.price is None:
             return _result(guard.tool, "no-data", reason="The provider returned no current price for this company.")
+        pinfo, pwarn = provider_meta(market)
         as_of, src, cur = iso(s.price_time) or iso(s.fetched_at), s.source, s.currency
         data = {
             "company": _company(ctx, t, s), "timeBasis": "current-market", "asOf": as_of, "currency": cur,
@@ -117,10 +134,11 @@ def make_market_data_tool(market: MarketDataProvider, resolver: Resolver) -> Bac
             "sharesOutstanding": quantity(s.shares_outstanding, "shares", as_of, src, "The provider did not report shares outstanding."),
             "fiftyTwoWeekHigh": quantity(s.high_52w, cur, as_of, src, "The provider did not report the 52-week high."),
             "fiftyTwoWeekLow": quantity(s.low_52w, cur, as_of, src, "The provider did not report the 52-week low."),
+            "providers": pinfo,
             "notice": "Current market observation. Shares outstanding and market cap are provider-reported and may differ from DART share counts (e.g. preferred shares).",
         }
-        srcs = [source("market-data", "yahoo-finance", as_of, s.fetched_at, t.corp_name, sourceName=s.source, title=f"{s.symbol} market data")]
-        return _result(guard.tool, "ok", data=data, sources=srcs, warnings=[{"code": "market-data-current", "text": CURRENT_MARKET_WARNING, "level": "note"}])
+        srcs = [source("market-data", "yahoo-finance", as_of, s.fetched_at, t.corp_name, sourceName=s.source, title=f"{s.symbol} market data", note=_src_note(market))]
+        return _result(guard.tool, "ok", data=data, sources=srcs, warnings=[{"code": "market-data-current", "text": CURRENT_MARKET_WARNING, "level": "note"}, *pwarn])
     return run
 
 
@@ -143,7 +161,7 @@ def make_market_assumptions_tool(market: MarketDataProvider, rates: RiskFreeRate
         try:
             r = rates.risk_free_rate("KR")
             rf = {"rate": r.rate, "unit": "ratio (decimal)", "maturity": r.maturity, "country": r.country, "instrument": r.instrument, "frequency": r.frequency, "asOf": r.as_of.isoformat(), "source": r.source}
-            sources.append(source("market-data", "fred", r.as_of.isoformat(), None, None, sourceName=r.source, title=r.instrument))
+            sources.append(source("market-data", "fred", r.as_of.isoformat(), None, None, sourceName=r.source, title=r.instrument, note=_src_note(rates)))
         except ProviderError as e:
             errors.append(e)
             rf = missing(e.message)
@@ -156,21 +174,22 @@ def make_market_assumptions_tool(market: MarketDataProvider, rates: RiskFreeRate
             debt = {"totalDebt": quantity(snap.total_debt, snap.financial_currency or snap.currency, q, snap.source, "The provider did not report total debt."),
                     "debtToEquity": quantity(snap.debt_to_equity, "percent (provider-reported)", q, snap.source, "The provider did not report debt-to-equity."),
                     "note": "Balance-sheet indicators are provider-reported as of the most recent reported quarter, which may differ from the DART fiscal-year figures in ValuFlow."}
-            sources.append(source("market-data", "yahoo-finance", as_of, snap.fetched_at, t.corp_name, sourceName=snap.source, title=f"{snap.symbol} beta and debt indicators"))  # type: ignore[union-attr]
+            sources.append(source("market-data", "yahoo-finance", as_of, snap.fetched_at, t.corp_name, sourceName=snap.source, title=f"{snap.symbol} beta and debt indicators", note=_src_note(market)))  # type: ignore[union-attr]
         elif t.stock_code:  # type: ignore[union-attr]
             beta, debt = missing("Market data for this company could not be retrieved."), missing("Market data for this company could not be retrieved.")
         else:
             beta, debt = missing("This company has no listed stock code."), missing("This company has no listed stock code.")
         if "rate" not in rf and snap is None and errors:
             return _provider_failure(guard.tool, errors[0])
+        pinfo, pwarn = provider_meta(market, rates)
         data = {
             "company": _company(ctx, t, snap), "timeBasis": "current-market", "applied": False, "notice": NOT_APPLIED,
             "riskFreeRate": rf, "beta": beta,
             "marketRiskPremium": missing("No market risk premium provider is configured; the analyst must choose and cite one (e.g. a published country equity risk premium)."),
-            "debtIndicators": debt,
+            "debtIndicators": debt, "providers": pinfo,
             "futureExtension": "Peer beta → unlever → relever is not computed here; use getComparableCompanies candidates and ValuFlow inputs.",
         }
-        warns = [{"code": "market-data-current", "text": CURRENT_MARKET_WARNING, "level": "note"}, {"code": "not-applied", "text": NOT_APPLIED, "level": "note"}]
+        warns = [{"code": "market-data-current", "text": CURRENT_MARKET_WARNING, "level": "note"}, {"code": "not-applied", "text": NOT_APPLIED, "level": "note"}, *pwarn]
         if errors:
             warns.append({"code": "partial-data", "text": "Some market assumption inputs could not be retrieved; they are marked missing and must not be guessed.", "level": "review"})
         return _result(guard.tool, "ok", data=data, sources=sources, warnings=warns)
@@ -253,18 +272,19 @@ def make_comparables_tool(market: MarketDataProvider, comps: ComparableProvider,
             return _result(guard.tool, "no-data", reason=f"No comparable company candidates were found for industry '{industry or subject.industry}' (scope: {scope}).")
         ranked = rank_peers(subject, found, top_k)
         as_of = iso(subject.fetched_at)
+        pinfo, pwarn = provider_meta(market, comps)
         data = {
             "company": _company(ctx, t, subject), "timeBasis": "current-market", "asOf": as_of, "scope": scope,
             "criteria": {"industry": industry or subject.industry, "sector": subject.sector, "basis": f"{subject.source} industry classification (business model and risk are not available from the provider)"},
-            "subject": _company_row(subject), "peers": [_company_row(p, why) for p, why in ranked], "applied": False, "notice": PEER_NOTICE,
+            "subject": _company_row(subject), "peers": [_company_row(p, why) for p, why in ranked], "applied": False, "notice": PEER_NOTICE, "providers": pinfo,
             "limitations": ["Revenue, operating margin and growth are provider-reported (basis and period unverified) and can differ materially from DART-based figures in ValuFlow; do not mix them.",
                             "Peer candidates come from the provider's industry screen; a conglomerate's provider classification may not match how analysts group it (use the industry input to screen another industry).",
                             "Currencies differ across markets: compare multiples (dimensionless), not raw amounts. Revenue is in the financial reporting currency and market cap in the trading currency (see units)."],
         }
-        srcs = [source("peer-data", "yahoo-finance", as_of, subject.fetched_at, t.corp_name, sourceName=subject.source, title=f"{p.symbol} peer data") for p, _ in ranked]
+        srcs = [source("peer-data", "yahoo-finance", as_of, subject.fetched_at, t.corp_name, sourceName=subject.source, title=f"{p.symbol} peer data", note=_src_note(comps)) for p, _ in ranked]
         return _result(guard.tool, "ok", data=data, sources=srcs, warnings=[{"code": "market-data-current", "text": CURRENT_MARKET_WARNING, "level": "note"},
                                                                           {"code": "peer-candidates", "text": PEER_NOTICE, "level": "note"},
-                                                                          {"code": "provider-fundamentals-unverified", "text": "Provider-reported revenue, margins and growth are unverified and may differ from ValuFlow's DART-based figures.", "level": "review"}])
+                                                                          {"code": "provider-fundamentals-unverified", "text": "Provider-reported revenue, margins and growth are unverified and may differ from ValuFlow's DART-based figures.", "level": "review"}, *pwarn])
     return run
 
 
@@ -294,10 +314,11 @@ def make_news_tool(news: NewsProvider, resolver: Resolver, now: Callable[[], dat
         if not items:
             return _result(guard.tool, "no-data", reason=f"No news was found for the query in the last {days} days. This does not mean nothing happened.")
         at = now()
-        data = {"company": _company(ctx, t), "query": extra or None, "windowDays": days, "asOf": iso(at), "contentType": "untrusted-news-excerpts", "notice": NEWS_NOTICE,
+        pinfo, pwarn = provider_meta(news)
+        data = {"company": _company(ctx, t), "providers": pinfo, "query": extra or None, "windowDays": days, "asOf": iso(at), "contentType": "untrusted-news-excerpts", "notice": NEWS_NOTICE,
                 "results": [{"title": n.title, "publisher": n.publisher, "publishedAt": iso(n.published_at), "url": n.url, "snippet": n.snippet} for n in items]}
-        srcs = [source("news", "google-news", iso(at), at, t.corp_name, title=n.title, publisher=n.publisher, publishedAt=iso(n.published_at), url=n.url, sourceName=news.name) for n in items]  # type: ignore[union-attr]
-        return _result(guard.tool, "ok", data=data, sources=srcs, warnings=[{"code": "news-headlines-only", "text": "Only headlines and short snippets were retrieved. Do not draw strong conclusions; publication dates differ from DART fiscal periods.", "level": "note"}])
+        srcs = [source("news", "google-news", iso(at), at, t.corp_name, title=n.title, publisher=n.publisher, publishedAt=iso(n.published_at), url=n.url, sourceName=news.name, note=_src_note(news)) for n in items]  # type: ignore[union-attr]
+        return _result(guard.tool, "ok", data=data, sources=srcs, warnings=[{"code": "news-headlines-only", "text": "Only headlines and short snippets were retrieved. Do not draw strong conclusions; publication dates differ from DART fiscal periods.", "level": "note"}, *pwarn])
     return run
 
 

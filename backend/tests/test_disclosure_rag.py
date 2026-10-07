@@ -405,7 +405,7 @@ def test_frontend_and_backend_tools_coexist_in_one_loop(rag):
     assert [(x["tool"], x["runtime"], x["status"]) for x in done["toolTrace"]] == [("getHistoricalAnalysis", "frontend", "ok"), ("searchDisclosures", "backend", "ok")]
     assert [r["tool"] for r in done["backendToolResults"]] == ["searchDisclosures"]
     # 반대 순서 + 한도: backend Tool 도 호출 횟수에 포함된다
-    gw, _ = gateway(rag, [tool_call("searchDisclosures", {"query": "설비투자"}, id_=f"b{i}") for i in range(1, 5)], max_tool_calls=2)
+    gw, _ = gateway(rag, [tool_call("searchDisclosures", {"query": f"설비투자 {i}"}, id_=f"b{i}") for i in range(1, 5)], max_tool_calls=2)
     limited = gw.query("q", CTX)
     assert limited["status"] == "tool-limit" and limited["toolCalls"] == 2 and [t["runtime"] for t in limited["toolTrace"]] == ["backend", "backend"]
     assert len(limited["backendToolResults"]) == 2

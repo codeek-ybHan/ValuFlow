@@ -155,3 +155,49 @@ def test_unit_tests_use_mock_providers_and_live_smoke_is_key_gated():
     for name in ("test_external_tools.py", "test_credentials.py"):
         assert "no_network" in (here / name).read_text(encoding="utf-8") or name == "test_credentials.py"
     assert not any(k in repr(Settings()) for k in ALL_KEYS)
+
+
+# ---- provider 신뢰 등급 (STEP 08-4 보완) ----
+def test_tool_results_expose_provider_reliability_and_never_claim_official():
+    from app.external.providers import ProviderInfo
+    from app.external.yahoo import INFO as YAHOO
+    from app.external.fred import FredRiskFree
+    from app.external.news import GoogleNews
+    assert (YAHOO.reliability, YAHOO.tier, YAHOO.valuation_grade) == ("unofficial", "development", False) and "development/demo" in YAHOO.note
+    assert FredRiskFree.info.reliability == "secondary" and GoogleNews.info.reliability == "unofficial" and not GoogleNews.info.valuation_grade
+    d = YAHOO.to_dict()
+    assert d["official"] is False and d["valuationGrade"] is False and set(d) == {"name", "official", "reliability", "tier", "valuationGrade", "note"}
+
+    class Shaped(FakeMarket):
+        info = YAHOO
+    class Official(FakeMarket):
+        info = ProviderInfo("KRX", "official", "production", True, "Exchange data.")
+    ctx = {"corpCode": SAMSUNG, "corpName": "삼성전자", "support": "supported"}
+    r = make_external_tools(ExternalProviders(Shaped(), FakeRates(), FakeComps(PEERS), FakeNews(NEWS)), resolver)["getMarketData"](ctx, {})
+    assert r["data"]["providers"][0]["reliability"] == "unofficial" and r["data"]["providers"][0]["official"] is False
+    w = [x for x in r["warnings"] if x["code"] == "provider-reliability"]
+    assert w and "development/demo" in w[0]["text"] and "Never describe it as official market data" in w[0]["text"]
+    assert r["sources"][0]["note"] == "unofficial provider (development tier)"
+    # 공식 provider 로 교체해도 Tool contract(필드)는 그대로이고, 비공식 경고만 사라진다
+    off = make_external_tools(ExternalProviders(Official(), FakeRates(), FakeComps(PEERS), FakeNews(NEWS)), resolver)["getMarketData"](ctx, {})
+    assert set(off["data"]) == set(r["data"]) and set(off["sources"][0]) == set(r["sources"][0])
+    assert off["data"]["providers"][0]["official"] is True and not [x for x in off["warnings"] if x["code"] == "provider-reliability"]
+    for name, args in (("getMarketAssumptions", {}), ("getComparableCompanies", {}), ("searchCompanyNews", {})):
+        res = make_external_tools(ExternalProviders(Shaped(), FakeRates(), FakeComps(PEERS), FakeNews(NEWS)), resolver)[name](ctx, args)
+        assert res["data"]["providers"] and any(x["code"] == "provider-reliability" for x in res["warnings"]), name
+    assert "never call their data \"official market data\"" in __import__("app.ai.catalog", fromlist=["load_catalog"]).load_catalog()["systemInstruction"]
+
+
+def test_production_env_blocks_development_providers_and_health_reports_reliability():
+    dev = build_external(settings())
+    assert not isinstance(dev.market, UnavailableProvider) and dev.market.info.tier == "development"
+    prod = build_external(settings(app_env="production"))
+    for p in (prod.market, prod.rates, prod.comparables, prod.news):
+        assert isinstance(p, UnavailableProvider) and "APP_ENV=production" in p.info.note
+    tools = make_external_tools(ExternalProviders(prod.market, prod.rates, prod.comparables, prod.news), resolver)
+    r = tools["getMarketData"]({"corpCode": SAMSUNG, "corpName": "삼성전자", "support": "supported"}, {})
+    assert r["status"] == "unavailable" and "development/demo provider" in r["reason"] and "official or commercial provider" in r["reason"]
+    h = TestClient(create_app(settings(), external=dev)).get("/api/health").json()
+    assert h["appEnv"] == "development" and h["externalProviders"]["market"]["reliability"] == "unofficial" and h["externalProviders"]["market"]["official"] is False
+    assert not any(k in json.dumps(h) for k in ALL_KEYS)
+    assert load_settings(env={"APP_ENV": "Production"}).app_env == "production" and Settings().app_env == "development"

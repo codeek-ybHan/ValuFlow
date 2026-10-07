@@ -12,7 +12,7 @@ import httpx
 
 from app.external.cache import TTLCache
 from app.external.errors import ProviderError
-from app.external.providers import NewsItem
+from app.external.providers import NewsItem, ProviderInfo
 
 URL = "https://news.google.com/rss/search"
 MAX_BYTES = 800_000
@@ -32,6 +32,8 @@ def clean_text(s: str | None, limit: int = SNIPPET_CHARS) -> str | None:
 
 class GoogleNews:
     name = "Google News"
+    info = ProviderInfo("Google News", "unofficial", "development", False,
+                        "Unofficial RSS feed for personal, non-commercial use (no API contract): development/demo only. Headlines and snippets only.")
 
     def __init__(self, client: httpx.Client | None = None, cache: TTLCache | None = None, ttl: float = 900, base_url: str = URL):
         self._http, self._cache, self._ttl, self._url = client or httpx.Client(timeout=15, headers={"User-Agent": "Mozilla/5.0 (ValuFlow)"}), cache or TTLCache(), ttl, base_url

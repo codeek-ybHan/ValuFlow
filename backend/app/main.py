@@ -27,6 +27,7 @@ from app.knowledge.service import KnowledgeService, parse_meta
 from app.rag.rerank import Reranker, build_reranker
 from app.ai.external_tools import ExternalProviders, TickerInfo, make_external_tools
 from app.external.errors import ProviderError
+from app.external.providers import provider_info
 from app.external.registry import build_external
 from app.secrets import install_redaction
 from app.dart.filings import DartDisclosureSource, FilingsSource
@@ -48,12 +49,14 @@ class AiQueryRequest(BaseModel):
     minimalContext: dict[str, Any] | None = None
     toolNames: list[str] | None = None
     classification: dict[str, Any] | None = None  # routing hint (기록용). 모델 선택을 대체하지 않는다
+    workflow: dict[str, Any] | None = None        # Agent workflow 계획 (gateway 가 종류 · Tool · 한도를 검증한다)
 
 class AiToolResultRequest(BaseModel):
     conversationId: str = Field(min_length=1, max_length=64)
     state: str = Field(min_length=1, max_length=600_000)
     callId: str = Field(min_length=1, max_length=128)
     toolResult: dict[str, Any]
+    workflowObservation: dict[str, Any] | None = None   # workflow 에서 frontend 가 Tool 결과를 요약한 observation (원문 아님)
 
 
 
@@ -100,6 +103,13 @@ def _error(code: str, message: str) -> JSONResponse:
     return JSONResponse({"error": {"code": code, "message": message}}, status_code=HTTP_STATUS.get(code, 502))  # type: ignore[arg-type]
 
 
+def _provider_report(external: ExternalProviders | None) -> dict[str, Any] | None:
+    """health 에 노출하는 provider 신뢰 등급 (이름 · 등급 · 운영 가능 여부만, credential 은 없다)."""
+    if external is None:
+        return None
+    return {k: provider_info(p).to_dict() for k, p in (("market", external.market), ("rates", external.rates), ("comparables", external.comparables), ("news", external.news)) if p is not None}
+
+
 def create_app(settings: Settings | None = None, dart: DartHttpClient | None = None, cache: CorpCodeCache | None = None, financials: FinancialsService | None = None,
                store: FinancialStore | None = None, historical: HistoricalService | None = None, ai: AiGateway | None = None,
                embedder: EmbeddingProvider | None = None, disclosure_source: FilingsSource | None = None, reranker: Reranker | None = None,
@@ -142,7 +152,7 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
         backend_tools.update(make_external_tools(external, _ticker))
     if ai is None and settings.has_ai:
         ai = AiGateway(OpenAiProvider(settings.openai_api_key, settings.openai_model, settings.openai_base_url),
-                       derive_secret(settings.ai_state_secret, settings.openai_api_key), max_tool_calls=settings.ai_max_tool_calls, backend_tools=backend_tools)
+                       derive_secret(settings.ai_state_secret, settings.openai_api_key), max_tool_calls=settings.ai_max_tool_calls, backend_tools=backend_tools, agent_max_tool_calls=settings.ai_agent_max_tool_calls)
     app = FastAPI(title="ValuFlow Backend")
 
     @app.exception_handler(DartApiError)
@@ -167,7 +177,7 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
-        return {"status": "ok", "dartConfigured": settings.has_api_key, "databaseConfigured": historical.persistence_enabled, "aiConfigured": ai is not None, "disclosureSearchConfigured": retriever is not None, "knowledgeUploadConfigured": knowledge is not None, "rerankerConfigured": reranker is not None, "externalToolsConfigured": external is not None, "corpCodesFetchedAt": cache.fetched_at}
+        return {"status": "ok", "dartConfigured": settings.has_api_key, "databaseConfigured": historical.persistence_enabled, "aiConfigured": ai is not None, "disclosureSearchConfigured": retriever is not None, "knowledgeUploadConfigured": knowledge is not None, "rerankerConfigured": reranker is not None, "externalToolsConfigured": external is not None, "externalProviders": _provider_report(external), "appEnv": settings.app_env, "corpCodesFetchedAt": cache.fetched_at}
 
     @app.get("/api/companies")
     def companies(q: str = Query(..., max_length=100), limit: int = Query(20, ge=1, le=MAX_LIMIT)) -> dict[str, Any]:
@@ -303,12 +313,12 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
     @app.post("/api/ai/query")
     def ai_query(body: AiQueryRequest) -> dict[str, Any]:
         """질문을 받아 모델을 호출한다. 응답: tool-call(frontend 가 Tool 실행) | final(AiAnalystAnswer) | tool-limit."""
-        return _require_ai().query(body.question, body.minimalContext, body.toolNames)
+        return _require_ai().query(body.question, body.minimalContext, body.toolNames, body.workflow)
 
     @app.post("/api/ai/tool-result")
     def ai_tool_result(body: AiToolResultRequest) -> dict[str, Any]:
         """frontend 가 실행한 Tool 결과를 받아 모델을 이어서 호출한다."""
-        result = _require_ai().tool_result(body.state, body.callId, body.toolResult, body.conversationId)
+        result = _require_ai().tool_result(body.state, body.callId, body.toolResult, body.conversationId, body.workflowObservation)
         return result
 
     return app

@@ -13,6 +13,7 @@ from typing import Any, Callable
 from app.ai.external_tools import ExternalProviders
 from app.config import Settings
 from app.external.errors import ProviderError
+from app.external.providers import ProviderInfo, provider_info
 from app.external.fred import FredRiskFree
 from app.external.news import GoogleNews
 from app.external.yahoo import YahooComparables, YahooMarketData
@@ -30,6 +31,7 @@ class UnavailableProvider:
 
     def __init__(self, name: str, reason: str):
         self.name, self._reason = name, reason
+        self.info = ProviderInfo(name, "unknown", "development", False, reason)
 
     def _fail(self, *a: Any, **k: Any) -> Any:
         raise ProviderError("unavailable", self._reason)
@@ -45,13 +47,21 @@ COMPARABLE_PROVIDERS: dict[str, ProviderSpec] = {"yahoo": ProviderSpec("yahoo", 
 NEWS_PROVIDERS: dict[str, ProviderSpec] = {"google": ProviderSpec("google", False, lambda s, _m: GoogleNews(ttl=s.news_ttl))}
 
 
+def _production_gate(provider: Any, kind: str, settings: Settings) -> Any:
+    """APP_ENV=production 에서는 development 등급 provider(비공식 · 개인용)를 쓰지 않는다: 그 Tool 만 unavailable 이 된다 (운영용 provider 를 등록하면 풀린다)."""
+    info = provider_info(provider)
+    if settings.app_env == "production" and info.tier != "production" and not isinstance(provider, UnavailableProvider):
+        return UnavailableProvider(info.name, f"The {kind} provider '{info.name}' is a development/demo provider ({info.reliability}) and is not allowed when APP_ENV=production. Configure an official or commercial provider.")
+    return provider
+
+
 def _pick(registry: dict[str, ProviderSpec], name: str, key: str, key_env: str, kind: str, settings: Settings, market: Any = None) -> Any:
     spec = registry.get(name)
     if spec is None:
         return UnavailableProvider(name, f"The {kind} provider '{name}' is not supported. Check the provider setting.")
     if spec.requires_key and not key:
         return UnavailableProvider(name, f"The {kind} provider '{name}' requires {key_env}, which is not configured.")   # Key 값이 아니라 환경변수 이름만 알려 준다
-    return spec.build(settings, market)
+    return _production_gate(spec.build(settings, market), kind, settings)
 
 
 def build_external(settings: Settings) -> ExternalProviders:

@@ -3,10 +3,13 @@
 //   node scripts/export-ai.ts  → backend/app/ai/tool_catalog.json
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { TOOL_CATALOG } from '../src/ai/tools/definitions.ts';
+import { WORKFLOWS } from '../src/ai/agent/workflows.ts';
 import { TOOL_CALLING_INSTRUCTIONS, buildSystemInstruction, UNSUPPORTED_DISCLOSURE } from '../src/ai/policy.ts';
 
 export const aiCatalogJson = () => JSON.stringify({
-  tools: TOOL_CATALOG.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema, allowedWhenUnsupported: t.allowedWhenUnsupported, execution: t.execution })),
+  tools: TOOL_CATALOG.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema, allowedWhenUnsupported: t.allowedWhenUnsupported, execution: t.execution, operation: t.operation })),
+  // workflow 정의: backend 가 agent workflow 요청(type · 단계의 Tool)을 검증하는 데 쓴다 (정규식 pattern 은 frontend planner 만 쓴다)
+  workflows: WORKFLOWS.map((w) => ({ type: w.type, label: w.label, tools: w.steps.map((s) => s.tool) })),
   systemInstruction: `${buildSystemInstruction()}\n\n${TOOL_CALLING_INSTRUCTIONS}`,
   unsupportedDisclosure: UNSUPPORTED_DISCLOSURE,
 }, null, 1) + '\n';
