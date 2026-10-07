@@ -3,7 +3,7 @@
 //   ValuationInput → 입력 검증 → Forecast → WACC → DCF → Equity → ValuationResult
 //
 // 반올림은 하지 않는다. 표시용 반올림은 UI 의 포맷 함수에서만 한다.
-import { calculateEbit, calculateFcff, calculateNopat, forecastRevenue } from './forecast.ts';
+import { runForecast } from './forecast.ts';
 import { calculateWacc } from './wacc.ts';
 import { calculateEquityValue, calculateNetDebt, calculatePerShareValue, runDcf } from './dcf.ts';
 import type { ValuationInput, ValuationResult } from './models.ts';
@@ -48,10 +48,7 @@ export function runValuation(input: ValuationInput): ValuationResult {
   validateInput(input);
 
   // Forecast
-  const revenue = forecastRevenue(input.currentRevenue, input.revenueGrowth);
-  const ebit = calculateEbit(revenue, input.operatingMargin);
-  const nopat = calculateNopat(ebit, input.taxRate);
-  const fcff = calculateFcff(nopat, input.depreciation, input.capex, input.deltaNwc);
+  const { revenue, ebit, nopat, fcff } = runForecast(input);
 
   // WACC
   const w = calculateWacc(input);

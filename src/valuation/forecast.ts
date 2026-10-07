@@ -1,4 +1,5 @@
 // Forecast: 매출 → EBIT → NOPAT → FCFF.
+import type { ValuationInput } from './models.ts';
 import { ValuationError } from './models.ts';
 
 const finite = (n: number) => typeof n === 'number' && Number.isFinite(n);
@@ -50,4 +51,20 @@ export function calculateFcff(nopat: number[], depreciation: number[], capex: nu
     if (values.length !== nopat.length) throw new ValuationError(`${name}: 예측 기간(${nopat.length}년)과 길이가 다릅니다(${values.length}).`);
   }
   return nopat.map((n, i) => n + depreciation[i] - capex[i] - deltaNwc[i]);
+}
+
+export interface ForecastResult {
+  revenue: number[];
+  ebit: number[];
+  nopat: number[];
+  fcff: number[];
+}
+
+/** ValuationInput 의 Forecast 구간을 한 번에 계산한다. runValuation 과 Sensitivity 가 공유한다. */
+export function runForecast(input: ValuationInput): ForecastResult {
+  const revenue = forecastRevenue(input.currentRevenue, input.revenueGrowth);
+  const ebit = calculateEbit(revenue, input.operatingMargin);
+  const nopat = calculateNopat(ebit, input.taxRate);
+  const fcff = calculateFcff(nopat, input.depreciation, input.capex, input.deltaNwc);
+  return { revenue, ebit, nopat, fcff };
 }
