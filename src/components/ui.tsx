@@ -60,3 +60,5 @@ export const BackLink = ({ to, children }: { to: string; children: ReactNode }) 
 export const fmtNum = (n: number | null | undefined, digits = 0) =>
   n == null || !Number.isFinite(n) ? '—' : n.toLocaleString('ko-KR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 export const fmtPct = (n: number | null | undefined, digits = 1) => (n == null || !Number.isFinite(n) ? '—' : `${(n * 100).toFixed(digits)}%`);
+/** 끝자리 0 을 줄인 퍼센트: 0.075 → '7.5%', 0.081375 → '8.1375%', 0.02 → '2%' (분석 범위 / Base 값 표기용) */
+export const fmtPctTrim = (n: number | null | undefined, maxDigits = 4) => (n == null || !Number.isFinite(n) ? '—' : `${Number((n * 100).toFixed(maxDigits))}%`);

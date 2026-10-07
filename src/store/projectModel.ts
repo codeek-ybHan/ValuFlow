@@ -5,12 +5,13 @@
 //   valuationAssumptions  사용자 / 학습용 입력 (입력 도중에는 일부 필드만 있을 수 있다. 엔진은 완성된 입력에서만 실행)
 //   valuationResult       runValuation() 결과  — 파생값
 //   sensitivityResult     runSensitivity() 결과 — 파생값
+//   relativeInputs        상대가치 검증용 입력 (순이익·PER 등. 사용자가 직접 입력, Valuation 가정과 별개)
 //
 // 계산은 valuation 공개 API 로만 수행한다 (forecast.ts / wacc.ts / dcf.ts 직접 import 금지).
 // 저장 대상은 historicalData 와 valuationAssumptions 뿐이며, 결과는 로드할 때 다시 계산한다
 // (입력과 결과가 어긋난 stale state 를 만들지 않기 위해).
 import { runSensitivity, runValuation, ValuationError } from '../valuation/index.ts';
-import type { SensitivityResult, ValuationInput, ValuationResult } from '../valuation/index.ts';
+import type { RelativeInput, SensitivityResult, ValuationInput, ValuationResult } from '../valuation/index.ts';
 import type { HistoricalData } from '../data/types.ts';
 import type { ForecastInputs } from '../engine/forecastForm.ts';
 import type { WaccInputs } from '../engine/waccForm.ts';
@@ -24,6 +25,8 @@ export interface ProjectState {
   valuationAssumptions: AssumptionsDraft | null;
   valuationResult: ValuationResult | null;
   sensitivityResult: SensitivityResult | null;
+  /** 상대가치 입력. 입력한 필드만 들어 있다 (Valuation 가정이 아니므로 가정 초기화로 지워지지 않는다). */
+  relativeInputs: RelativeInput;
   /** 직전 계산이 ValuationError 로 실패했을 때의 메시지. 화면에 표시하고 앱은 멈추지 않는다. */
   valuationError: string | null;
   sensitivityError: string | null;
@@ -33,6 +36,7 @@ export interface ProjectState {
 export interface PersistedProject {
   historicalData: HistoricalData | null;
   valuationAssumptions: AssumptionsDraft | null;
+  relativeInputs: RelativeInput;
 }
 
 export const emptyProjectState: ProjectState = {
@@ -40,6 +44,7 @@ export const emptyProjectState: ProjectState = {
   valuationAssumptions: null,
   valuationResult: null,
   sensitivityResult: null,
+  relativeInputs: {},
   valuationError: null,
   sensitivityError: null,
 };
@@ -96,6 +101,14 @@ export function withDcfInputs(state: ProjectState, dcf: DcfInputs): ProjectState
   return withAssumptions(state, { ...(state.valuationAssumptions ?? {}), ...dcf });
 }
 
+/**
+ * 상대가치 입력을 통째로 교체한다 (비운 칸은 빠진다). 상대가치 결과는 입력에서 매번 계산되는 파생값이라 stale 처리가 필요 없다.
+ * Valuation 가정 / 결과는 건드리지 않는다.
+ */
+export function withRelativeInputs(state: ProjectState, relativeInputs: RelativeInput): ProjectState {
+  return { ...state, relativeInputs: { ...relativeInputs } };
+}
+
 /** 입력이 유효하지 않은 상태로 바뀌었을 때: 가정은 그대로 두고 어긋난(stale) 결과와 오류만 비운다. */
 export function withResultsCleared(state: ProjectState): ProjectState {
   if (!state.valuationResult && !state.sensitivityResult && !state.valuationError && !state.sensitivityError) return state;
@@ -141,7 +154,20 @@ export function withPracticeAssumptions(state: ProjectState): ProjectState {
 // ---- 저장 / 복원 ----
 
 export function toPersisted(state: ProjectState): PersistedProject {
-  return { historicalData: state.historicalData, valuationAssumptions: state.valuationAssumptions };
+  return { historicalData: state.historicalData, valuationAssumptions: state.valuationAssumptions, relativeInputs: state.relativeInputs };
+}
+
+const RELATIVE_KEYS = ['netIncome', 'per', 'bookEquity', 'pbr', 'ebitda', 'evEbitda'] as const;
+/** 저장된 상대가치 입력에서 알려진 필드의 유한한 숫자만 남긴다 (손상된 값 방어). */
+function sanitizeRelativeInputs(raw: unknown): RelativeInput {
+  const out: RelativeInput = {};
+  if (typeof raw === 'object' && raw !== null) {
+    for (const k of RELATIVE_KEYS) {
+      const v = (raw as Record<string, unknown>)[k];
+      if (typeof v === 'number' && Number.isFinite(v)) out[k] = v;
+    }
+  }
+  return out;
 }
 
 /**
@@ -154,6 +180,7 @@ export function restoreProjectState(raw: unknown): ProjectState {
     ...emptyProjectState,
     historicalData: p.historicalData ?? null,
     valuationAssumptions: p.valuationAssumptions ?? null,
+    relativeInputs: sanitizeRelativeInputs(p.relativeInputs),
   };
   return withSensitivityRun(withValuationRun(base));
 }

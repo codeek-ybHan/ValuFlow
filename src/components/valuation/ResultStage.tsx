@@ -8,11 +8,12 @@ export function ResultStage() {
   const { project } = useProject();
   const r = project.valuationResult;
   const s = project.sensitivityResult;
-  const prev = stages[stages.length - 2];
+  const prev = stages[stages.length - 3];
+  const next = stages[stages.length - 1];
   const base = s?.cells.flat().find((c) => c.isBaseCase);
   return (
     <>
-      <p className="muted">{stages[stages.length - 1].summary}</p>
+      <p className="muted">{stages[4].summary}</p>
       <section className="kpi-row" aria-label="Valuation Result">
         <Kpi label="Enterprise Value" value={r ? fmtNum(r.enterpriseValue, 2) : '—'} sub="억원" />
         <Kpi label="Equity Value" value={r ? fmtNum(r.equityValue, 2) : '—'} sub={r ? `Net Debt ${fmtNum(r.netDebt, 0)} 억원` : '억원'} />
@@ -31,11 +32,11 @@ export function ResultStage() {
         ) : (
           <p className="muted">Sensitivity 결과가 없습니다.</p>
         )}
-        <p className="hint">Sensitivity Matrix / Heatmap 화면은 이후 단계에서 연결됩니다.</p>
+        <p className="hint">Sensitivity Matrix 는 Validation 단계에서 확인할 수 있습니다.</p>
       </section>
       <div className="row between slot-nav">
         <Link className="btn" to={`/valuation/${prev.id}`}>← {prev.label}</Link>
-        <div />
+        <Link className="btn primary" to={`/valuation/${next.id}`}>{next.label} →</Link>
       </div>
     </>
   );

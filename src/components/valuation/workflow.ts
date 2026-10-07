@@ -1,7 +1,7 @@
 // Valuation Workflow 정의. Stepper 와 단계 이동 링크가 이 설정을 읽는다. 계산식은 여기에 두지 않는다.
 // 계산은 valuation 공개 API(runValuation / runSensitivity)가 하고, 각 단계 컴포넌트가 입력과 결과를 보여 준다.
 
-export type StageId = 'historical' | 'forecast' | 'wacc' | 'dcf' | 'result';
+export type StageId = 'historical' | 'forecast' | 'wacc' | 'dcf' | 'result' | 'validation';
 
 export interface WorkflowStage {
   id: StageId;
@@ -32,6 +32,10 @@ export const stages: WorkflowStage[] = [
   {
     id: 'result', no: 5, label: 'Result',
     summary: 'Net Debt 를 차감해 Equity Value 와 주당 가치를 확인합니다.',
+  },
+  {
+    id: 'validation', no: 6, label: 'Validation',
+    summary: '민감도 · 시나리오 · 상대가치로 DCF 결과가 합리적인지 검토합니다. 하나의 숫자가 아니라 범위와 차이를 봅니다.',
   },
 ];
 

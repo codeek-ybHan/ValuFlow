@@ -34,6 +34,26 @@ import { calculateWacc } from '../valuation';
 const { wacc, costOfEquity } = calculateWacc({ riskFreeRate: 0.03, beta: 1.1, marketRiskPremium: 0.06, preTaxCostOfDebt: 0.05, taxRate: 0.25, equityMarketValue: 900, debtMarketValue: 300 });
 ```
 
+검증용 계산도 공개 API 로 제공합니다.
+
+```ts
+import { runScenarios, calculateRelativeValuation } from '../valuation';
+
+// Bear / Base / Bull: 영업 가정(성장률·마진·CAPEX)과 할인 가정(위험 프리미엄 → WACC, g)을 함께 바꾼 가정 묶음.
+// 내부에서 runValuation 을 그대로 재사용하며 base 입력은 변경하지 않는다. 한 시나리오가 계산 불가여도 나머지는 유지된다.
+const [bear, base, bull] = runScenarios(input); // { id, label, description, overrides, ok, result | error }
+
+// 상대가치: 멀티플은 사용자가 입력. 입력한 방법만 계산된다 (incomplete / invalid 는 방법별로 표시).
+const outcomes = calculateRelativeValuation(
+  { netIncome: 150, per: 12, ebitda: 220, evEbitda: 10 },
+  { interestBearingDebt: 300, cash: 100, sharesOutstanding: 1_000_000 },
+);
+```
+
+- **Sensitivity 와 Scenario 는 다르다.** Sensitivity 는 FCFF 를 고정하고 WACC·g 두 값만 바꿔 다시 할인한다. Scenario 는 영업 가정까지 바꿔 전체 Valuation 을 다시 계산한다.
+- **PER / PBR 의 Enterprise Value** 는 Equity Value 에 Net Debt 를 더해 환산한 참고값이다. EV/EBITDA 는 EV 가 직접 나오고 Net Debt 를 빼 Equity Value 로 환산한다.
+- **Valuation Range 는 평균이 아니다.** 방법별 결과의 Low / High 를 보여 줄 뿐 "정답 가치"를 만들지 않는다 (`engine/validationView.ts`).
+
 잘못된 입력은 `ValuationError` 를 던집니다 (임의의 값으로 대체하지 않음).
 
 ```ts
@@ -64,6 +84,8 @@ valuation/
 ├── wacc.ts         CAPM, 세후 Kd, 자본구조 가중치, WACC
 ├── dcf.ts          할인, Terminal Value, EV, Net Debt, Equity Value, 주당가치   (runDcf)
 ├── sensitivity.ts  WACC × g → EV / Equity / 주당가치   (runSensitivity)
+├── scenario.ts     Bear / Base / Bull 가정 묶음   (runScenario, runScenarios)
+├── multiples.ts    PER / PBR / EV·EBITDA 상대가치   (calculateRelativeValuation)
 ├── engine.ts       입력 검증 + 전체 흐름 조립   (runValuation)
 └── index.ts        공개 API
 ```

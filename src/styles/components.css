@@ -262,3 +262,13 @@ input[type='radio'], input[type='checkbox'] { width: 16px; min-height: 0; height
 .completeness { margin: 16px 0 0; }
 .completeness-row { display: flex; gap: 24px; flex-wrap: wrap; }
 .completeness-item { display: inline-flex; align-items: center; gap: 8px; }
+
+/* ===== 경고 callout / 세그먼트 토글 ===== */
+.callout.warn { background: var(--warn-soft); border-color: transparent; border-left-color: var(--warn); color: var(--ink); }
+.callout.warn strong { color: var(--warn); }
+.callout.warn .plain-list { margin: 6px 0 0; }
+.seg { display: inline-flex; padding: 3px; gap: 2px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); }
+.seg button { font: inherit; font-size: 13px; font-weight: 600; padding: 5px 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); cursor: pointer; }
+.seg button:hover { color: var(--ink); }
+.seg button.active { background: var(--accent); color: var(--accent-ink); }
+.note-chip { display: inline-block; padding: 3px 10px; border-radius: 999px; background: var(--sunken); color: var(--ink-2); font-size: 12.5px; font-weight: 600; }

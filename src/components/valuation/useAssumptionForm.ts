@@ -4,16 +4,17 @@ import type { AssumptionsDraft } from '../../store/assumptions';
 type Errors = Record<string, string>;
 type Parsed<I> = { ok: true; value: I } | { ok: false; errors: Errors };
 
-interface Options<V, I> {
-  assumptions: AssumptionsDraft | null;
+interface Options<V, I, S> {
+  /** 저장소에 있는 현재 값 (가정 / 상대가치 입력 등) */
+  assumptions: S | null;
   /** 저장된 가정 → 폼 문자열 (없는 값은 '') */
-  toForm: (a: AssumptionsDraft | null) => V;
+  toForm: (a: S | null) => V;
   /** 편집 중인 문자열(drafts)을 기준 폼 위에 덮는다 */
   merge: (base: V, drafts: Record<string, string>) => V;
   /** 폼 문자열 → 입력(소수 / 억원) + 필드별 검증 */
   parse: (values: V) => Parsed<I>;
   /** 현재 가정이 방금 우리가 반영한 입력과 같은지 (같으면 외부 변경이 아니다) */
-  isOurs: (a: AssumptionsDraft, pushed: I) => boolean;
+  isOurs: (a: S, pushed: I) => boolean;
   /** 유효하고 완성된 입력을 가정에 반영 (이전 결과는 비워진다) */
   push: (value: I) => void;
   /** 입력이 유효하지 않을 때: 가정은 유지하고 어긋난 결과만 비운다 */
@@ -26,7 +27,7 @@ interface Options<V, I> {
  * - 유효하고 완성된 입력만 가정에 반영한다.
  * - 가정이 외부에서 바뀌면(학습용 가정 적용, 초기화 등) drafts 를 지운다.
  */
-export function useAssumptionForm<V, I>(options: Options<V, I>) {
+export function useAssumptionForm<V, I, S = AssumptionsDraft>(options: Options<V, I, S>) {
   const o = useRef(options);
   o.current = options;
 
