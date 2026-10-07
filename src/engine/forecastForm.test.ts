@@ -32,7 +32,7 @@ test('Historical reference: 금액 참고값은 억원으로 환산되고 D&A �
   assert.equal(row('deltaNwc').values[0], null);
   close(row('deltaNwc').values[1]!, 60543.18);
   assert.ok(row('depreciation').values.every((v) => v === null));
-  assert.match(row('depreciation').note!, /데이터가 없어/);
+  assert.match(row('depreciation').note!, /Data unavailable/);
 });
 
 test('Historical reference 는 자동 입력되지 않는다: 빈 폼은 참고값과 무관하게 비어 있다', () => {

@@ -5,6 +5,7 @@ import { deriveHistoricalMetrics } from '../engine/historical';
 import type { HistoricalData } from '../data/types';
 import { CompanySearch } from '../components/CompanySearch';
 import { historicalSourceView } from '../store/companySelection';
+import { depreciationUnavailableNote, historicalDepreciation } from '../engine/depreciation';
 
 const TABS = ['Overview', 'Income Statement', 'Balance Sheet', 'Cash Flow', 'Historical Analysis'] as const;
 type Tab = (typeof TABS)[number];
@@ -42,9 +43,12 @@ function Statements({ tab, h }: { tab: Tab; h: HistoricalData }) {
       { label: 'Accounts Payable', values: bs.accountsPayable }, { label: 'Total Assets', values: bs.totalAssets, total: true },
       { label: 'Total Liabilities', values: bs.totalLiabilities }, { label: 'Total Equity', values: bs.totalEquity },
     ]} />;
-  return <FinTable period={p} note="CAPEX (Learning Basis): 현재 학습 버전에서는 유형자산 취득액을 CAPEX 로 사용합니다. 무형자산 취득액은 별도로 표시만 합니다." rows={[
+  const da = historicalDepreciation(h);
+  const note = `CAPEX (Learning Basis): 현재 학습 버전에서는 유형자산 취득액을 CAPEX 로 사용합니다. 무형자산 취득액은 별도로 표시만 합니다.${da ? '' : ` D&A: ${depreciationUnavailableNote(h)}`}`;
+  return <FinTable period={p} note={note} rows={[
     { label: 'CFO', values: cf.cfo }, { label: 'PPE Acquisition (CAPEX, Learning Basis)', values: cf.ppeAcquisition },
     { label: 'Intangible Asset Acquisition', values: cf.intangibleAcquisition },
+    { label: 'D&A', values: da ?? p.map(() => null) },
   ]} />;
 }
 

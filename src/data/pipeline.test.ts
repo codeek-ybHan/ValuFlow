@@ -173,7 +173,7 @@ test('필수 계정이 없으면 값을 채우지 않고 ok:false + warning, 선
   }
   const ok = normalizeFinancials(input(rows(FULL)));
   assert.ok(ok.ok);
-  assert.ok(ok.quality.warnings.includes('D&A account not found'));
+  assert.ok(ok.quality.warnings.includes('D&A not available from current OpenDART financial statement source.'));
   assert.ok(ok.quality.warnings.includes('Cash account not found'));
   assert.equal(ok.data.balanceSheet.cash, undefined);
 

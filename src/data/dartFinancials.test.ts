@@ -71,7 +71,7 @@ test('Repository: Raw fetch → normalizeFinancials → HistoricalData (실제 �
   assert.deepEqual(r.data.balanceSheet.interestBearingDebt, [2023, 2024, 2025].map(debt));
   assert.equal(r.data.balanceSheet.interestBearingDebt?.[2], 25239139); // 17,574,980 + 1,177,508 + 7,134 + 6,479,517
   assert.equal(r.data.cashFlow.depreciationAmortization, undefined);
-  assert.ok(r.quality.warnings.includes('D&A account not found'));
+  assert.ok(r.quality.warnings.includes('D&A not available from current OpenDART financial statement source.'));
   assert.deepEqual([r.fetch?.basisUsed, r.fetch?.yearsReceived], ['Consolidated', [2023, 2024, 2025]]);
   assert.equal(r.quality.basisFallback, false);
 });

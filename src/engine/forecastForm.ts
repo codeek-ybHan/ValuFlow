@@ -1,6 +1,7 @@
 // Forecast 입력 폼의 순수 로직: 문자열 입력 ↔ ValuationInput 변환, UI 단계 검증, Historical 참고값.
 // UI 는 % 로 입력받고 Engine 은 소수로 받는다 (8.0% ↔ 0.08). 금액은 억원 기준이다.
 // 이 파일은 historicalData 와 입력 문자열만 사용하며 Valuation 결과는 읽지 않는다.
+import { depreciationUnavailableNote, historicalDepreciation } from './depreciation.ts';
 import type { ValuationInput } from '../valuation/index.ts';
 import type { HistoricalData } from '../data/types';
 import { deriveHistoricalMetrics } from './historical.ts';
@@ -215,6 +216,7 @@ export function buildForecastReference(h: HistoricalData | null): ForecastRefere
   const m = deriveHistoricalMetrics(h);
   const eok = (arr: (number | null)[]) => arr.map((v) => (v === null ? null : krwMillionToEok(v)));
   const periods = h.company.period;
+  const da = historicalDepreciation(h);
   const last = periods.length - 1;
 
   const growth = m.revenueGrowth.filter((v): v is number => v !== null);
@@ -228,7 +230,9 @@ export function buildForecastReference(h: HistoricalData | null): ForecastRefere
     rows: [
       { key: 'revenueGrowth', label: 'Revenue Growth', unit: '%', helper: '매출 성장률 가정', values: m.revenueGrowth },
       { key: 'operatingMargin', label: 'Operating Margin', unit: '%', helper: '매출 대비 영업이익 비율', values: m.operatingMargin },
-      { key: 'depreciation', label: 'D&A', unit: '억원', helper: '감가상각비', values: periods.map(() => null), note: 'Historical D&A 데이터가 없어 참고값을 제공하지 않습니다.' },
+      da
+        ? { key: 'depreciation', label: 'D&A', unit: '억원', helper: '감가상각비', values: eok(da) }
+        : { key: 'depreciation', label: 'D&A', unit: '억원', helper: '감가상각비', values: periods.map(() => null), note: `${depreciationUnavailableNote(h)} 값을 추정하거나 채우지 않습니다.` },
       { key: 'capex', label: 'CAPEX', unit: '억원', helper: '설비 등 장기자산 투자 (과거 참고값은 유형자산 취득액 기준)', values: eok(m.capex) },
       { key: 'deltaNwc', label: 'ΔNWC', unit: '억원', helper: '운전자본 증가분 (감소는 음수)', values: eok(m.deltaNwc) },
     ],

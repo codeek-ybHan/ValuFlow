@@ -16,7 +16,7 @@ test('Empty State: historicalData 가 없으면 view 가 없다', () => {
 test('Samsung 데이터: 3개년이 모두 표시된다', () => {
   assert.equal(view.header.periods.length, 3);
   for (const r of [...view.keyFinancials, ...view.metrics]) assert.equal(r.values.length, 3, r.key);
-  assert.deepEqual(view.keyFinancials.map((r) => r.key), ['revenue', 'operatingProfit', 'netIncome', 'cfo', 'capex']);
+  assert.deepEqual(view.keyFinancials.map((r) => r.key), ['revenue', 'operatingProfit', 'netIncome', 'cfo', 'depreciationAmortization', 'capex']);
   assert.deepEqual(view.keyFinancials[0].values, [258935494, 300870903, 333605938]);
 });
 

@@ -5,7 +5,7 @@ import type { HistoricalData, HistoricalSource } from '../types.ts';
 import type { DartBasis, DartRawAccount, DartRawUnit } from '../dart/types.ts';
 import { ACCOUNT_RULES, OPTIONAL_FIELDS, REQUIRED_FIELDS, normalizeAccountName, type AccountRule, type CanonicalField } from './accounts.ts';
 import { buildPeriods, resolveRelativePeriod } from './periods.ts';
-import type { DataQuality, FieldQuality } from './quality.ts';
+import type { DataQuality, FieldQuality, MatchType } from './quality.ts';
 import { toKrwMillion } from './units.ts';
 
 export interface NormalizeInput {
@@ -46,7 +46,7 @@ function inRule(rule: AccountRule, a: DartRawAccount): 'strong' | { weak: string
   return weak ? { weak: weak.note } : null;
 }
 
-interface YearValue { value: number | null; sources: string[]; ambiguous: boolean; notes: string[] }
+interface YearValue { value: number | null; sources: string[]; ambiguous: boolean; notes: string[]; matchType?: MatchType }
 
 /** 한 규칙을 한 연도에 적용한다. 값은 KRW million. */
 function applyRule(rule: AccountRule, rows: Resolved[], year: number, unitOf: (a: DartRawAccount) => DartRawUnit): YearValue {
@@ -65,7 +65,7 @@ function applyRule(rule: AccountRule, rows: Resolved[], year: number, unitOf: (a
     if (parts.length === 0) return { value: null, sources: [], ambiguous: false, notes: [] };
     const notes = [`${rule.label} summed from: ${parts.map((p) => p.name).join(', ')}`];
     if (rule.warnIfPartial && parts.length < rule.names.length) notes.push(`${rule.label} is partial: only ${parts.map((p) => p.name).join(', ')} found`);
-    return { value: parts.reduce((s, p) => s + p.value, 0), sources: parts.map((p) => p.name), ambiguous: false, notes };
+    return { value: parts.reduce((s, p) => s + p.value, 0), sources: parts.map((p) => p.name), ambiguous: false, notes, matchType: 'sum' };
   }
 
   const strong: DartRawAccount[] = [];
@@ -81,7 +81,8 @@ function applyRule(rule: AccountRule, rows: Resolved[], year: number, unitOf: (a
   const values = pool.map(conv);
   const ambiguous = values.some((v) => v !== values[0]);
   if (ambiguous) notes.push(`${rule.label}: multiple different values found for ${year}, first one used`);
-  return { value: values[0], sources: [pool[0].accountName], ambiguous, notes };
+  const byId = strong.length > 0 && !!pool[0].accountId && !!rule.ids?.includes(pool[0].accountId);
+  return { value: values[0], sources: [pool[0].accountName], ambiguous, notes, matchType: strong.length === 0 ? 'weak-name' : byId ? 'account-id' : 'exact-name' };
 }
 
 interface BasisBuild {
@@ -90,7 +91,7 @@ interface BasisBuild {
   notes: string[];
 }
 
-function buildForBasis(basis: DartBasis, resolved: Resolved[], years: number[], unitOf: (a: DartRawAccount) => DartRawUnit): BasisBuild {
+function buildForBasis(basis: DartBasis, resolved: Resolved[], years: number[], unitOf: (a: DartRawAccount) => DartRawUnit, sourceLabel: string): BasisBuild {
   const rows = resolved.filter((r) => r.account.basis === basis);
   const series: BasisBuild['series'] = {};
   const fields: BasisBuild['fields'] = {};
@@ -100,7 +101,8 @@ function buildForBasis(basis: DartBasis, resolved: Resolved[], years: number[], 
     series[rule.field] = per.map((p) => p.value);
     const missingYears = years.filter((_, i) => per[i].value === null);
     const status = missingYears.length === years.length ? 'missing' : missingYears.length > 0 ? 'partial' : per.some((p) => p.ambiguous) ? 'ambiguous' : 'available';
-    fields[rule.field] = { status, missingYears, sources: [...new Set(per.flatMap((p) => p.sources))] };
+    const matchType = per.find((p) => p.matchType)?.matchType;
+    fields[rule.field] = { status, source: sourceLabel, ...(matchType ? { matchType } : {}), missingYears, sources: [...new Set(per.flatMap((p) => p.sources))] };
     for (const n of new Set(per.flatMap((p) => p.notes))) notes.push(n);
   }
   return { series, fields, notes };
@@ -126,11 +128,12 @@ export function normalizeFinancials(input: NormalizeInput): NormalizeResult {
   if (unresolved > 0) warnings.push(`${unresolved} account row(s) skipped: fiscal year could not be determined`);
 
   // 기준 선택: 선호 기준이 필수 계정을 모두 채우면 그것을, 아니면 (허용 시) 다른 기준을 쓴다.
-  const first = buildForBasis(requested, resolved, periods.years, unitOf);
+  const sourceLabel = (input.source ?? 'DART Annual Report') === 'DART Annual Report' ? 'OpenDART Financial Statement' : String(input.source);
+  const first = buildForBasis(requested, resolved, periods.years, unitOf, sourceLabel);
   let used = requested;
   let chosen = first;
   if (!isComplete(first) && (input.allowBasisFallback ?? true)) {
-    const alt = buildForBasis(otherBasis(requested), resolved, periods.years, unitOf);
+    const alt = buildForBasis(otherBasis(requested), resolved, periods.years, unitOf, sourceLabel);
     if (isComplete(alt) || coverage(alt) > coverage(first)) { used = otherBasis(requested); chosen = alt; }
   }
   const basisFallback = used !== requested;
@@ -147,7 +150,7 @@ export function normalizeFinancials(input: NormalizeInput): NormalizeResult {
   });
   for (const f of OPTIONAL_FIELDS) {
     const q = chosen.fields[f];
-    if (q?.status === 'missing') warnings.push(`${ACCOUNT_RULES.find((r) => r.field === f)!.label} account not found`);
+    if (q?.status === 'missing') warnings.push(f === 'depreciationAmortization' ? 'D&A not available from current OpenDART financial statement source.' : `${ACCOUNT_RULES.find((r) => r.field === f)!.label} account not found`);
     else if (q?.status === 'partial') warnings.push(`${ACCOUNT_RULES.find((r) => r.field === f)!.label} missing for ${q.missingYears.join(', ')}`);
   }
   for (const f of missingRequired) warnings.push(`${ACCOUNT_RULES.find((r) => r.field === f)!.label} account not found or incomplete`);

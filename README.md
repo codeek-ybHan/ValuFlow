@@ -80,6 +80,7 @@ Node 22.6 이상이 필요합니다. 엔진 테스트가 TypeScript 파일을 �
 | Result | EV · Equity Value · 주당가치 · WACC 요약 |
 | Validation | Sensitivity(WACC × g) · Scenario(Bear/Base/Bull) · 상대가치(PER/PBR/EV·EBITDA) · Valuation Range · 검토 지표 |
 
+- Historical D&A 는 출처(OpenDART 재무제표 본문)에 없으면 `—`(missing)로 두며 0 · 학습용 값 · CAPEX/PPE 추정으로 채우지 않습니다. 필요하면 Forecast 에서 직접 입력합니다.
 - 모든 가정이 준비(Forecast · WACC · DCF/Equity READY)되어야 `Run Valuation` 이 활성화됩니다. 비어 있는 값은 어떤 기본값으로도 채우지 않습니다.
 - 학습용 값은 `[학습용 DCF 가정 적용]` 을 눌렀을 때만 들어옵니다. 직접 입력한 값이 있으면 덮어쓰기 전에 확인합니다.
 - `[Valuation 초기화]` 는 가정 · 결과 · 상대가치 입력을 모두 지우고 새 Valuation 을 시작합니다. Historical Data 는 유지됩니다.

@@ -3,6 +3,7 @@
 // 원본 historicalData 값은 변경하지 않는다. 표시용 변환(조원 환산 등)은 chart 필드에만 적용한다.
 import type { HistoricalData } from '../data/types';
 import { deriveHistoricalMetrics } from './historical.ts';
+import { depreciationUnavailableNote, historicalDepreciation } from './depreciation.ts';
 
 export interface HistoricalHeader {
   name: string;
@@ -118,6 +119,7 @@ export function buildHistoricalView(h: HistoricalData | null): HistoricalView | 
   const m = deriveHistoricalMetrics(h);
   const periods = h.company.period;
   const { incomeStatement: is, cashFlow: cf } = h;
+  const da = historicalDepreciation(h);
 
   return {
     header: {
@@ -134,6 +136,9 @@ export function buildHistoricalView(h: HistoricalData | null): HistoricalView | 
       { key: 'operatingProfit', label: 'Operating Profit', values: is.operatingProfit, kind: 'amount' },
       { key: 'netIncome', label: 'Net Income', values: is.netIncome, kind: 'amount' },
       { key: 'cfo', label: 'CFO', values: cf.cfo, kind: 'amount' },
+      da
+        ? { key: 'depreciationAmortization', label: 'D&A', values: da, kind: 'amount' }
+        : { key: 'depreciationAmortization', label: 'D&A', values: periods.map(() => null), kind: 'amount', note: depreciationUnavailableNote(h) },
       { key: 'capex', label: 'CAPEX (PPE acquisition basis)', values: m.capex, kind: 'amount', note: '유형자산 취득액 기준의 학습용 CAPEX 입니다. 무형자산 취득 등을 반영한 실무 조정치가 아닙니다.' },
     ],
     metrics: [
