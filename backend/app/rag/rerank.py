@@ -86,7 +86,7 @@ class CohereReranker:
             raise AiGatewayError("invalid-model-output", MESSAGES["invalid-model-output"], 502) from None
 
 
-def build_reranker(kind: str, model: str = "", cohere_key: str = "", cache_dir: str | None = None) -> Reranker | None:
+def build_reranker(kind: str, model: str = "", api_key: str = "", cache_dir: str | None = None) -> Reranker | None:
     """설정 → Reranker. kind: none | cross-encoder | cohere | auto (fastembed 가 설치되어 있으면 cross-encoder, 아니면 none)."""
     kind = (kind or "none").lower()
     if kind == "auto":
@@ -99,5 +99,8 @@ def build_reranker(kind: str, model: str = "", cohere_key: str = "", cache_dir: 
     if kind == "cross-encoder":
         return CrossEncoderReranker(model or "jinaai/jina-reranker-v2-base-multilingual", cache_dir)
     if kind == "cohere":
-        return CohereReranker(cohere_key, model or "rerank-v3.5") if cohere_key else None
+        if not api_key:
+            log.info("RERANKER=cohere but RERANKER_API_KEY is not configured: reranking is disabled (hybrid order is used)")
+            return None
+        return CohereReranker(api_key, model or "rerank-v3.5")
     return None

@@ -114,6 +114,20 @@ backend 가 직접 실행하는 외부 데이터 Tool 4종입니다. **계산은
 - provider 는 `backend/app/external/providers.py` 의 Protocol 로 분리되어 있어(Yahoo → 다른 시세 provider · MCP server 등) 교체해도 Tool contract 는 그대로입니다. `EXTERNAL_DATA=false` 로 끌 수 있고 TTL 은 `MARKET_TTL_SECONDS` · `FUNDAMENTALS_TTL_SECONDS` · `RATE_TTL_SECONDS` · `NEWS_TTL_SECONDS`.
 - 주의: Yahoo Finance · Google News 는 비공식 / 개인용 접근이라 지연 · 차단 · 필드 오류가 있을 수 있습니다 (예: provider 의 영업이익률이 DART 기준과 크게 다를 수 있어 Tool 이 경고합니다). 상업 서비스라면 라이선스가 있는 provider 로 교체하세요. `pip install yfinance` 가 필요합니다 (requirements.txt).
 
+### Credential 정책
+
+| 환경변수 | 쓰이는 곳 | 없을 때 |
+|---|---|---|
+| `DART_API_KEY` | OpenDART (기업 · 재무 · 공시, 종목코드 조회) | 해당 기능 오류. 외부 Tool 은 종목을 못 찾아 `unavailable` |
+| `OPENAI_API_KEY` | LLM · embedding | AI Analyst / 공시 검색 비활성 (`ai-not-configured`) |
+| `MARKET_DATA_API_KEY` · `NEWS_API_KEY` | Key 가 필요한 시세 · 뉴스 provider 를 고른 경우 (기본 yahoo · google 은 불필요) | **해당 Tool 만** `unavailable` |
+| `RERANKER_API_KEY` | `RERANKER=cohere` (예전 이름 `COHERE_API_KEY`) | reranking 만 꺼지고 Hybrid 로 동작 |
+
+- 모든 credential 은 backend 환경변수(또는 `backend/.env`)에만 둡니다. frontend 에는 어떤 Key 도 없고 `VITE_` 접두사 변수에 Key 를 두면 안 됩니다 (테스트가 소스 · 빌드 결과를 검사합니다).
+- 응답 · Audit · 오류 메시지에는 Key 가 없고, 로그에서는 설정된 모든 credential 값이 `***` 로 가려지며 예외 본문 · traceback 은 남기지 않습니다. 사유 문구는 Key 값이 아니라 필요한 환경변수 이름만 알려 줍니다.
+- provider 를 바꿔도 Tool contract 는 같습니다 (`backend/app/external/registry.py` 에 provider 와 `requires_key` 를 등록).
+- 단위 테스트는 mock provider 만 쓰고 네트워크를 막습니다. live smoke 만 Key 가 있을 때 실행됩니다.
+
 기업 검색과 재무제표 수집(`GET /api/companies/{corpCode}/financials?years=2023,2024,2025&basis=auto`)은 backend 가 켜져 있어야 동작합니다. 실제 응답의 계정명 조사는 `.venv/bin/python -m scripts.inspect_raw_accounts` 로 다시 실행할 수 있습니다 (dev 서버가 `/api` 를 8000 포트로 전달).
 
 ```bash

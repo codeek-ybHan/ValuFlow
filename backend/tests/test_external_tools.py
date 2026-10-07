@@ -440,4 +440,4 @@ def test_app_wires_external_tools_without_network_and_health_flag(store):
     assert h["externalToolsConfigured"] is True and KEY not in json.dumps(h)
     off = TestClient(create_app(Settings(dart_api_key="x", external_data=False))).get("/api/health").json()
     assert off["externalToolsConfigured"] is False
-    assert Settings().external_data is False and "COHERE" not in repr(Settings(cohere_api_key="k"))
+    assert Settings().external_data is False and "COHERE" not in repr(Settings(reranker_api_key="k"))

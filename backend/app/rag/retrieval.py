@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 import math
 import re
 from dataclasses import dataclass, field
@@ -261,7 +262,7 @@ class DisclosureRetriever:
         try:
             scores = self.reranker.score(query, [f"{e['doc'].title or e['doc'].report_name} {e['chunk'].section}\n{e['chunk'].text}".strip() for e in pool])  # type: ignore[union-attr]
         except Exception:  # noqa: BLE001  (reranker 장애로 검색 전체가 실패하지 않는다: hybrid 순서로 돌려준다)
-            log.exception("reranker failed; falling back to hybrid order")
+            log.error("reranker failed (%s); falling back to hybrid order", type(sys.exc_info()[1]).__name__)   # 예외 본문 · traceback 은 남기지 않는다 (credential 이 섞일 수 있다)
             return RetrievalResult([self._hit(e, i + 1, i + 1, None) for i, e in enumerate(pool[:top_k])], RetrievalStats(mode, len(pool), 0, self.reranker.name, True))  # type: ignore[union-attr]
         # 표 위주 chunk 는 서술형 문단보다 질문에 직접 답하는 경우가 드물다: 1단계와 같은 prior(TABLE_WEIGHT)를 정렬 점수에만 반영한다 (rerankScore 는 모델 점수 그대로)
         adjusted = [scores[i] * (self.rerank_table_weight if pool[i]["chunk"].kind == "table" else 1.0) for i in range(len(pool))]

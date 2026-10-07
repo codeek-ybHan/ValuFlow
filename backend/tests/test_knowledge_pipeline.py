@@ -295,9 +295,9 @@ def test_reranker_providers(monkeypatch):
     with pytest.raises(AiGatewayError) as e:
         bad.score("q", ["a"])
     assert "ck-123" not in e.value.message
-    assert build_reranker("none") is None and build_reranker("cohere", cohere_key="") is None
-    assert isinstance(build_reranker("cross-encoder", "m"), CrossEncoderReranker) and isinstance(build_reranker("cohere", cohere_key="k"), CohereReranker)
-    assert "ck-123" not in repr(Settings(cohere_api_key="ck-123"))
+    assert build_reranker("none") is None and build_reranker("cohere", api_key="") is None
+    assert isinstance(build_reranker("cross-encoder", "m"), CrossEncoderReranker) and isinstance(build_reranker("cohere", api_key="k"), CohereReranker)
+    assert "ck-123" not in repr(Settings(reranker_api_key="ck-123"))
 
 
 # ---------- 18 · 19 · 20 · 21 filtering ----------

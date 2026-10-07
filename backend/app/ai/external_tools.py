@@ -83,7 +83,10 @@ class _Guard:
         corp = ctx.get("corpCode")
         if not corp:
             return None, _result(self.tool, "unavailable", reason="No company is selected.")
-        info = self.resolver(corp) or TickerInfo(ctx.get("corpName"), None)
+        try:
+            info = self.resolver(corp) or TickerInfo(ctx.get("corpName"), None)
+        except ProviderError as e:   # 기업 목록(DART)을 읽지 못한 경우: 종목을 모르는 것(no-data)과 구분한다
+            return None, _provider_failure(self.tool, e)
         if need_listed and not info.stock_code:
             return None, _result(self.tool, "no-data", reason="This company has no listed stock code, so there is no market data for it.")
         return TickerInfo(info.corp_name or ctx.get("corpName"), info.stock_code), None

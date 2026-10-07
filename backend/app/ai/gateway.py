@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 import re
 import secrets
 import time
@@ -166,7 +167,7 @@ class AiGateway:
         except AiGatewayError as e:  # embedding / provider 오류: 질문 전체를 실패시키지 않고 이 Tool 만 unavailable 로 알린다
             return {"status": "unavailable", "tool": name, "reason": f"Tool failed ({e.code}).", "sources": [], "warnings": []}
         except Exception:  # noqa: BLE001  (DB 등 내부 오류의 원문은 모델 · 응답에 싣지 않는다)
-            log.exception("backend tool %s failed", name)
+            log.error("backend tool %s failed (%s)", name, type(sys.exc_info()[1]).__name__)   # 예외 본문 · traceback 은 남기지 않는다 (credential 이 섞일 수 있다)
             return {"status": "unavailable", "tool": name, "reason": "Tool failed (internal error).", "sources": [], "warnings": []}
 
     @staticmethod

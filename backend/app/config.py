@@ -45,7 +45,12 @@ class Settings:
     # Reranker: none | cross-encoder (로컬 fastembed) | cohere | auto (fastembed 가 설치되어 있으면 cross-encoder)
     reranker: str = "none"
     reranker_model: str = ""
-    cohere_api_key: str = field(default="", repr=False)
+    reranker_api_key: str = field(default="", repr=False)     # RERANKER=cohere 일 때만 (예전 이름 COHERE_API_KEY 도 읽는다)
+    # 외부 데이터 provider 선택 + credential. 기본 provider(yahoo · google)는 Key 가 필요 없다. Key 가 필요한 provider 를 고르고 Key 가 없으면 그 Tool 만 unavailable 이다.
+    market_data_provider: str = "yahoo"
+    market_data_api_key: str = field(default="", repr=False)
+    news_provider: str = "google"
+    news_api_key: str = field(default="", repr=False)
     rerank_candidates: int = 15
     rerank_min_score: float | None = None
     reranker_cache_dir: str = ""
@@ -57,6 +62,10 @@ class Settings:
     news_ttl: int = 900
     # 사용자 PDF 업로드
     max_upload_mb: int = 20
+
+    def secrets(self) -> list[str]:
+        """로그에서 가릴 모든 credential 값 (DB URL 은 비밀번호를 포함한다)."""
+        return [v for v in (self.dart_api_key, self.openai_api_key, self.ai_state_secret, self.database_url, self.reranker_api_key, self.market_data_api_key, self.news_api_key) if v]
 
     @property
     def has_api_key(self) -> bool:
@@ -89,7 +98,11 @@ def load_settings(env: dict[str, str] | None = None, dotenv_path: Path | None = 
         retrieval_min_score=float(source.get("RETRIEVAL_MIN_SCORE") or 0.3),
         reranker=(source.get("RERANKER") or dotenv.get("RERANKER", "") or "auto").lower(),
         reranker_model=source.get("RERANKER_MODEL") or dotenv.get("RERANKER_MODEL", ""),
-        cohere_api_key=(source.get("COHERE_API_KEY") or dotenv.get("COHERE_API_KEY", "")).strip(),
+        reranker_api_key=(source.get("RERANKER_API_KEY") or source.get("COHERE_API_KEY") or dotenv.get("RERANKER_API_KEY", "") or dotenv.get("COHERE_API_KEY", "")).strip(),
+        market_data_provider=(source.get("MARKET_DATA_PROVIDER") or dotenv.get("MARKET_DATA_PROVIDER", "") or "yahoo").lower(),
+        market_data_api_key=(source.get("MARKET_DATA_API_KEY") or dotenv.get("MARKET_DATA_API_KEY", "")).strip(),
+        news_provider=(source.get("NEWS_PROVIDER") or dotenv.get("NEWS_PROVIDER", "") or "google").lower(),
+        news_api_key=(source.get("NEWS_API_KEY") or dotenv.get("NEWS_API_KEY", "")).strip(),
         rerank_candidates=int(source.get("RERANK_CANDIDATES") or 15),
         rerank_min_score=float(source["RERANK_MIN_SCORE"]) if source.get("RERANK_MIN_SCORE") else None,
         reranker_cache_dir=source.get("RERANKER_CACHE_DIR") or dotenv.get("RERANKER_CACHE_DIR", ""),

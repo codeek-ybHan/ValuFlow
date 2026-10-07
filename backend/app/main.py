@@ -26,9 +26,9 @@ from app.knowledge.loaders.pdf_loader import PdfError
 from app.knowledge.service import KnowledgeService, parse_meta
 from app.rag.rerank import Reranker, build_reranker
 from app.ai.external_tools import ExternalProviders, TickerInfo, make_external_tools
-from app.external.fred import FredRiskFree
-from app.external.news import GoogleNews
-from app.external.yahoo import YahooComparables, YahooMarketData
+from app.external.errors import ProviderError
+from app.external.registry import build_external
+from app.secrets import install_redaction
 from app.dart.filings import DartDisclosureSource, FilingsSource
 from app.rag.embeddings import EmbeddingProvider, OpenAiEmbeddings
 from app.rag.ingestion import DisclosureIngestionService
@@ -118,7 +118,7 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
     if store is not None and embedder is not None:
         disclosure_store = DisclosureStore(store.session_factory)
         if reranker is None:
-            reranker = build_reranker(settings.reranker, settings.reranker_model, settings.cohere_api_key, settings.reranker_cache_dir or None)
+            reranker = build_reranker(settings.reranker, settings.reranker_model, settings.reranker_api_key, settings.reranker_cache_dir or None)
         retriever = DisclosureRetriever(store.session_factory, embedder, min_score=settings.retrieval_min_score, reranker=reranker, rerank_candidates=settings.rerank_candidates, rerank_min_score=settings.rerank_min_score)
         ingestion = DisclosureIngestionService(disclosure_source or DartDisclosureSource(dart), embedder, disclosure_store)
 
@@ -128,12 +128,15 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
         knowledge = KnowledgeService(embedder, disclosure_store, max_bytes=settings.max_upload_mb * 1024 * 1024, corp_name_lookup=_corp_name)
     backend_tools = make_retrieval_tools(retriever) if retriever is not None else {}
     if external is None and settings.external_data:
-        market = YahooMarketData(quote_ttl=settings.market_ttl, fundamentals_ttl=settings.fundamentals_ttl)
-        external = ExternalProviders(market, FredRiskFree(ttl=settings.rate_ttl), YahooComparables(market, ttl=settings.fundamentals_ttl), GoogleNews(ttl=settings.news_ttl))
+        external = build_external(settings)   # provider 별 Key 가 없으면 그 Tool 만 unavailable
+    install_redaction(settings.secrets())     # 로그에서 모든 credential 값을 가린다
 
     def _ticker(corp_code: str) -> TickerInfo | None:
         """corp code → 종목코드: 서버가 DART 기업 목록에서 찾는다 (모델 · frontend 가 정한 값이 아니다)."""
-        rec = next((r for r in cache.get() if r.corp_code == corp_code), None)
+        try:
+            rec = next((r for r in cache.get() if r.corp_code == corp_code), None)
+        except DartApiError:
+            raise ProviderError("unavailable", "The company directory (DART) is not available, so the ticker cannot be resolved.") from None
         return TickerInfo(rec.corp_name, (rec.stock_code or "").strip() or None) if rec else None
     if external is not None:
         backend_tools.update(make_external_tools(external, _ticker))
