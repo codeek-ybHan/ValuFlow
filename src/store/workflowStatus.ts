@@ -34,6 +34,11 @@ export function stageStatuses(state: ProjectState): StageStatusMap {
   };
 }
 
+/** Historical 출처 이름: 실제 데이터(database / opendart)와 학습용 fixture 를 구분한다. */
+export function historicalSourceLabel(p: ProjectState['historicalProvenance']): string {
+  return p?.source === 'database' ? 'Database' : p?.source === 'opendart' ? 'OpenDART' : 'Fixture (학습용)';
+}
+
 export interface ProgressRow {
   key: string;
   label: string;
@@ -41,6 +46,8 @@ export interface ProgressRow {
   /** 화면에 표시할 문구 (Historical 은 READY 대신 LOADED) */
   display: string;
   to: string;
+  /** 보조 표시 (Historical 은 출처: OpenDART / Database / Fixture) */
+  detail?: string;
 }
 
 /** Dashboard 의 Workflow Progress. 실제 상태에서 계산한다. */
@@ -49,7 +56,7 @@ export function buildWorkflowProgress(state: ProjectState): ProgressRow[] {
   const c = assumptionCompleteness(state.valuationAssumptions);
   const sensitivity: StageStatus = state.sensitivityError ? 'ERROR' : state.sensitivityResult ? 'CALCULATED' : c.complete ? 'READY' : s.result === 'NOT STARTED' ? 'NOT STARTED' : 'INCOMPLETE';
   return [
-    { key: 'historical', label: 'Historical', status: s.historical, display: s.historical === 'READY' ? 'LOADED' : s.historical, to: '/valuation/historical' },
+    { key: 'historical', label: 'Historical', status: s.historical, display: s.historical === 'READY' ? 'LOADED' : s.historical, to: '/valuation/historical', ...(state.historicalData ? { detail: historicalSourceLabel(state.historicalProvenance) } : {}) },
     { key: 'forecast', label: 'Forecast', status: s.forecast, display: s.forecast, to: '/valuation/forecast' },
     { key: 'wacc', label: 'WACC', status: s.wacc, display: s.wacc, to: '/valuation/wacc' },
     { key: 'dcf', label: 'DCF / Equity', status: s.dcf, display: s.dcf, to: '/valuation/dcf' },
@@ -74,7 +81,7 @@ export function assumptionBasis(state: ProjectState): AssumptionBasis {
 }
 
 export interface BasisSummary {
-  historical: { present: boolean; label: string };
+  historical: { present: boolean; label: string; sourceLabel: string | null };
   assumptions: { basis: AssumptionBasis; label: string };
   /** 실제 Historical 과 학습용 가정이 함께 있을 때 혼동을 막는 안내 */
   caution: string | null;
@@ -83,12 +90,12 @@ export interface BasisSummary {
 export function describeBasis(state: ProjectState): BasisSummary {
   const h = state.historicalData;
   const basis = assumptionBasis(state);
-  const historical = h ? { present: true, label: `${h.company.name} · Actual` } : { present: false, label: '불러오지 않음' };
+  const historical = h ? { present: true, label: `${h.company.name} · Actual`, sourceLabel: historicalSourceLabel(state.historicalProvenance) } : { present: false, label: '불러오지 않음', sourceLabel: null };
   const assumptions = { basis, label: basis === 'learning' ? '학습용 가정' : basis === 'user' ? '사용자 입력' : '미입력' };
   const caution =
     basis === 'learning'
       ? h
-        ? `Historical Data(${h.company.name} 실제 공시)와 Valuation Assumptions(STEP 04 학습용 가상값)는 서로 다른 출처입니다. 이 결과를 ${h.company.name}의 가치평가로 해석하지 마세요.`
+        ? `Historical Data(${h.company.name} ${state.historicalProvenance?.source === 'fixture' ? '학습용 fixture' : '실제 공시'})와 Valuation Assumptions(STEP 04 학습용 가상값)는 서로 다른 출처입니다. 이 결과를 ${h.company.name}의 가치평가로 해석하지 마세요.`
         : 'Valuation Assumptions 는 STEP 04 학습용 가상값입니다. 실제 기업의 가치평가가 아닙니다.'
       : null;
   return { historical, assumptions, caution };

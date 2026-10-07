@@ -3,8 +3,9 @@ import { defaultFinancialRepository } from '../data/repository/defaultRepository
 import type { CompanyProfile, FinancialRepository } from '../data/repository/financialRepository';
 import { companyView, errorMessage, selectCompany } from '../store/companySelection';
 import { useProject } from '../store/project';
+import { HistoricalLoadControls } from './HistoricalSource';
 
-// 기업 검색 (OpenDART). 검색 → [선택] → 기업개황 표시까지만 한다. 재무데이터는 불러오지 않는다 (STEP 06-3).
+// 기업 검색 (OpenDART). 검색 → [선택] → 기업개황 표시. 재무데이터는 자동으로 불러오지 않고 [재무데이터 불러오기] 로 명시적으로 불러온다.
 export function CompanySearch({ repository = defaultFinancialRepository }: { repository?: FinancialRepository }) {
   const { project, setSelectedCompany } = useProject();
   const selected = project.selectedCompany;
@@ -72,7 +73,8 @@ export function CompanySearch({ repository = defaultFinancialRepository }: { rep
         <div className="company-selected" aria-label="선택한 기업">
           <h4>{view.title}</h4>
           <dl className="stat-dl">{view.lines.map((l) => <div key={l.label}><dt>{l.label}</dt><dd className="num">{l.value}</dd></div>)}</dl>
-          <p className="small muted">기업만 선택되었습니다. 재무데이터는 아직 자동으로 불러오지 않습니다 (STEP 06-3).</p>
+          <p className="small muted">기업만 선택되었습니다. 재무데이터는 자동으로 불러오지 않습니다. 아래 버튼으로 불러오세요.</p>
+          <HistoricalLoadControls compact />
         </div>
       )}
     </section>

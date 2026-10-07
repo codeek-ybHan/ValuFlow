@@ -4,6 +4,8 @@ import { useProject } from '../../store/project';
 import { buildHistoricalView, type HistoricalRow } from '../../engine/historicalView';
 import { BarChart, LineChart } from '../Charts';
 import { fmtNum, fmtPct } from '../ui';
+import { DataQualityPanel, HistoricalFailureNotice, HistoricalLoadControls, ProvenanceList } from '../HistoricalSource';
+import { provenanceView } from '../../store/historicalLoad';
 import { stages } from './workflow';
 
 // 1. Historical — project.historicalData 만 사용한다 (Forecast / Result 값은 읽지 않는다).
@@ -34,8 +36,9 @@ function FinTable({ periods, rows, unit }: { periods: string[]; rows: Historical
 }
 
 export function HistoricalStage() {
-  const { project, loadSamsung } = useProject();
-  const view = useMemo(() => buildHistoricalView(project.historicalData), [project.historicalData]);
+  const { project, loadSamsung, historicalStatus } = useProject();
+  // DataQuality 를 함께 넘겨 weak 매핑 · 누락 계정의 안내가 표에 붙는다 (fixture 는 quality 가 없다)
+  const view = useMemo(() => buildHistoricalView(project.historicalData, project.historicalQuality), [project.historicalData, project.historicalQuality]);
   const next = stages[1];
 
   if (!view) {
@@ -45,13 +48,19 @@ export function HistoricalStage() {
         <div className="empty-state">
           <h3>No historical data loaded</h3>
           <p>과거 재무데이터가 없어 Historical 분석을 표시할 수 없습니다. 값을 임의로 채우지 않습니다.</p>
-          <button className="btn primary" onClick={loadSamsung}>삼성전자 학습용 Historical 불러오기</button>
+          {historicalStatus.kind === 'failed' && <HistoricalFailureNotice failure={historicalStatus.failure} />}
+          {historicalStatus.kind === 'loading' && <p className="small muted" role="status">Loading financial data...</p>}
+          {project.selectedCompany && <div><p className="small muted">선택한 기업: {project.selectedCompany.corpName} ({project.selectedCompany.stockCode ?? '비상장'})</p><HistoricalLoadControls compact /></div>}
+          {!project.selectedCompany && <p className="small muted">Workspace 에서 기업을 검색해 선택한 뒤 [재무데이터 불러오기] 를 실행하세요.</p>}
+          <p className="small muted">학습용 데이터가 필요하면:</p>
+          <button className="btn" onClick={loadSamsung}>삼성전자 학습용 Historical 불러오기</button>
         </div>
       </>
     );
   }
 
   const { header, keyFinancials, metrics, trends, chart } = view;
+  const prov = provenanceView(project.historicalData!, project.historicalProvenance);
   const pctFmt = (n: number) => `${n.toFixed(0)}%`;
   const trnFmt = (n: number) => n.toFixed(0);
 
@@ -66,15 +75,15 @@ export function HistoricalStage() {
             <h3>{header.name}</h3>
             <p className="small muted">{header.ticker}</p>
           </div>
-          <span className="chip" title="공시로 확정된 실적(Actual)입니다. Forecast 는 이후 단계에서 2026E … 로 구분합니다.">Actual · 공시 기반</span>
+          <span className="chip" title="확정된 실적(Actual)입니다. Forecast 는 이후 단계에서 2026E … 로 구분합니다.">Actual · {prov.sourceLabel}</span>
         </div>
-        <dl className="status-grid">
-          <div><dt>Basis</dt><dd>{header.basis}</dd></div>
-          <div><dt>Currency</dt><dd>{header.currency}</dd></div>
-          <div><dt>Unit</dt><dd>{header.unitLabel}</dd></div>
-          <div><dt>Period</dt><dd className="num">{header.periodRange}</dd></div>
-        </dl>
+        <ProvenanceList h={project.historicalData!} provenance={project.historicalProvenance} />
+        <p className="small muted">{header.currency} · {header.unitLabel}</p>
+        <HistoricalLoadControls />
       </section>
+
+      {/* 데이터 품질 · 출처 (실제 데이터일 때) */}
+      {prov.actual && <DataQualityPanel quality={project.historicalQuality} />}
 
       {/* B. Key Financials */}
       <h3 className="section-title">Key Financials</h3>

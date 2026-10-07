@@ -52,7 +52,8 @@ test('backend 오류 코드를 DartClientError 로 변환하고, 연결 실패 /
     await assert.rejects(new BackendDartClient({ fetch: m.fn }).getCompany('00126380'), (e: unknown) => e instanceof DartClientError && e.code === code && e.status === status && e.message === '정제된 문구');
   }
   await assert.rejects(new BackendDartClient({ fetch: mockFetch(() => 'network-error').fn }).searchCompanies({ query: 'a' }), (e: unknown) => e instanceof DartClientError && e.code === 'backend-unreachable' && !/Failed to fetch/.test(e.message));
-  await assert.rejects(new BackendDartClient({ fetch: mockFetch(() => ({ status: 500 })).fn }).getCompany('00126380'), (e: unknown) => e instanceof DartClientError && e.code === 'unknown');
+  await assert.rejects(new BackendDartClient({ fetch: mockFetch(() => ({ status: 500 })).fn }).getCompany('00126380'), (e: unknown) => e instanceof DartClientError && e.code === 'backend-unreachable' && e.status === 500);
+  await assert.rejects(new BackendDartClient({ fetch: mockFetch(() => ({ status: 404 })).fn }).getCompany('00126380'), (e: unknown) => e instanceof DartClientError && e.code === 'unknown');
   await assert.rejects(new BackendDartClient({ fetch: mockFetch(() => ({ status: 400, body: { error: { code: 'weird' } } })).fn }).getCompany('1'), (e: unknown) => e instanceof DartClientError && e.code === 'unknown');
 });
 

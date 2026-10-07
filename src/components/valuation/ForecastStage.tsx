@@ -9,6 +9,7 @@ import {
 } from '../../engine/forecastForm';
 import { fmtNum, fmtPct } from '../ui';
 import { stages } from './workflow';
+import { provenanceView } from '../../store/historicalLoad';
 
 // 2. Forecast — 사용자가 미래 가정을 직접 입력한다. Historical 값은 참고용(reference-only)이며 자동 입력하지 않는다.
 // 입력은 % / 억원 단위의 문자열로 받고, 유효한 완성 입력만 valuationAssumptions(소수 / 억원)에 반영한다.
@@ -20,7 +21,9 @@ export function ForecastStage() {
   const { project, setForecastInputs, clearStaleResults } = useProject();
   const a = project.valuationAssumptions;
   const h = project.historicalData;
-  const ref = useMemo(() => buildForecastReference(h), [h]);
+  // 과거 참고값은 Historical Analysis 의 ForecastReferenceModel 에서 온다 (품질 정보 포함). 값은 자동으로 입력되지 않는다.
+  const ref = useMemo(() => buildForecastReference(h, project.historicalQuality), [h, project.historicalQuality]);
+  const refSource = h ? provenanceView(h, project.historicalProvenance) : null;
   const estimateLabels = useMemo(() => forecastLabels(ref?.periods ?? null, FORECAST_YEARS), [ref]);
 
   const { values, parsed, errors, touched, edit, blur, shown } = useAssumptionForm<ForecastFormValues, ForecastInputs>({
@@ -107,8 +110,8 @@ export function ForecastStage() {
           <thead>
             <tr className="fc-group">
               <th rowSpan={2}>Driver</th>
-              {ref && <th colSpan={ref.periods.length} className="fc-group-actual">Actual · 참고용 (자동 입력 안 됨)</th>}
-              <th colSpan={FORECAST_YEARS} className="fc-group-estimate">Estimate · 입력</th>
+              {ref && <th colSpan={ref.periods.length} className="fc-group-actual">Actual · {refSource?.sourceLabel} · 참고용 (자동 입력 안 됨)</th>}
+              <th colSpan={FORECAST_YEARS} className="fc-group-estimate">Estimate · Analyst Assumption</th>
             </tr>
             <tr>
               {ref?.periods.map((p) => <th key={p} className="num fc-actual">{p}</th>)}

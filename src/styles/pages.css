@@ -252,3 +252,18 @@
 .company-results li > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .company-selected { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line-strong); }
 .company-selected h4 { margin: 0 0 8px; font-size: 16px; }
+
+/* ===== Historical 출처 · 데이터 품질 ===== */
+.hist-load { margin-top: 12px; }
+.hist-load .action-row { margin-bottom: 8px; }
+.dq-panel { margin-top: 16px; }
+.dq-panel .callout { margin: 8px 0 12px; }
+.dq-notes { margin: 8px 0 12px; }
+.dq-fields { list-style: none; margin: 12px 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px 16px; }
+.dq-fields li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.dq-fields li.muted { color: var(--faint); }
+.dq-fields li.warn .chip { color: var(--warn); }
+.dq-sources { margin-top: 8px; }
+.dq-sources summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+.dq-sources td { vertical-align: top; }
+.wf-detail { font-weight: 400; }

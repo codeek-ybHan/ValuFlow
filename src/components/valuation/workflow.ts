@@ -48,6 +48,12 @@ export const stageIndex = (id: string | undefined) => stages.findIndex((s) => s.
  *  Historical : 공시 기반 실적(Actual)        Forecast : 애널리스트 가정
  *  WACC / DCF / Validation(상대가치) : 사용자 가정(Assumption)
  */
+/** Historical 단계의 출처 표시: 실제 데이터(OpenDART / Database)와 학습용 fixture 를 구분한다. */
+export function historicalStageBasis(p: { source: 'database' | 'opendart' | 'fixture' } | null): string {
+  if (!p) return STAGE_BASIS.historical;
+  return p.source === 'fixture' ? 'Actual · Fixture (학습용)' : `Actual · ${p.source === 'database' ? 'Database' : 'OpenDART'}`;
+}
+
 export const STAGE_BASIS: Record<StageId, string> = {
   historical: 'Actual · 공시 기반',
   forecast: SOURCE_LABELS.analyst,

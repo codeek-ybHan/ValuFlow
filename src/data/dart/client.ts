@@ -55,6 +55,10 @@ export class BackendDartClient implements DartClient {
     }
     let body: unknown = null;
     try { body = await res.json(); } catch { /* JSON 이 아니면 아래에서 unknown 처리 */ }
+    if (!res.ok && res.status >= 500 && !(body as { error?: unknown } | null)?.error) {
+      // 개발 proxy / 게이트웨이가 backend 에 닿지 못한 경우 (JSON 오류 본문이 없다)
+      throw new DartClientError('backend-unreachable', 'ValuFlow backend 에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.', res.status);
+    }
     if (!res.ok) {
       const err = (body as { error?: { code?: unknown; message?: unknown } } | null)?.error;
       const code = CODES.find((c) => c === err?.code) ?? 'unknown';

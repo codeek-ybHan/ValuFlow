@@ -8,12 +8,30 @@ export type HistoricalSource = 'Fixture' | 'DART Annual Report' | 'Database';
  * 실제 데이터 연결을 위한 메타데이터. 기존 저장값(localStorage)과의 호환을 위해 선택 필드로 둔다.
  * company.basis 는 "실제로 사용한" 기준이다 (연결 → 별도 fallback 이 일어났다면 Separate).
  */
+/** 정규화 품질 (필드 상태 · warning · 매핑 추적). store / 화면은 이 경로로 가져온다. */
+export type { DataQuality } from './normalization/quality.ts';
+
 export interface HistoricalMeta {
   corpCode?: string;
   stockCode?: string;
   source: HistoricalSource;
   /** 데이터를 가져온(또는 fixture 를 만든) 시각, ISO 8601. */
   fetchedAt?: string;
+}
+
+/**
+ * 현재 Historical 데이터가 어디서 왔는가. 실제 데이터(database / opendart)와 학습용 fixture 를 화면에서 구분하는 근거다.
+ * 저장 정책: database / opendart 는 식별 정보(corpCode · fiscalYears)만 저장하고 reload 때 backend 에서 다시 조회한다.
+ */
+export interface HistoricalProvenance {
+  source: 'database' | 'opendart' | 'fixture';
+  /** 이 결과가 backend DB 에 저장되었는가 (fixture 는 false) */
+  persisted: boolean;
+  fetchedAt?: string;
+  fetchId?: string | null;
+  corpCode?: string;
+  /** reload 시 같은 key 로 다시 조회하기 위한 회계연도 */
+  fiscalYears?: number[];
 }
 
 /** Workspace 에서 사용자가 고른 기업. Historical 재무데이터와는 별개이며, 선택만으로 재무데이터가 붙지 않는다. */

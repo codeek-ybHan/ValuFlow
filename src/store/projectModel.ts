@@ -12,7 +12,7 @@
 // (입력과 결과가 어긋난 stale state 를 만들지 않기 위해).
 import { calculateWacc, runSensitivity, runValuation, ValuationError } from '../valuation/index.ts';
 import type { RelativeInput, SensitivityResult, ValuationInput, ValuationResult } from '../valuation/index.ts';
-import type { HistoricalData, SelectedCompany } from '../data/types.ts';
+import type { DataQuality, HistoricalData, HistoricalProvenance, SelectedCompany } from '../data/types.ts';
 import type { ForecastInputs } from '../engine/forecastForm.ts';
 import type { WaccInputs } from '../engine/waccForm.ts';
 import { buildSensitivityAxes } from '../engine/sensitivityAxes.ts';
@@ -25,6 +25,10 @@ export interface ProjectState {
   /** Workspace 에서 고른 기업(OpenDART). Historical 재무데이터와 별개이며 선택만으로 historicalData 가 바뀌지 않는다. */
   selectedCompany: SelectedCompany | null;
   historicalData: HistoricalData | null;
+  /** 정규화 품질(필드 상태 · warning · 매핑 추적). fixture 는 null. 저장하지 않는다 (reload 때 backend 에서 다시 받는다). */
+  historicalQuality: DataQuality | null;
+  /** Historical 의 출처. 데이터가 없으면 null. */
+  historicalProvenance: HistoricalProvenance | null;
   valuationAssumptions: AssumptionsDraft | null;
   valuationResult: ValuationResult | null;
   sensitivityResult: SensitivityResult | null;
@@ -38,7 +42,9 @@ export interface ProjectState {
 /** 저장되는 부분. 결과와 오류는 파생값이라 저장하지 않는다. */
 export interface PersistedProject {
   selectedCompany?: SelectedCompany | null;
+  /** fixture 일 때만 저장한다. database / opendart 는 provenance 만 저장하고 reload 때 다시 조회한다. */
   historicalData: HistoricalData | null;
+  historicalProvenance?: HistoricalProvenance | null;
   valuationAssumptions: AssumptionsDraft | null;
   relativeInputs: RelativeInput;
 }
@@ -46,6 +52,8 @@ export interface PersistedProject {
 export const emptyProjectState: ProjectState = {
   selectedCompany: null,
   historicalData: null,
+  historicalQuality: null,
+  historicalProvenance: null,
   valuationAssumptions: null,
   valuationResult: null,
   sensitivityResult: null,
@@ -68,14 +76,33 @@ export function withSelectedCompany(state: ProjectState, selectedCompany: Select
   return { ...state, selectedCompany };
 }
 
-/** Historical Data 만 설정한다. 가정과 결과는 건드리지 않는다. */
+/** 데이터의 meta 로 출처를 추정한다 (provenance 없이 설정되거나 이전 버전에서 저장된 데이터). */
+export function deriveProvenance(h: HistoricalData | null): HistoricalProvenance | null {
+  if (!h) return null;
+  const s = h.meta?.source;
+  if (s === 'DART Annual Report') return { source: 'opendart', persisted: false, ...(h.meta?.fetchedAt ? { fetchedAt: h.meta.fetchedAt } : {}), ...(h.meta?.corpCode ? { corpCode: h.meta.corpCode } : {}) };
+  if (s === 'Database') return { source: 'database', persisted: true, ...(h.meta?.fetchedAt ? { fetchedAt: h.meta.fetchedAt } : {}), ...(h.meta?.corpCode ? { corpCode: h.meta.corpCode } : {}) };
+  return { source: 'fixture', persisted: false, ...(h.meta?.fetchedAt ? { fetchedAt: h.meta.fetchedAt } : {}) };
+}
+
+/** Historical Data 만 설정한다. 가정과 결과는 건드리지 않는다. 품질은 알 수 없으므로 비우고 출처는 meta 에서 추정한다. */
 export function withHistoricalData(state: ProjectState, historicalData: HistoricalData | null): ProjectState {
-  return { ...state, historicalData };
+  return { ...state, historicalData, historicalQuality: null, historicalProvenance: deriveProvenance(historicalData) };
+}
+
+/** 실제 데이터(backend 가 정규화 · 저장한 결과)를 Historical 로 설정한다: 데이터 · 품질 · 출처를 함께 교체한다. 가정과 결과는 건드리지 않는다. */
+export function withHistoricalLoaded(state: ProjectState, loaded: { data: HistoricalData; quality: DataQuality | null; provenance: HistoricalProvenance }): ProjectState {
+  return { ...state, historicalData: loaded.data, historicalQuality: loaded.quality, historicalProvenance: loaded.provenance };
+}
+
+/** [Historical 제거]: Historical 만 지운다. 선택한 기업과 Valuation 가정 · 결과는 유지한다. */
+export function withHistoricalCleared(state: ProjectState): ProjectState {
+  return { ...state, historicalData: null, historicalQuality: null, historicalProvenance: null };
 }
 
 /** 삼성전자 FY2023~FY2025 공시 기반 데이터 불러오기. historicalData 만 바뀐다. */
 export function withSamsungHistorical(state: ProjectState): ProjectState {
-  return withHistoricalData(state, samsungHistoricalData);
+  return { ...state, historicalData: samsungHistoricalData, historicalQuality: null, historicalProvenance: { source: 'fixture', persisted: false } };
 }
 
 /** 가정을 바꾸면 이전 결과는 더 이상 유효하지 않으므로 비운다 (stale 방지). */
@@ -191,7 +218,9 @@ export function applyPracticeWithConfirmation(state: ProjectState, confirmed: bo
 // ---- 저장 / 복원 ----
 
 export function toPersisted(state: ProjectState): PersistedProject {
-  return { selectedCompany: state.selectedCompany, historicalData: state.historicalData, valuationAssumptions: state.valuationAssumptions, relativeInputs: state.relativeInputs };
+  // database / opendart 의 Historical 은 복제 저장하지 않는다: provenance(corpCode · fiscalYears)만 저장하고 reload 때 backend 에서 다시 조회한다.
+  const isFixture = state.historicalProvenance?.source === 'fixture';
+  return { selectedCompany: state.selectedCompany, historicalData: isFixture ? state.historicalData : null, historicalProvenance: state.historicalProvenance, valuationAssumptions: state.valuationAssumptions, relativeInputs: state.relativeInputs };
 }
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
@@ -202,6 +231,40 @@ function sanitizeSelectedCompany(raw: unknown): SelectedCompany | null {
   const corpCode = str(r.corpCode), corpName = str(r.corpName), fetchedAt = str(r.fetchedAt);
   if (!corpCode || !/^\d{8}$/.test(corpCode) || !corpName || !fetchedAt || r.source !== 'OpenDART') return null;
   return { corpCode, corpName, corpNameEng: str(r.corpNameEng), stockCode: str(r.stockCode), corpClass: str(r.corpClass), source: 'OpenDART', fetchedAt };
+}
+
+const SOURCES = ['database', 'opendart', 'fixture'];
+/** 저장된 출처의 형식이 맞을 때만 복원한다. */
+function sanitizeProvenance(raw: unknown): HistoricalProvenance | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.source !== 'string' || !SOURCES.includes(r.source)) return null;
+  const years = Array.isArray(r.fiscalYears) && r.fiscalYears.every((y) => Number.isInteger(y)) ? (r.fiscalYears as number[]) : undefined;
+  return {
+    source: r.source as HistoricalProvenance['source'], persisted: r.persisted === true,
+    ...(str(r.fetchedAt) ? { fetchedAt: str(r.fetchedAt) as string } : {}), ...(typeof r.fetchId === 'string' || r.fetchId === null ? { fetchId: r.fetchId as string | null } : {}),
+    ...(str(r.corpCode) ? { corpCode: str(r.corpCode) as string } : {}), ...(years ? { fiscalYears: years } : {}),
+  };
+}
+
+/**
+ * Historical 복원 정책 (reload):
+ *  - fixture(또는 출처 불명의 이전 저장값): 저장된 데이터를 그대로 복원한다.
+ *  - database / opendart: 데이터는 복원하지 않는다. provenance(corpCode · fiscalYears)가 남아 있으면 needsHistoricalRefetch 가 true 이고
+ *    provider 가 backend 에서 다시 조회한다 (오래된 값 · 출처가 남지 않는다).
+ */
+function restoreHistorical(p: Partial<PersistedProject>): Pick<ProjectState, 'historicalData' | 'historicalQuality' | 'historicalProvenance'> {
+  const provenance = sanitizeProvenance(p.historicalProvenance);
+  const data = p.historicalData ?? null;
+  if (provenance && provenance.source !== 'fixture') return { historicalData: null, historicalQuality: null, historicalProvenance: provenance };
+  if (data) return { historicalData: data, historicalQuality: null, historicalProvenance: provenance ?? deriveProvenance(data) };
+  return { historicalData: null, historicalQuality: null, historicalProvenance: null };
+}
+
+/** reload 후 backend 에서 Historical 을 다시 조회해야 하는가. */
+export function needsHistoricalRefetch(state: ProjectState): boolean {
+  const p = state.historicalProvenance;
+  return state.historicalData === null && p !== null && p.source !== 'fixture' && !!p.corpCode && !!p.fiscalYears?.length;
 }
 
 const RELATIVE_KEYS = ['netIncome', 'per', 'bookEquity', 'pbr', 'ebitda', 'evEbitda'] as const;
@@ -226,7 +289,7 @@ export function restoreProjectState(raw: unknown): ProjectState {
   const base: ProjectState = {
     ...emptyProjectState,
     selectedCompany: sanitizeSelectedCompany(p.selectedCompany),
-    historicalData: p.historicalData ?? null,
+    ...restoreHistorical(p),
     valuationAssumptions: p.valuationAssumptions ?? null,
     relativeInputs: sanitizeRelativeInputs(p.relativeInputs),
   };

@@ -36,7 +36,7 @@ export function ValuationControls() {
       <dl className="basis-row" aria-label="데이터 출처와 실행 상태">
         <div>
           <dt>Historical Data</dt>
-          <dd>{basis.historical.label}{basis.historical.present && <span className="source-tag">공시 기반</span>}</dd>
+          <dd>{basis.historical.label}{basis.historical.sourceLabel && <span className="source-tag">{basis.historical.sourceLabel}</span>}</dd>
         </div>
         <div>
           <dt>Valuation Assumptions</dt>

@@ -49,7 +49,7 @@ export function Dashboard() {
               {progress.map((w, i) => (
                 <li key={w.key}>
                   <Link to={w.to} className="wf-row">
-                    <span className="num">{String(i + 1).padStart(2, '0')}</span><span>{w.label}</span><StatusBadge label={w.display} />
+                    <span className="num">{String(i + 1).padStart(2, '0')}</span><span>{w.label}{w.detail && <small className="muted wf-detail"> · {w.detail}</small>}</span><StatusBadge label={w.display} />
                   </Link>
                 </li>
               ))}
