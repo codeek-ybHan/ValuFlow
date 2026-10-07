@@ -255,3 +255,10 @@ def test_provider_retries_a_transient_failure_once_but_not_client_errors():
     boom = httpx.Client(transport=httpx.MockTransport(lambda r: (_ for _ in ()).throw(httpx.ReadTimeout("slow"))))
     with pytest.raises(AiGatewayError):
         OpenAiProvider("sk-test-XXXXXXXXXXXXXXXXXXXX", client=boom).create_response([{"role": "user", "content": "q"}], [], WORKFLOW_ANSWER_SCHEMA)
+
+
+def test_workflow_prompt_routes_absence_statements_to_limitations():
+    """STEP 08-8: '공시에 언급이 없다' 같은 부재 진술은 근거를 인용할 수 없어 claim 이면 fallback 을 부른다 → 한계(limitations)로 쓰게 한다."""
+    from app.ai.gateway import _workflow_message
+    msg = _workflow_message({"type": "disclosure-review", "label": "Disclosure Review", "steps": [{"id": "d", "tool": "searchDisclosures", "purpose": "p", "optional": False}], "maxToolCalls": 10}, 10)
+    assert "NOT found" in msg and "limitations, not claims" in msg

@@ -163,6 +163,14 @@ Agent 가 만든 분석 문장의 핵심 claim 을 **Claim → Evidence → Sour
 - **테스트**: `src/ai/analyst.test.ts`(view-model · 실행 · 오류 · PDF client) · `src/ai/analystRender.test.ts`(esbuild 로 번들해 서버 렌더링한 HTML 검증).
 - **알려진 한계**: 질문 시 source filter(OpenDART / Uploaded) 는 제공하지 않는다(AI 가 선택). 진행 표시는 frontend 가 실행하는 Tool 의 완료 시점에만 갱신된다(backend 검색 Tool 은 gateway 안에서 실행되므로 그 동안은 다음 대기 단계가 표시된다). Cancel 은 진행 중인 요청 자체를 끊지 않고 결과를 버리며, 다음 왕복 전에 workflow 를 멈춘다.
 
+### Evaluation & Guardrails (STEP 08-8)
+
+고정 질문 40개(Historical · Valuation · RAG · External · Mixed · Failure)와 지표, 오프라인 Guardrail 스위트 17개, 라이브 평가 러너로 AI Analyst 의 품질과 실패 조건을 측정한다. 결과 · 실패 사례 로그 · Guardrail Matrix 는 `docs/STEP08-8_evaluation.md`, STEP 08 전체 요약과 포트폴리오 설명은 `docs/STEP08_summary.md`.
+
+- **오프라인(항상 실행)**: `npm test` 가 데이터셋 불변식 · 라우팅 · Tool selection 지표 · Guardrail 스위트(악의적 모델: 단위 오류 · 출처 환각 · provider 충돌 · 시점 혼합 · missing 값 · 이전 맥락 · prompt injection · system prompt 유출 · write 요청 · 장애 · 재생성 · fallback)를 검증한다. `node scripts/eval-guardrails.ts` 는 Guardrail Matrix 를 출력한다.
+- **라이브(실제 LLM · backend 필요)**: `DOCS=1 node scripts/eval-live.ts <baseUrl> out.json [repeat]` → `node scripts/eval-report.ts out.json …`. 합성 PDF 는 `PYTHONPATH=. python -m scripts.make_eval_pdfs <dir>`, provider 장애는 `APP_ENV=production` backend 로, provider 지연은 `python -m scripts.probe_latency` 로 본다.
+- **출력 가드레일**: system instruction 조각이 답변에 들어가면 제거(`src/ai/guard.ts`), Quick Answer 의 요약 · 근거 항목 숫자는 Tool 결과에서 찾을 수 없으면 제거(`src/ai/quickGuard.ts`).
+
 ### Credential 정책
 
 | 환경변수 | 쓰이는 곳 | 없을 때 |

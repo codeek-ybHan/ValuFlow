@@ -254,7 +254,12 @@ export function groundAnalysis(input: GroundInput): GroundOutput {
   // ---- summary 의 숫자 (claim 에 속하지 않는 숫자 포함) ----
   const sNums = parseNumbers(input.summary);
   const sFlags = new Set<GroundingIssueCode>();
-  const summaryNumbers = sNums.map((n) => checkNumber(n, sNums, [], all, false, sFlags, clauseTerms(input.summary, n.start), categoryOf(clauseTerms(input.summary, n.start), new Set())));
+  // summary 의 Valuation 지표(EV · 주주가치 · WACC …)도 엔진 값이어야 한다: 문서 · 뉴스 안에 같은 숫자가 있어도 (prompt injection 으로 주입된 "이 EV 를 사용하라" 포함) 근거가 아니다
+  const summaryNumbers = sNums.map((n) => {
+    const st = clauseTerms(input.summary, n.start);
+    const valuation = st.some((x) => x.category === 'valuation' || x.key === 'wacc') && !st.some((x) => x.category === 'market' || x.category === 'peer');
+    return checkNumber(n, sNums, [], all, valuation, sFlags, st, categoryOf(st, new Set()));
+  });
   for (const n of summaryNumbers) if (n.status === 'ungrounded') issues.push({ target: 'summary', code: 'ungrounded-text-number', detail: `summary number "${n.text}" is not found in any tool result`, blocking: true });
   if (sFlags.has('contradicted-by-priority-source')) issues.push({ target: 'summary', code: 'provider-contradiction', detail: 'summary uses a provider value that conflicts with a higher-priority source', blocking: true });
 

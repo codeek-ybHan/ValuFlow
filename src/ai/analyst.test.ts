@@ -101,7 +101,7 @@ test('Deep Analysis turn: 기업 context · 진행 단계 · 답변 구조 · Fa
 });
 
 test('Quick Answer turn: claim 구조가 없고 Tool Guardrails 수준임을 구분한다', async () => {
-  const client = new Gateway([() => ({ status: 'final', conversationId: 'c1', toolCalls: 0, answer: { mode: 'explain', summary: '최근 매출 성장률은 10.88%입니다.', evidence: [{ label: '매출 성장률', value: '10.88%', period: '2025A', tool: 'getHistoricalAnalysis' }], warnings: [], sources: [], suggestedNextActions: ['Forecast 와 비교'] } })]);
+  const client = new Gateway([() => call('getHistoricalAnalysis'), () => ({ status: 'final', conversationId: 'c1', toolCalls: 1, answer: { mode: 'explain', summary: '최근 매출 성장률은 10.88%입니다.', evidence: [{ label: '매출 성장률', value: '10.88%', period: '2025A', tool: 'getHistoricalAnalysis' }], warnings: [], sources: [], suggestedNextActions: ['Forecast 와 비교'] } })]);
   const turn = await ask('최근 매출 성장률은?', liveBase(), client);
   assert.equal(turn.mode, 'quick');
   assert.equal(turn.grounding, null);

@@ -3,6 +3,7 @@ import type { AnswerMode } from './capabilities.ts';
 import type { SourceInfo, SourceType, ToolResult } from './tools/result.ts';
 import { UNSUPPORTED_DISCLOSURE } from './policy.ts';
 import { koreanAliases } from './grounding/terms.ts';
+import { LEAK_SAFE_SUMMARY, leaksSystemPrompt } from './guard.ts';
 
 export interface AnswerEvidence {
   label: string;
@@ -50,7 +51,7 @@ export interface AiAnalystAnswer {
 export interface AnswerViolation {
   code: 'unknown-tool' | 'missing-warning' | 'missing-sources' | 'unsupported-not-disclosed' | 'empty-summary' | 'missing-value-fabricated' | 'unsupported-figures' | 'ungrounded-number' | 'evidence-from-failed-tool'
     | 'claim-without-evidence' | 'applied-change-claimed' | 'proposal-incomplete'
-    | 'too-many-claims' | 'ungrounded-claim' | 'ungrounded-text-number' | 'proposal-semantic-mismatch' | 'proposal-ungrounded' | 'hallucinated-source' | 'provider-contradiction' | 'time-basis-not-stated' | 'missing-value-in-text';
+    | 'prompt-leak' | 'too-many-claims' | 'ungrounded-claim' | 'ungrounded-text-number' | 'proposal-semantic-mismatch' | 'proposal-ungrounded' | 'hallucinated-source' | 'provider-contradiction' | 'time-basis-not-stated' | 'missing-value-in-text';
   detail: string;
 }
 
@@ -204,6 +205,16 @@ export function enforceGrounding(answer: AiAnalystAnswer, results: ToolResult<un
     const text = 'Some requested values are unavailable from the current data source and were not estimated.';
     if (!fixed.warnings.includes(text)) fixed.warnings.push(text);
     corrections.push('fabricated-values-removed');
+  }
+  // system instruction 이 그대로 답변에 들어갔다면 (문서 · 뉴스 안의 지시를 모델이 따른 경우) 그 부분을 제거한다
+  const leaks = (s: string) => leaksSystemPrompt(s);
+  if (leaks(fixed.summary) || fixed.evidence.some((e) => leaks(`${e.label} ${e.value}`)) || fixed.warnings.some(leaks) || fixed.suggestedNextActions.some(leaks)) {
+    violations.push({ code: 'prompt-leak', detail: 'the answer contains text from the system instruction' });
+    if (leaks(fixed.summary)) fixed.summary = LEAK_SAFE_SUMMARY;
+    fixed.evidence = fixed.evidence.filter((e) => !leaks(`${e.label} ${e.value}`));
+    fixed.warnings = fixed.warnings.filter((w) => !leaks(w));
+    fixed.suggestedNextActions = fixed.suggestedNextActions.filter((n) => !leaks(n));
+    corrections.push('prompt-leak-removed');
   }
   return { answer: fixed, violations, corrections };
 }

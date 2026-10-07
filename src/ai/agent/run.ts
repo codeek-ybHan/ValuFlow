@@ -19,6 +19,7 @@ import { groundWithRepair, type RawWorkflowAnswer } from '../grounding/repair.ts
 import type { Proposal } from '../grounding/wacc.ts';
 import type { GroundingAuditEvent } from '../grounding/types.ts';
 import { planWorkflow } from './planner.ts';
+import { leaksSystemPrompt } from '../guard.ts';
 import type { HumanCheckpoint, Observation, WorkflowAnswer, WorkflowAuditEvent, WorkflowOutcome, WorkflowPlan, WorkflowState, WorkflowStatus, WorkflowStep } from './types.ts';
 
 /** workflow 단계 수 상한 (계획 + 관찰에 따라 추가된 동적 단계). */
@@ -69,6 +70,9 @@ function runTool(name: string, ctx: AiValuationContext, input: unknown): ToolRes
   try { return executeTool(name, ctx, input); } catch { return { status: 'unavailable', tool: name, reason: 'Tool execution failed.', sources: [], warnings: [] }; }
 }
 
+const RETRIEVAL_TOOLS = new Set<string>(['searchDisclosures', 'searchUploadedDocuments', 'searchKnowledge']);
+/** 같은 Tool 이거나 같은 retrieval 계열(검색 Tool 끼리)인가. */
+export const sameFamily = (a: string, b: string) => a === b || (RETRIEVAL_TOOLS.has(a) && RETRIEVAL_TOOLS.has(b));
 const capabilityOf = (tool: string): CapabilityId => CAPABILITIES.find((c) => (c.tools as string[]).includes(tool))?.id ?? 'historical';
 
 /** 사람의 판단이 필요한 변경 제안을 승인 / 거절로 기록한다. 어떤 경우에도 값을 적용하지 않는다 (이 단계에는 write Tool 이 없다). */
@@ -142,8 +146,9 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
   // ---- 실행 ----
   const steps = state.steps;
   const setStep = (tool: string, patch: Partial<WorkflowStep>) => {
-    const s = steps.find((x) => x.tool === tool && (x.status === 'pending' || x.status === 'running')) ?? null;
-    if (s) { Object.assign(s, patch); return; }
+    // 검색 Tool(공시 · 업로드 문서 · 통합 지식 검색)은 같은 retrieval 계열이다: 업로드 문서를 묻는 질문에서 searchUploadedDocuments 로 확인했다면 대기 중인 검색 단계(searchDisclosures)를 충족한 것이다
+    const s = steps.find((x) => x.tool === tool && (x.status === 'pending' || x.status === 'running')) ?? (RETRIEVAL_TOOLS.has(tool) && patch.status === 'completed' ? steps.find((x) => RETRIEVAL_TOOLS.has(x.tool) && x.status === 'pending') ?? null : null);
+    if (s) { Object.assign(s, patch, s.tool !== tool && patch.status === 'completed' ? { reason: `같은 검색 계열 Tool(${tool})로 확인했습니다.` } : {}); return; }
     if (patch.status === 'completed' || patch.status === 'failed') {  // 계획에 없던 Tool: 관찰에 따라 모델이 추가로 호출한 동적 단계
       if (steps.length >= MAX_WORKFLOW_STEPS) { state.status = 'tool-limit'; return; }
       steps.push({ id: `dynamic-${steps.length + 1}`, capability: capabilityOf(tool), tool: tool as ToolName, purpose: `${getToolDefinition(tool)?.description.slice(0, 40) ?? tool} (관찰에 따라 추가)`, optional: true, status: 'pending', dynamic: true, ...patch });
@@ -257,7 +262,8 @@ async function finalize(raw: RawWorkflowAnswer, state: WorkflowState, results: T
     const word = LIMITATION_LABEL[tool]?.split(' ')[0];
     if (!limitations.some((l) => l.includes(tool) || (word !== undefined && l.includes(word)))) { limitations.push(limitationFor(tool, why)); if (!corrections.includes('limitations-restored')) corrections.push('limitations-restored'); }
   };
-  for (const s of state.steps) if (s.status === 'failed') restore(s.tool, s.reason ?? 'unavailable');
+  // 같은 Tool 이 나중에 성공했다면(예: 첫 검색이 결과 없음 → 질의를 바꿔 재검색 성공) 그 실패는 한계가 아니다
+  for (const s of state.steps) if (s.status === 'failed' && !state.steps.some((x) => sameFamily(x.tool, s.tool) && x.status === 'completed')) restore(s.tool, s.reason ?? 'unavailable');
   for (const s of state.steps) if (s.status === 'skipped' && !s.optional && s.reason && !s.reason.startsWith('지원하지')) restore(s.tool, s.reason === '호출되지 않았습니다.' ? '필수 단계가 실행되지 않았습니다' : s.reason);
   const reviewedAreas = (raw.reviewedAreas ?? []).length > 0 ? [...raw.reviewedAreas!] : state.steps.filter((s) => s.status === 'completed').map((s) => s.purpose);
   if ((raw.reviewedAreas ?? []).length === 0 && reviewedAreas.length > 0) corrections.push('reviewed-areas-filled');
@@ -265,5 +271,7 @@ async function finalize(raw: RawWorkflowAnswer, state: WorkflowState, results: T
   if ((APPLIED_CLAIM.test(text) && r.proposals.length === 0) || /(WACC|Forecast|가정|배수).{0,15}(변경|수정|적용|저장)(했|되었|됐)/.test(text)) {
     violations.push({ code: 'applied-change-claimed', detail: 'the answer states that an assumption was changed/applied, but the agent never changes anything' });
   }
-  return { ...r.answer, reviewedAreas, limitations, judgmentItems: raw.judgmentItems ?? [], claims: r.claims, evidenceMap: r.report.evidenceMap, grounding: r.report, proposedActions: r.proposals };
+  const leak = (s: string) => leaksSystemPrompt(s);   // claim · 한계 · 판단 항목 · 제안에 system instruction 이 들어간 경우도 제거한다
+  const clean = <T,>(list: T[], text: (x: T) => string): T[] => { const kept = list.filter((x) => !leak(text(x))); if (kept.length !== list.length && !corrections.includes('prompt-leak-removed')) { corrections.push('prompt-leak-removed'); violations.push({ code: 'prompt-leak', detail: 'the answer contains text from the system instruction' }); } return kept; };
+  return { ...r.answer, reviewedAreas: clean(reviewedAreas, (x) => x), limitations: clean(limitations, (x) => x), judgmentItems: clean(raw.judgmentItems ?? [], (x) => x), claims: clean(r.claims, (c) => c.text), evidenceMap: r.report.evidenceMap, grounding: r.report, proposedActions: r.proposals };
 }

@@ -41,7 +41,9 @@
 .ai-running { border-style: dashed; }
 
 /* Turn header · status */
-.ai-turn-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.ai-turn-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.ai-turn-head > div { min-width: 0; }
+.ai-turn-head .chip { white-space: normal; height: auto; padding-top: 3px; padding-bottom: 3px; line-height: 1.4; }
 .ai-q { margin: 2px 0 0; font-size: 18px; letter-spacing: -.02em; }
 .ai-status { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--surface-2); font-size: 13.5px; }
 .ai-status strong::before { content: '● '; color: var(--muted); }

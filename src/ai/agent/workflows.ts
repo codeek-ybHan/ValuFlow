@@ -57,7 +57,7 @@ export const WORKFLOWS: readonly WorkflowTemplate[] = [
   },
   {
     type: 'event-review', label: 'Risk / News Review',
-    pattern: /(뉴스|기사|이벤트|사건|\bnews\b|최근\s*(소식|이슈|동향)).{0,30}(valuation|밸류에이션|가치|위험|리스크|risk|영향)|(valuation|밸류에이션|가치|위험|리스크|risk).{0,30}(뉴스|기사|이벤트|사건|최근)|valuation\s*risk|밸류에이션\s*(위험|리스크)|시장\s*상황.{0,30}(위험|리스크|risk)/i,
+    pattern: /(뉴스|기사|이벤트|사건|\bnews\b|최근\s*(소식|이슈|동향)).{0,30}(valuation|밸류에이션|가치|위험|리스크|risk|영향)|(valuation|밸류에이션|가치|위험|리스크|risk).{0,30}(뉴스|기사|이벤트|사건|최근)|valuation\s*risk|밸류에이션\s*(위험|리스크)|시장\s*상황.{0,30}(위험|리스크|risk)|(공시.{0,12}뉴스|뉴스.{0,12}공시)/i,
     steps: [
       S('news', 'news', 'searchCompanyNews', '최근 기업 뉴스 · 이벤트 확인'),
       S('disclosure', 'disclosure', 'searchDisclosures', '이벤트의 공시 근거 확인', true),

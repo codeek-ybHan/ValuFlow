@@ -6,6 +6,7 @@ import type { AiQueryOutcome } from '../query.ts';
 import type { CheckpointKind, StepStatus, WorkflowOutcome, WorkflowType } from '../agent/types.ts';
 import type { ClaimStatus, ClaimType, Confidence, Evidence, GroundedClaim } from '../grounding/types.ts';
 import { UNSUPPORTED_DISCLOSURE } from '../policy.ts';
+import { sameFamily } from '../agent/run.ts';
 import { formatFinancialValue, formatPercent, normalizeDisplayUnit } from '../tools/display.ts';
 
 export type AnalystMode = 'quick' | 'workflow';
@@ -415,7 +416,7 @@ const groupClaims = (claims: GroundedClaim[]) => {
 export function buildWorkflowTurn(o: WorkflowOutcome, ctx: BuildContext, question: string): AnalystTurn {
   const a = o.answer;
   const stepViews: StepView[] = o.state.steps.map((s) => ({ id: s.id, label: s.purpose, tool: s.tool, status: s.status, reason: s.reason ?? null, optional: s.optional }));
-  const failedSteps = o.state.steps.filter((s) => s.status === 'failed');
+  const failedSteps = o.state.steps.filter((s) => s.status === 'failed' && !o.state.steps.some((x) => sameFamily(x.tool, s.tool) && x.status === 'completed'));   // 같은 Tool 이 나중에 성공했다면 실패로 보이지 않는다
   const usedTools = [...new Set(o.state.toolsExecuted.filter((t) => t.status === 'ok').map((t) => t.tool))];
   const usedSources = usedTools.map(toolLabel);
   const warnings: WarningView[] = [];

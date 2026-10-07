@@ -12,6 +12,7 @@ import { AiClientError, type AiGatewayClient, type GatewayResponse, type ToolTra
 import { enforceGrounding, type AiAnalystAnswer, type AnswerViolation } from './answer.ts';
 import type { AiFinalStatus, AiQueryAuditEvent } from './audit.ts';
 import { buildMinimalContext } from './minimalContext.ts';
+import { enforceQuickNumbers } from './quickGuard.ts';
 
 /** 클라이언트 측 안전장치: backend 의 Tool 한도와 별개로 왕복 횟수를 제한한다 (무한 loop 방지). */
 export const MAX_CLIENT_ROUNDS = 10;
@@ -25,6 +26,7 @@ export interface RunAiQueryOptions extends AiContextOptions {
 
 /**
  * 기술부채: 일반 질문(runAiQuery)에는 Grounded Analysis(claim ↔ evidence 검증 · 교정 재생성)를 아직 적용하지 않는다 — 답변에 claim 구조가 없다.
+ * (STEP 08-8 에서 요약 숫자는 문장 단위로 검증한다: quickGuard.ts. claim 연결 · 재생성은 여전히 Deep Analysis 에만 있다.)
  * 통합 지점: `groundWithRepair`(src/ai/grounding/repair.ts)는 claims 가 비어 있어도 summary 의 숫자 검증을 하므로, 일반 질문도 같은 경로에 태우면 된다
  * (답변 schema 에 claims 를 추가하거나 summary 숫자 검증만 적용). UI 는 `groundingLevel` 로 두 경로의 수준 차이를 구분해서 보여야 한다.
  */
@@ -108,7 +110,10 @@ export async function runAiQuery(options: RunAiQueryOptions): Promise<AiQueryOut
         trace = res.toolTrace ?? trace;
         results.push(...(res.backendToolResults ?? []));  // backend 가 실행한 Tool 결과(공시 검색 등)도 같은 grounding 대상이다
         const g = enforceGrounding(res.answer, results, { unsupported: ctx.support.status === 'unsupported' });
-        return finish(g.corrections.length > 0 ? 'answered-with-corrections' : 'answered', { answer: g.answer, violations: g.violations, corrections: g.corrections });
+        const n = enforceQuickNumbers(g.answer, results);   // 요약의 근거 없는 숫자 · 엔진 값이 아닌 Valuation 숫자 제거 (문장 단위)
+        const violations = [...g.violations, ...n.violations];
+        const corrections = [...g.corrections, ...n.corrections];
+        return finish(corrections.length > 0 ? 'answered-with-corrections' : 'answered', { answer: n.answer, violations, corrections });
       }
       requested.push(res.tool);
       const result = runTool(res.tool, ctx, res.input);
