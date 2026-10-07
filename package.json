@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "npm run test:engine",
     "test:valuation": "node --test src/valuation/*.test.ts",
-    "test:engine": "node --test src/data/*.test.ts src/engine/*.test.ts src/valuation/*.test.ts src/store/*.test.ts",
+    "test:engine": "node --test src/ai/*.test.ts src/data/*.test.ts src/engine/*.test.ts src/valuation/*.test.ts src/store/*.test.ts",
     "export:normalization": "node scripts/export-normalization.ts"
   },
   "dependencies": {
