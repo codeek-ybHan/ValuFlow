@@ -1,15 +1,7 @@
 // DCF: 할인 → Terminal Value → EV → Net Debt → Equity Value → 주당가치.
 // 할인은 연도 말(end-of-year) 가정이다. Terminal Value 는 Gordon Growth.
 import { ValuationError } from './models.ts';
-
-const finite = (n: number) => typeof n === 'number' && Number.isFinite(n);
-function assertFinite(name: string, n: number): void {
-  if (!finite(n)) throw new ValuationError(`${name}: 숫자가 아닙니다.`);
-}
-function assertSeries(name: string, values: number[]): void {
-  if (!Array.isArray(values) || values.length === 0) throw new ValuationError(`${name}: 예측 기간(1년 이상)의 값이 필요합니다.`);
-  values.forEach((v, i) => assertFinite(`${name}[Y${i + 1}]`, v));
-}
+import { assertFinite, assertSeries } from './validate.ts';
 function assertWacc(wacc: number): void {
   assertFinite('wacc', wacc);
   if (wacc <= -1) throw new ValuationError('wacc: -100% 보다 커야 합니다.');

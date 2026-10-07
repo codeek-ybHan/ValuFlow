@@ -8,6 +8,7 @@ import { calculateWacc } from './wacc.ts';
 import { calculateEquityValue, calculateNetDebt, calculatePerShareValue, runDcf } from './dcf.ts';
 import type { ValuationInput, ValuationResult } from './models.ts';
 import { ValuationError } from './models.ts';
+import { assertFinite, assertSeries, isFiniteNumber } from './validate.ts';
 
 const SCALARS: (keyof ValuationInput)[] = [
   'currentRevenue', 'taxRate', 'riskFreeRate', 'beta', 'marketRiskPremium', 'preTaxCostOfDebt',
@@ -17,20 +18,14 @@ const SERIES: (keyof ValuationInput)[] = ['revenueGrowth', 'operatingMargin', 'd
 
 /** 계산 전에 입력 전체를 점검한다. 세부 범위(세율, 성장률, WACC > g 등)는 각 계산 함수가 다시 검증한다. */
 export function validateInput(input: ValuationInput): void {
-  for (const k of SCALARS) {
-    const v = input[k] as number;
-    if (typeof v !== 'number' || !Number.isFinite(v)) throw new ValuationError(`${k}: 숫자가 아닙니다.`);
-  }
-  const years = input.revenueGrowth?.length ?? 0;
-  if (years < 1) throw new ValuationError('revenueGrowth: 예측 기간(1년 이상)의 값이 필요합니다.');
+  for (const k of SCALARS) assertFinite(k, input[k]);
+  assertSeries('revenueGrowth', input.revenueGrowth);
+  const years = input.revenueGrowth.length;
   for (const k of SERIES) {
-    const arr = input[k] as number[];
-    if (!Array.isArray(arr) || arr.length !== years) {
-      throw new ValuationError(`${k}: 예측 기간(${years}년)과 길이가 다릅니다(${Array.isArray(arr) ? arr.length : 0}).`);
+    assertSeries(k, input[k]);
+    if ((input[k] as number[]).length !== years) {
+      throw new ValuationError(`${k}: 예측 기간(${years}년)과 길이가 다릅니다(${(input[k] as number[]).length}).`);
     }
-    arr.forEach((v, i) => {
-      if (typeof v !== 'number' || !Number.isFinite(v)) throw new ValuationError(`${k}: Y${i + 1} 값이 숫자가 아닙니다.`);
-    });
   }
   if (input.sharesOutstanding <= 0) throw new ValuationError('sharesOutstanding: 0 보다 커야 합니다.');
   if (input.equityMarketValue + input.debtMarketValue <= 0) throw new ValuationError('equityMarketValue + debtMarketValue: 0 보다 커야 합니다.');
@@ -40,7 +35,7 @@ export function validateInput(input: ValuationInput): void {
 function assertFiniteResult(result: ValuationResult): void {
   for (const [key, value] of Object.entries(result)) {
     const nums = Array.isArray(value) ? value : [value];
-    if (nums.some((n) => !Number.isFinite(n))) throw new ValuationError(`계산 결과(${key})가 유한한 숫자가 아닙니다. 입력을 확인하세요.`);
+    if (nums.some((n) => !isFiniteNumber(n))) throw new ValuationError(`계산 결과(${key})가 유한한 숫자가 아닙니다. 입력을 확인하세요.`);
   }
 }
 

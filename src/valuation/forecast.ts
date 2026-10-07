@@ -1,19 +1,11 @@
 // Forecast: 매출 → EBIT → NOPAT → FCFF.
 import type { ValuationInput } from './models.ts';
 import { ValuationError } from './models.ts';
-
-const finite = (n: number) => typeof n === 'number' && Number.isFinite(n);
-
-function assertSeries(name: string, values: number[]): void {
-  if (!Array.isArray(values) || values.length === 0) throw new ValuationError(`${name}: 예측 기간(1년 이상)의 값이 필요합니다.`);
-  values.forEach((v, i) => {
-    if (!finite(v)) throw new ValuationError(`${name}: Y${i + 1} 값이 숫자가 아닙니다.`);
-  });
-}
+import { assertSeries, assertTaxRate, isFiniteNumber } from './validate.ts';
 
 /** Y1 = Y0 × (1 + g1), Y2 = Y1 × (1 + g2), … 성장률 -100% 이하(매출 0 이하)는 허용하지 않는다. */
 export function forecastRevenue(currentRevenue: number, growth: number[]): number[] {
-  if (!finite(currentRevenue) || currentRevenue < 0) throw new ValuationError('currentRevenue: 0 이상의 숫자여야 합니다.');
+  if (!isFiniteNumber(currentRevenue) || currentRevenue < 0) throw new ValuationError('currentRevenue: 0 이상의 숫자여야 합니다.');
   assertSeries('revenueGrowth', growth);
   const out: number[] = [];
   let prev = currentRevenue;
@@ -38,7 +30,7 @@ export function calculateEbit(revenue: number[], operatingMargin: number[]): num
 /** NOPAT = EBIT × (1 − 세율). 세율은 0 이상 1 미만. */
 export function calculateNopat(ebit: number[], taxRate: number): number[] {
   assertSeries('ebit', ebit);
-  if (!finite(taxRate) || taxRate < 0 || taxRate >= 1) throw new ValuationError('taxRate: 0 이상 1 미만의 소수여야 합니다 (25% → 0.25).');
+  assertTaxRate(taxRate);
   return ebit.map((e) => e * (1 - taxRate));
 }
 

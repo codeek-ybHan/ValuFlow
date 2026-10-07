@@ -34,5 +34,5 @@ export interface HistoricalData {
   };
 }
 
-/** Valuation 입력 가정. 엔진의 입력 모델(valuation/models.ts)과 같은 타입이다. */
-export type { ValuationInput as ValuationAssumptions } from '../valuation/models';
+/** Valuation 입력 가정. 엔진의 입력 모델(valuation 공개 API 의 ValuationInput)과 같은 타입이다. */
+export type { ValuationInput as ValuationAssumptions } from '../valuation';

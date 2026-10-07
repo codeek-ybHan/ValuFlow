@@ -4,6 +4,7 @@
 //   비율            소수 (8% → 0.08, 25% → 0.25)
 //   sharesOutstanding  실제 주식 수(주)
 //   perShareValue   원 — 억원 × 100,000,000 → 원으로 변환한 뒤 주식 수로 나눈다
+//   반올림         엔진 내부에서는 하지 않는다 (표시용 포맷은 UI 에서만)
 //   연도 배열        Y1, Y2, … 순서
 // 계산은 이 폴더의 순수 함수만 수행한다. UI / LLM 은 결과 객체를 읽기만 한다.
 
@@ -73,9 +74,4 @@ export class ValuationError extends Error {
     super(message);
     this.name = 'ValuationError';
   }
-}
-
-/** 아직 구현되지 않은 계산. 가짜 값을 돌려주지 않고 명시적으로 실패한다. */
-export function notImplemented(fn: string): never {
-  throw new ValuationError(`${fn}: 아직 구현되지 않았습니다 (STEP 05-2 에서 구현 예정).`);
 }

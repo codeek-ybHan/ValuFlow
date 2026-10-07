@@ -1,6 +1,7 @@
 // WACC: CAPM 자기자본비용, 세후 타인자본비용, 자본구조 가중치.
 import type { ValuationInput } from './models.ts';
 import { ValuationError } from './models.ts';
+import { assertFinite, assertTaxRate } from './validate.ts';
 
 export interface WaccResult {
   costOfEquity: number;
@@ -8,11 +9,6 @@ export interface WaccResult {
   equityWeight: number;
   debtWeight: number;
   wacc: number;
-}
-
-const finite = (n: number) => typeof n === 'number' && Number.isFinite(n);
-function assertFinite(name: string, n: number): void {
-  if (!finite(n)) throw new ValuationError(`${name}: 숫자가 아닙니다.`);
 }
 
 /** Re = Rf + β × MRP */
@@ -26,7 +22,7 @@ export function calculateCostOfEquity(riskFreeRate: number, beta: number, market
 /** Rd × (1 − T). 세율은 0 이상 1 미만. */
 export function calculateAfterTaxCostOfDebt(preTaxCostOfDebt: number, taxRate: number): number {
   assertFinite('preTaxCostOfDebt', preTaxCostOfDebt);
-  if (!finite(taxRate) || taxRate < 0 || taxRate >= 1) throw new ValuationError('taxRate: 0 이상 1 미만의 소수여야 합니다 (25% → 0.25).');
+  assertTaxRate(taxRate);
   return preTaxCostOfDebt * (1 - taxRate);
 }
 
