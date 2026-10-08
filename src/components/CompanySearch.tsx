@@ -37,7 +37,7 @@ export function CompanySearch({ repository = defaultFinancialRepository }: { rep
     setError(null);
     const r = await selectCompany(repository, c);
     setBusy(null);
-    if (r.ok) setSelectedCompany(r.company);
+    if (r.ok) { setSelectedCompany(r.company); setResults(null); }   // 선택하면 후보 목록을 닫고 선택한 기업과 [재무데이터 불러오기] 만 보여 준다
     else setError(r.message);
   };
 
