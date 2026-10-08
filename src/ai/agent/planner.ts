@@ -1,5 +1,7 @@
 // Workflow Planner: 질문 → workflow 종류 · 필요한 capability · 예상 Tool · 순서를 정한다 (규칙 기반; classifyQuestion 은 routing hint 로 재사용한다).
 // Planner 는 Tool 입력 값이나 데이터를 만들어 내지 않는다: 계획에는 Tool 이름과 목적만 있고, 값은 Tool 실행 결과에서만 온다.
+import type { RetrievalRoute } from '../retrievalRoute.ts';
+import type { WorkflowTemplateStep } from './workflows.ts';
 import type { AiValuationContext } from '../context.ts';
 import { getToolDefinition, type ToolRequirement } from '../tools/definitions.ts';
 import { classifyQuestion } from '../capabilities.ts';
@@ -26,7 +28,22 @@ function met(req: ToolRequirement, ctx: AiValuationContext): { ok: boolean; reas
   }
 }
 
-export interface PlanOptions { maxToolCalls?: number }
+export interface PlanOptions { maxToolCalls?: number; route?: RetrievalRoute }
+
+/** 문서 질문의 라우팅을 workflow 단계에 반영한다: 업로드 문서를 가리키면 공시 검색 단계를 업로드 문서 검색으로 바꾸고, 공시만 명시하면 업로드 문서 검색 단계를 뺀다. */
+export function routeSteps(steps: readonly WorkflowTemplateStep[], route: RetrievalRoute | undefined): WorkflowTemplateStep[] {
+  if (route === undefined || route === 'default' || route === 'both') return [...steps];
+  const out: WorkflowTemplateStep[] = [];
+  for (const s of steps) {
+    if (route === 'uploaded' && (s.tool === 'searchDisclosures' || s.tool === 'searchKnowledge')) {
+      const prior = out.find((x) => x.tool === 'searchUploadedDocuments');
+      if (prior) { if (!s.optional) prior.optional = false; continue; }
+      out.push({ ...s, capability: 'knowledge', tool: 'searchUploadedDocuments', purpose: '업로드한 문서에서 근거 확인' });
+    } else if (route === 'disclosure' && (s.tool === 'searchUploadedDocuments' || s.tool === 'searchKnowledge')) continue;
+    else out.push({ ...s });
+  }
+  return out;
+}
 
 /** 질문과 context 로 계획을 만든다. workflow 질문이 아니면 null. */
 export function planWorkflow(question: string, ctx: AiValuationContext, options: PlanOptions = {}): WorkflowPlan | null {
@@ -35,7 +52,7 @@ export function planWorkflow(question: string, ctx: AiValuationContext, options:
   const hints = classifyQuestion(question);
   const maxToolCalls = options.maxToolCalls ?? AGENT_MAX_TOOL_CALLS;
   const unsupported = ctx.support.status === 'unsupported';
-  const steps: WorkflowStep[] = template.steps.map((s): WorkflowStep => {
+  const steps: WorkflowStep[] = routeSteps(template.steps, options.route).map((s): WorkflowStep => {
     const def = getToolDefinition(s.tool)!;
     const r = met(def.requires, ctx);
     const base: WorkflowStep = { id: s.id, capability: s.capability, tool: s.tool, purpose: s.purpose, optional: s.optional, status: 'pending' };

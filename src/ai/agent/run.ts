@@ -3,6 +3,7 @@
 //  - 한 workflow 동안 같은 context snapshot 을 쓴다 (시작 후 Project State 가 바뀌어도 섞이지 않는다).
 //  - Agent 는 가정 · Forecast · WACC · Peer 배수 · 시나리오를 바꾸지 않는다. 변경이 필요해 보이면 proposedActions → HumanCheckpoint(waiting-for-user)로만 남긴다.
 //  - 한 Tool 이 실패해도 workflow 는 계속되고 최종 답변에 한계(limitations)로 남는다.
+import { routeContext, routeRetrieval, toolNamesFor, type RouteDecision } from '../retrievalRoute.ts';
 import { buildAiContext, type AiContextOptions, type AiValuationContext } from '../context.ts';
 import type { ProjectState } from '../../store/projectModel.ts';
 import { CAPABILITIES, type CapabilityId } from '../capabilities.ts';
@@ -27,6 +28,8 @@ export const MAX_WORKFLOW_STEPS = 14;
 
 export interface RunWorkflowOptions extends AiContextOptions {
   question: string;
+  /** 문서 질문의 검색 대상 라우팅 (없으면 질문에서 정한다). */
+  route?: RouteDecision;
   project: ProjectState;
   client: AiGatewayClient;
   now?: () => Date;
@@ -106,7 +109,8 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
   const now = options.now ?? (() => new Date());
   const t0 = now().getTime();
   const ctx = buildAiContext(options.project, { historicalStatus: options.historicalStatus });   // immutable snapshot: workflow 끝까지 같은 값을 쓴다
-  const plan = planWorkflow(options.question, ctx, { maxToolCalls: options.maxToolCalls });
+  const route = options.route ?? routeRetrieval(options.question);
+  const plan = planWorkflow(options.question, ctx, { maxToolCalls: options.maxToolCalls, route: route.route });
   if (!plan) return null;
   const classification = classifyQuestion(options.question);
   const workflowId = (options.newId ?? (() => `wf_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`))();
@@ -184,7 +188,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
 
   try {
     let res: GatewayResponse = await options.client.query({
-      question: options.question, minimalContext: buildMinimalContext(ctx), toolNames: [...TOOL_NAMES],
+      question: options.question, minimalContext: { ...buildMinimalContext(ctx), ...routeContext(route) }, toolNames: toolNamesFor(TOOL_NAMES, route.route),
       classification: { mode: classification.mode, capabilities: classification.capabilities, matched: classification.matched, suggestedTools: classification.suggestedTools },
       workflow: { type: plan.workflowType, steps: steps.filter((s) => s.status === 'pending').map((s) => ({ id: s.id, tool: s.tool, purpose: s.purpose, optional: s.optional })), maxToolCalls: plan.maxToolCalls },
     });

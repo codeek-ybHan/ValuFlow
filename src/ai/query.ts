@@ -12,6 +12,7 @@ import { AiClientError, type AiGatewayClient, type GatewayResponse, type ToolTra
 import { enforceGrounding, type AiAnalystAnswer, type AnswerViolation } from './answer.ts';
 import type { AiFinalStatus, AiQueryAuditEvent } from './audit.ts';
 import { buildMinimalContext } from './minimalContext.ts';
+import { routeContext, routeRetrieval, toolNamesFor, type RouteDecision } from './retrievalRoute.ts';
 import { enforceQuickNumbers } from './quickGuard.ts';
 
 /** 클라이언트 측 안전장치: backend 의 Tool 한도와 별개로 왕복 횟수를 제한한다 (무한 loop 방지). */
@@ -22,6 +23,8 @@ export interface RunAiQueryOptions extends AiContextOptions {
   project: ProjectState;
   client: AiGatewayClient;
   now?: () => Date;
+  /** 문서 질문의 검색 대상 라우팅 (없으면 질문에서 정한다). 허용되지 않은 검색 Tool 은 모델에 주어지지 않는다. */
+  route?: RouteDecision;
 }
 
 /**
@@ -58,6 +61,7 @@ export async function runAiQuery(options: RunAiQueryOptions): Promise<AiQueryOut
   // 질문 시작 시점의 immutable snapshot (loop 동안 같은 snapshot 사용)
   const ctx = buildAiContext(options.project, { historicalStatus: options.historicalStatus });
   const classification = classifyQuestion(question);
+  const route = options.route ?? routeRetrieval(question);
 
   const requested: string[] = [];
   const executed: { tool: string; status: string }[] = [];
@@ -100,7 +104,7 @@ export async function runAiQuery(options: RunAiQueryOptions): Promise<AiQueryOut
 
   try {
     let res: GatewayResponse = await options.client.query({
-      question, minimalContext: buildMinimalContext(ctx), toolNames: [...TOOL_NAMES],
+      question, minimalContext: { ...buildMinimalContext(ctx), ...routeContext(route) }, toolNames: toolNamesFor(TOOL_NAMES, route.route),
       classification: { mode: classification.mode, capabilities: classification.capabilities, matched: classification.matched, suggestedTools: classification.suggestedTools },
     });
     for (let round = 0; round < MAX_CLIENT_ROUNDS; round++) {

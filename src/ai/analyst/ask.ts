@@ -7,6 +7,7 @@ import type { AiGatewayClient } from '../client.ts';
 import { planWorkflow } from '../agent/planner.ts';
 import { runWorkflow, snapshotId } from '../agent/run.ts';
 import { runAiQuery } from '../query.ts';
+import { routeRetrieval } from '../retrievalRoute.ts';
 import type { WorkflowState } from '../agent/types.ts';
 import {
   buildQuickTurn, buildWorkflowTurn, errorView, progressText, QUICK_PROGRESS_TEXT, waccPanel,
@@ -28,6 +29,8 @@ export interface AskOptions {
   newId?: () => string;
   onProgress?: (p: Progress) => void;
   signal?: { readonly aborted: boolean };
+  /** 현재 범위(현재 기업 문서 + 일반 문서)에서 검색 가능한 업로드 문서 수. 모르면 null/생략: 문서 질문의 라우팅과 "업로드한 문서 없음" 안내에 쓴다. */
+  uploadedCount?: number | null;
 }
 
 /** Quick / Workflow 선택: 자동이면 workflow 질문일 때만 Deep Analysis. Deep Analysis 를 골라도 workflow 로 계획할 수 없는 질문은 Quick 이다. */
@@ -53,10 +56,16 @@ export async function askAnalyst(o: AskOptions): Promise<AnalystTurn> {
     return { ...emptyTurn(base, o.question, mode), status: 'failed', error: errorView('no-company') };
   }
 
+  // 문서 질문의 검색 대상: "이 문서"·"업로드한 PDF" 는 업로드 문서, "사업보고서에서"·"공시에서" 는 공시. 회사가 선택돼 있다는 이유만으로 공시로 보내지 않는다.
+  const route = routeRetrieval(o.question, { uploadedCount: o.uploadedCount ?? null });
+  if (route.limitation) {   // 업로드한 문서가 하나도 없는데 "이 문서"를 말하면 LLM 을 부르지 않고 한계를 알린다 (공시 검색으로 우회하지 않는다)
+    return { ...emptyTurn(base, o.question, 'quick'), status: 'failed', error: errorView('no-uploaded-documents') };
+  }
+
   try {
     if (mode === 'workflow') {
       const outcome = await runWorkflow({
-        question: o.question, project: o.project, client: o.client, historicalStatus: o.historicalStatus, now, signal: o.signal,
+        question: o.question, project: o.project, client: o.client, historicalStatus: o.historicalStatus, now, signal: o.signal, route,
         onProgress: o.onProgress ? (s) => o.onProgress!({ mode, label: null, steps: stepViews(s), text: progressText(s.steps) }) : undefined,
       });
       if (outcome) {
@@ -65,7 +74,7 @@ export async function askAnalyst(o: AskOptions): Promise<AnalystTurn> {
       }
     }
     o.onProgress?.({ mode: 'quick', label: null, steps: [], text: QUICK_PROGRESS_TEXT });
-    return buildQuickTurn(await runAiQuery({ question: o.question, project: o.project, client: o.client, historicalStatus: o.historicalStatus, now }), base, o.question);
+    return buildQuickTurn(await runAiQuery({ question: o.question, project: o.project, client: o.client, historicalStatus: o.historicalStatus, now, route }), base, o.question);
   } catch {
     return { ...emptyTurn(base, o.question, mode), status: 'failed', error: errorView('unknown') };
   }

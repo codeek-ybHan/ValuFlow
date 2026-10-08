@@ -80,7 +80,7 @@ export function extractEvidence(results: ToolResult<unknown>[]): EvidenceIndex {
         const isNews = r.tool === 'searchCompanyNews';
         const type = isNews ? 'news' : it.sourceType === 'user-upload' ? 'uploaded-document' : 'disclosure-document';
         push({
-          fieldPath: `results[${i}]`, sourceType: type, documentId: typeof it.documentId === 'string' ? it.documentId : undefined, page: typeof it.pageNumber === 'number' ? it.pageNumber : undefined,
+          fieldPath: `results[${i}]`, sourceType: type, documentId: typeof it.documentId === 'string' ? it.documentId : undefined, filename: typeof it.filename === 'string' && it.filename ? it.filename : undefined, page: typeof it.pageNumber === 'number' ? it.pageNumber : undefined,
           section: typeof it.section === 'string' ? it.section : undefined, asOf: String(it.publishedAt ?? it.filingDate ?? it.uploadedAt ?? '') || undefined,
           sourceLabel: String(it.title ?? it.reportName ?? it.publisher ?? label ?? ''), url: typeof it.url === 'string' ? it.url : undefined,
           excerpt: clip(String(it.text ?? [it.title, it.snippet].filter(Boolean).join(' — '))),

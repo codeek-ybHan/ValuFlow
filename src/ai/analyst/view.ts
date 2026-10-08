@@ -1,6 +1,7 @@
 // STEP 08-7 AI Analyst UI 의 view-model. React 를 모르는 순수 함수만 둔다 (화면은 이 결과만 그린다).
 // 원칙: Tool 결과 JSON 을 그대로 보이지 않는다 · 내부 추론(chain-of-thought)은 없다 · Fact 와 Judgment 를 같은 스타일로 보이지 않는다 ·
 //       숫자에는 단위를 붙인다 · 외부 provider 의 신뢰 등급을 숨기지 않는다 · 현재 Project 값을 다시 계산해서 과거 답변을 바꾸지 않는다.
+import { NO_UPLOADED_DOCUMENTS } from '../retrievalRoute.ts';
 import type { AnswerSource } from '../answer.ts';
 import type { AiQueryOutcome } from '../query.ts';
 import type { CheckpointKind, StepStatus, WorkflowOutcome, WorkflowType } from '../agent/types.ts';
@@ -110,6 +111,8 @@ export interface EvidenceView {
   page: number | null;
   section: string | null;
   documentId: string | null;
+  /** 업로드 PDF 의 원본 파일명 */
+  filename: string | null;
   excerpt: string | null;
   url: string | null;
   reliability: ReliabilityView | null;
@@ -161,7 +164,7 @@ export function evidenceView(e: Evidence): EvidenceView {
   const badge = badgeOf(e.sourceType, e.sourceKind, e.origin);
   return {
     id: e.evidenceId, badge, badgeLabel: BADGE_LABEL[badge], kindLabel: KIND_LABEL[e.sourceKind] ?? null, sourceLabel: sourceLabelOf(e), field: humanField(e.fieldPath),
-    valueText: e.missing ? null : valueText(e.value, e.unit, e.fieldPath), period: e.period ?? null, asOf: dateOf(e.asOf), page: e.page ?? null, section: e.section ?? null, documentId: e.documentId ?? null,
+    valueText: e.missing ? null : valueText(e.value, e.unit, e.fieldPath), period: e.period ?? null, asOf: dateOf(e.asOf), page: e.page ?? null, section: e.section ?? null, documentId: e.documentId ?? null, filename: e.filename ?? null,
     excerpt: e.excerpt ?? null, url: e.url ?? null, reliability: e.provider ? reliabilityOf(e.provider, e.sourceType) : reliabilityOf(null, e.sourceType), quality: e.quality && e.quality !== 'available' ? e.quality : null, missing: e.missing === true,
   };
 }
@@ -217,7 +220,7 @@ export function sourceView(s: AnswerSource, providers: Map<string, { reliability
     for (const l of [s.corpName, s.section, s.filingDate ? `공시일 ${s.filingDate}` : null, s.receiptNo ? `접수번호 ${s.receiptNo}` : null]) if (l) lines.push(l);
   } else if (s.type === 'uploaded-document') {
     title = s.title ?? 'Uploaded PDF';
-    for (const l of [s.page != null ? `p.${s.page}` : null, s.section, s.sourceName, s.uploadedAt ? `업로드 ${dateOf(s.uploadedAt)}` : null]) if (l) lines.push(l);
+    for (const l of [s.filename ? `파일 ${s.filename}` : null, s.page != null ? `p.${s.page}` : null, s.section, s.sourceName, s.uploadedAt ? `업로드 ${dateOf(s.uploadedAt)}` : null]) if (l) lines.push(l);
   } else if (s.type === 'news') {
     title = s.title ?? 'News';
     for (const l of [s.publisher, s.publishedAt ? `발행 ${dateOf(s.publishedAt)}` : null]) if (l) lines.push(l);
@@ -353,6 +356,7 @@ export function errorView(code: string | null | undefined): ErrorView {
     case 'provider-error': case 'invalid-model-output': return { kind: 'llm-unavailable', title: 'AI 서비스를 사용할 수 없습니다', detail: '잠시 후 다시 시도하세요.' };
     case 'rate-limited': return { kind: 'rate-limit', title: 'Demo AI 사용 한도에 도달했습니다', detail: '잠시 후 다시 시도해 주세요.' };   // 공개 데모의 IP 기준 한도 (HTTP 429)
     case 'provider-rate-limit': return { kind: 'rate-limit', title: '요청이 너무 많습니다', detail: 'AI 서비스 요청 한도를 초과했습니다. 잠시 후 다시 시도하세요.' };
+    case 'no-uploaded-documents': return { kind: 'no-result', title: '업로드한 문서가 없습니다', detail: NO_UPLOADED_DOCUMENTS };
     case 'cancelled': return { kind: 'cancelled', title: '분석을 취소했습니다', detail: '' };
     case 'no-company': return { kind: 'no-company', title: '기업이 선택되지 않았습니다', detail: 'Workspace 에서 기업을 선택하고 재무데이터를 불러오세요.' };
     case 'state-expired': case 'conversation-too-large': return { kind: 'unknown', title: '대화가 만료되었거나 너무 길어졌습니다', detail: '질문을 다시 시작하세요.' };

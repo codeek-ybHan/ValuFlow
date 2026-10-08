@@ -486,3 +486,28 @@ def test_health_and_unit_tests_do_not_load_a_model(kn):
     assert h["rerankerConfigured"] is False and h["knowledgeUploadConfigured"] is True
     with_reranker = create_app(Settings(dart_api_key="x", openai_api_key=KEY), store=kn.store_fin, embedder=kn.embedder, reranker=Scripted(lambda i, t: 0.5))
     assert TestClient(with_reranker).get("/api/health").json()["rerankerConfigured"] is True
+
+
+def test_uploaded_document_search_tool_never_returns_another_company_pdf_and_exposes_filename(kn):
+    """searchUploadedDocuments(업로드 문서 질문의 라우팅 대상): 현재 기업 문서 + 기업에 연결되지 않은 일반 문서만, 다른 기업에 귀속된 PDF 는 검색하지 않는다. 근거에는 파일명 · 페이지가 있다."""
+    industry, ir_sec, ir_hmc = seed(kn)
+    run = tools(kn)["searchUploadedDocuments"]
+    out = run(ctx(SAMSUNG), {"query": "설비투자 HBM 수요 전망 반도체"})
+    assert out["status"] == "ok"
+    items = out["data"]["results"]
+    ids = {i["documentId"] for i in items}
+    assert str(ir_hmc["documentId"]) not in ids, "현대차에 귀속된 PDF 는 삼성전자 질문에서 검색되지 않는다"
+    assert ids <= {str(industry["documentId"]), str(ir_sec["documentId"])}
+    assert {i["sourceType"] for i in items} == {"user-upload"}, "공시는 섞이지 않는다"
+    names = {i["filename"] for i in items}
+    assert names <= {"outlook.pdf", "ir.pdf"} and None not in names
+    assert all(i["pageNumber"] is not None and i["text"] for i in items), "페이지 · 발췌(본문)가 있다"
+    assert all(s["type"] == "uploaded-document" and s["filename"] in names and s["page"] is not None for s in out["sources"])
+    # 반대편: 현대차 질문에서는 삼성전자 PDF 가 나오지 않는다
+    other = run(ctx(HYUNDAI), {"query": "설비투자 HBM 수요 전망 반도체"})
+    assert str(ir_sec["documentId"]) not in {i["documentId"] for i in other["data"]["results"]}
+    # 업로드 문서가 하나도 없는 범위: 공시로 대체하지 않고 unavailable (업로드한 문서가 없다)
+    lone = run(ctx("00999999"), {"query": "삼성전자 IR 설비투자"})
+    assert lone["status"] in ("unavailable", "ok")
+    if lone["status"] == "ok":
+        assert all(i["sourceType"] == "user-upload" and i["documentId"] in {str(industry["documentId"])} for i in lone["data"]["results"]), "기업 미귀속(일반) 문서만"

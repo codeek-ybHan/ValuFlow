@@ -80,6 +80,7 @@ export function EvidenceCard({ e }: { e: EvidenceView }) {
       <div className="ev-head"><SourceBadge id={e.badge} label={e.badgeLabel} />{e.kindLabel ? <span className="small muted">{e.kindLabel}</span> : null}<ReliabilityTag r={e.reliability} /></div>
       <dl className="ev-dl">
         <div><dt>Source</dt><dd>{e.sourceLabel}</dd></div>
+        {e.badge === 'upload' && e.filename ? <div><dt>File</dt><dd>{e.filename}</dd></div> : null}
         {DOC_BADGES.has(e.badge) ? null : <div><dt>Field</dt><dd>{e.field}{e.period ? ` · ${e.period}` : ''}</dd></div>}
         {e.missing ? <div><dt>Value</dt><dd className="empty">값 없음 (Missing)</dd></div> : e.valueText ? <div><dt>Value</dt><dd className="num">{e.valueText}</dd></div> : null}
         {e.asOf ? <div><dt>As of</dt><dd className="num">{e.asOf}</dd></div> : null}
@@ -87,7 +88,7 @@ export function EvidenceCard({ e }: { e: EvidenceView }) {
         {e.page != null ? <div><dt>Page</dt><dd className="num">p.{e.page}</dd></div> : null}
         {e.quality ? <div><dt>Data quality</dt><dd>{e.quality}</dd></div> : null}
       </dl>
-      {e.excerpt ? <details><summary>발췌 보기</summary><p className="ev-excerpt">{e.excerpt}</p></details> : null}
+      {e.excerpt ? <details open={e.badge === 'upload'}><summary>발췌 보기</summary><p className="ev-excerpt">{e.excerpt}</p></details> : null}
       {e.url ? <a className="small" href={e.url} target="_blank" rel="noreferrer noopener">원문 열기</a> : null}
     </li>
   );

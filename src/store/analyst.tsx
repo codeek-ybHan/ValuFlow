@@ -5,6 +5,7 @@ import { activeTurn, addTurn, decideCheckpoint, emptySession, selectTurn, type A
 import type { AnalystTurn, CheckpointDecision, ModePreference } from '../ai/analyst/view.ts';
 import { buildAiContext } from '../ai/context.ts';
 import { defaultPersistence, type PersistenceClient } from '../data/persist/client.ts';
+import { countSearchableUploads } from '../data/repository/knowledgeRepository.ts';
 import { useProject } from './project';
 
 // AI Analyst 의 대화 state. Project(valuation) state 와 분리되어 있고, 여기서 Project 를 바꾸는 함수는 하나도 쓰지 않는다 (읽기 전용).
@@ -57,8 +58,10 @@ export function AnalystProvider({ children, client, initial, persistence }: { ch
     abort.current = signal;
     pending.current = { question: q };
     const { project: p, historicalStatus: hs } = latest.current;       // 질문 시점의 Project snapshot
+    const uploadedCount = await countSearchableUploads(p.selectedCompany?.corpCode ?? null);   // 문서 질문 라우팅: 현재 기업 + 일반 문서 수
+    if (seq.current !== mine) return;
     setRunning({ mode: resolveMode(q, buildAiContext(p, { historicalStatus: hs }), preference), label: null, steps: [], text: '질문을 준비하는 중…' });
-    const turn = await askAnalyst({ question: q, project: p, historicalStatus: hs, client: gateway, preference, signal, onProgress: (pr) => { if (seq.current === mine) setRunning(pr); } });
+    const turn = await askAnalyst({ question: q, project: p, historicalStatus: hs, client: gateway, preference, signal, onProgress: (pr) => { if (seq.current === mine) setRunning(pr); }, uploadedCount });
     if (seq.current !== mine) return;
     abort.current = null;
     pending.current = null;

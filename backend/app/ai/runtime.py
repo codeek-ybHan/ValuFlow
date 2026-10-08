@@ -61,7 +61,7 @@ def _result_item(h: Hit) -> dict[str, Any]:
         "text": h.text, "title": h.title, "sourceType": h.source_type, "reportName": h.report_name if h.source_type == SOURCE_OPENDART else h.title, "documentType": h.report_type,
         "filingDate": h.filing_date, "businessYear": h.business_year, "pageNumber": h.page_number, "section": h.section or None,
         "retrievalScore": h.score, "rerankScore": h.rerank_score, "finalRank": h.final_rank, "documentId": _document_id(h), "receiptNo": h.receipt_no,
-        "sourceName": h.source_name, "uploadedAt": h.uploaded_at, "matchedBy": list(h.matched_by),
+        "sourceName": h.source_name, "uploadedAt": h.uploaded_at, "filename": h.filename, "matchedBy": list(h.matched_by),
     }
 
 
@@ -74,7 +74,7 @@ def _source(h: Hit) -> dict[str, Any]:
     common = {"kind": "document", "basis": None, "persisted": True, "note": None, "title": h.title, "page": h.page_number, "documentId": _document_id(h), "asOf": None, "url": None, "publisher": None, "publishedAt": None}
     if h.source_type == SOURCE_UPLOAD:
         return {**common, "type": "uploaded-document", "origin": "user-upload", "fetchedAt": h.uploaded_at, "corpName": h.corp_name, "reportName": None, "filingDate": None, "section": None,
-                "receiptNo": None, "sourceName": h.source_name, "uploadedAt": h.uploaded_at}
+                "receiptNo": None, "sourceName": h.source_name, "uploadedAt": h.uploaded_at, "filename": h.filename}
     return {**common, "type": "disclosure-document", "origin": "opendart", "fetchedAt": h.ingested_at, "corpName": h.corp_name, "reportName": h.report_name, "filingDate": h.filing_date,
             "section": h.section, "receiptNo": h.receipt_no, "sourceName": h.source_name or "OpenDART", "uploadedAt": None}
 

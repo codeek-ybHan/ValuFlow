@@ -31,6 +31,8 @@ export interface AnswerSource {
   page?: number | null;
   sourceName?: string | null;
   uploadedAt?: string | null;
+  /** 업로드 PDF 의 원본 파일명 */
+  filename?: string | null;
   documentId?: string | null;
   asOf?: string | null;
   publishedAt?: string | null;

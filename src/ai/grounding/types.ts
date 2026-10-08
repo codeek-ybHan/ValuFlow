@@ -18,6 +18,8 @@ export interface Evidence {
   /** Historical series 의 기간 라벨 (2025A) */
   period?: string;
   documentId?: string;
+  /** 업로드 PDF 의 원본 파일명 */
+  filename?: string;
   page?: number;
   section?: string;
   /** 관측 시점 (시장: asOf · 뉴스: publishedAt · 공시: 공시일) */

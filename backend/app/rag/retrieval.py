@@ -19,7 +19,7 @@ from sqlalchemy import and_, case, func, literal, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.models import DisclosureChunk, DisclosureDocument
-from app.knowledge.document import SOURCE_OPENDART
+from app.knowledge.document import SOURCE_OPENDART, SOURCE_UPLOAD
 from app.rag.embeddings import EmbeddingProvider
 from app.rag.rerank import Reranker
 
@@ -87,6 +87,7 @@ class Hit:
     page_number: int | None = None
     source_name: str | None = None
     uploaded_at: str | None = None
+    filename: str | None = None  # 업로드 PDF 의 원본 파일명 (표시용 · 인용에 쓴다)
     rrf_score: float = 0.0
     retrieval_rank: int = 0      # rerank 전 순위 (1부터)
     rerank_score: float | None = None
@@ -247,7 +248,7 @@ class DisclosureRetriever:
                    receipt_no=d.receipt_no, corp_code=d.corp_code, corp_name=d.corp_name, report_name=d.report_name, report_type=d.report_type,
                    filing_date=d.filing_date.isoformat() if d.filing_date else None, business_year=d.business_year, url=d.url, ingested_at=d.ingested_at.isoformat(),
                    document_id=d.id, source_type=d.source_type, title=d.title or d.report_name, page_number=c.page_number, source_name=d.source_name,
-                   uploaded_at=d.uploaded_at.isoformat() if d.uploaded_at else None, rrf_score=round(e["rrf"], 6), retrieval_rank=retrieval_rank,
+                   uploaded_at=d.uploaded_at.isoformat() if d.uploaded_at else None, filename=d.original_filename if d.source_type == SOURCE_UPLOAD else None, rrf_score=round(e["rrf"], 6), retrieval_rank=retrieval_rank,
                    rerank_score=None if rerank_score is None else round(rerank_score, 4), final_rank=final_rank)
 
     def retrieve(self, query: str, scope: Scope, top_k: int = 5, rerank: bool = True) -> RetrievalResult:

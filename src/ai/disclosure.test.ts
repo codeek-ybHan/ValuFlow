@@ -75,7 +75,8 @@ test('backend 가 실행한 공시 검색 결과가 답변 · 출처 · audit �
   ]);
   const out = await runAiQuery({ question: '회사가 설비투자와 관련해 어떤 내용을 공시했어?', project: live(), client });
   assert.equal(out.status, 'answered');
-  assert.deepEqual(client.queries[0].toolNames, [...TOOL_NAMES]);
+  // '공시' 를 명시한 질문: 검색 Tool 은 공시 검색만 모델에 주어진다 (업로드 문서 검색 · 통합 검색 제외), 나머지 Tool 은 그대로
+  assert.deepEqual(client.queries[0].toolNames, TOOL_NAMES.filter((t) => !['searchUploadedDocuments', 'searchKnowledge'].includes(t)));
   assert.equal((client.queries[0].minimalContext.company as { corpCode: string }).corpCode, '00126380'); // backend 는 context 의 기업으로 검색한다
   assert.equal(client.toolResults.length, 0, 'backend Tool 은 frontend 왕복이 없다');
   const s = out.answer!.sources[0];

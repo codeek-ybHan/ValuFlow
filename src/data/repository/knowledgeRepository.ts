@@ -9,6 +9,8 @@ export interface KnowledgeDocument {
   sourceType: 'opendart' | 'user-upload';
   title: string;
   documentType: string | null;
+  /** 문서가 연결된 기업 (null 이면 기업에 연결되지 않은 일반 문서) */
+  corpCode: string | null;
   corpName: string | null;
   businessYear: number | null;
   uploadedAt: string | null;
@@ -53,7 +55,7 @@ export function toDocument(raw: Json, state?: DocumentState): KnowledgeDocument 
   const n = (k: string) => (typeof raw[k] === 'number' ? (raw[k] as number) : null);
   const status = s('status');
   return {
-    documentId: n('documentId') ?? -1, sourceType: raw.sourceType === 'opendart' ? 'opendart' : 'user-upload', title: s('title') ?? s('originalFilename') ?? '제목 없음', documentType: s('documentType'), corpName: s('corpName'),
+    documentId: n('documentId') ?? -1, sourceType: raw.sourceType === 'opendart' ? 'opendart' : 'user-upload', title: s('title') ?? s('originalFilename') ?? '제목 없음', documentType: s('documentType'), corpCode: s('corpCode'), corpName: s('corpName'),
     businessYear: n('businessYear'), uploadedAt: s('uploadedAt'), filingDate: s('filingDate'), chunkCount: n('chunkCount') ?? 0, sectionCount: n('sectionCount'), embeddingModel: s('embeddingModel'), originalFilename: s('originalFilename'),
     state: state ?? (status === 'ready' ? 'ready' : status === 'failed' ? 'failed' : status ? 'indexing' : 'ready'),
   };
@@ -104,3 +106,14 @@ export class KnowledgeClient {
 }
 
 export const defaultKnowledgeClient = new KnowledgeClient();
+
+/**
+ * 현재 기업 범위에서 검색 가능한 업로드 문서 수: 현재 기업에 연결된 문서 + 기업에 연결되지 않은 일반 문서. 다른 기업에 연결된 문서는 세지 않는다
+ * (backend 검색도 같은 범위로 고정된다). 목록을 못 받으면 null (모름: 질문을 막지 않는다).
+ */
+export async function countSearchableUploads(corpCode: string | null, client: Pick<KnowledgeClient, 'list'> = defaultKnowledgeClient): Promise<number | null> {
+  try {
+    const docs = await client.list();
+    return docs.filter((d) => d.sourceType === 'user-upload' && d.state !== 'failed' && (d.corpCode === null || d.corpCode === corpCode)).length;
+  } catch { return null; }
+}
