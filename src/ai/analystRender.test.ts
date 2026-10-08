@@ -176,5 +176,6 @@ test('레이아웃: Evidence · Sources · Data Basis · Warnings 는 모두 왼
   const rest = html.slice(html.indexOf('</aside>'));
   assert.doesNotMatch(rest, /<h4>Evidence<\/h4>|<h4>Warnings<\/h4>/, '답변 영역(오른쪽)에는 근거 블록이 없다');
   const css = readFileSync(new URL('../styles/minimal.css', import.meta.url), 'utf8');
-  assert.match(css, /\.main:has\(\.ai-page\) \{ max-width: none; padding-left: 16px; padding-right: 16px; \}/, 'AI 화면은 좌우 여백이 거의 없다');
+  assert.match(css, /\.ai-evidence-group \.ai-card \{ background: color-mix\(in srgb, var\(--surface\) 94%, var\(--ink\)\)/, '분석 이후 블록은 Report 와 같은 톤으로 살짝 진하다');
+  assert.doesNotMatch(css, /:has\(\.ai-page\)/, 'AI 화면의 본문 폭은 다른 페이지와 같다 (좌우 여백을 따로 줄이지 않는다)');
 });

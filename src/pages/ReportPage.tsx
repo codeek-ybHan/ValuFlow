@@ -37,12 +37,22 @@ function ReportView() {
       ) : null}
 
       <div className="rp-grid">
-        <aside className="rp-left" aria-label="Report settings">
+        <aside className="rp-left" aria-label="Report settings, validation and export">
           <section className="ai-card">
             <div className="panel-head"><h4>Report settings</h4></div>
             <p className="small"><strong>{company?.name ?? '기업 미선택'}</strong><br /><span className="muted">Template: valuation-standard-v1 (v1.0)</span></p>
             {!company ? <p className="small rp-error">기업이 선택되지 않았습니다. <Link to="/workspace">Workspace 로 이동</Link></p> : null}
           </section>
+          <section className="ai-card" aria-label="Validation">
+            <div className="panel-head"><h4>Validation</h4>{validation ? <span className={`chip`}>{validation.ok ? (warnings > 0 ? `${warnings} warning` : 'OK') : 'Blocked'}</span> : null}</div>
+            {validation ? <ValidationList validation={validation} /> : <p className="small muted">Report 를 생성하면 검증 결과가 표시됩니다.</p>}
+            {res && res.document.diagnostics.hiddenSections.length > 0 ? (
+              <details className="small"><summary>제외된 section {res.document.diagnostics.hiddenSections.length}개</summary>
+                <ul className="plain-list">{res.document.diagnostics.hiddenSections.map((h) => <li key={h.sectionId}><strong>{h.title}</strong>: {h.reason}</li>)}</ul></details>
+            ) : null}
+          </section>
+          <ExportCard pdf={r.pdf} filename={res?.renderModel.meta.filename ?? null} disabled={!res} onPdf={r.downloadPdf} onHtml={r.downloadHtml} onJson={r.downloadJson}
+            reportId={res?.model.metadata.reportId ?? null} renderHash={res ? renderHashOf(res.renderModel) : null} />
           <section className="ai-card"><AnalysisPicker choices={r.choices} selected={r.selectedAnalysisId} onSelect={r.select} /></section>
           <section className="ai-card"><SectionToggles hidden={r.hideOptional} onToggle={r.toggleSection} /></section>
           {r.persistenceEnabled ? <section className="ai-card" aria-label="Saved reports">
@@ -59,6 +69,18 @@ function ReportView() {
             )}
             {r.persistNote ? <p className="small muted" role="status">{r.persistNote}</p> : null}
           </section> : null}
+          {res ? (
+            <section className="ai-card" aria-label="Snapshot">
+              <div className="panel-head"><h4>Snapshot</h4></div>
+              <dl className="stat-dl small">
+                <div><dt>Context</dt><dd className="num">{res.model.metadata.snapshot.contextSnapshotId}</dd></div>
+                <div><dt>Valuation</dt><dd className="num">{res.model.metadata.snapshot.valuationSnapshotId}</dd></div>
+                <div><dt>Historical as of</dt><dd className="num">{res.model.metadata.snapshot.historicalAsOf?.slice(0, 10) ?? '-'}</dd></div>
+                <div><dt>Market as of</dt><dd className="num">{res.model.metadata.snapshot.marketAsOf?.slice(0, 10) ?? '-'}</dd></div>
+                <div><dt>Created</dt><dd className="num">{res.model.metadata.createdAt.slice(0, 19)}</dd></div>
+              </dl>
+            </section>
+          ) : null}
         </aside>
 
         <section className="rp-center" aria-label="Preview">
@@ -76,30 +98,6 @@ function ReportView() {
           )}
         </section>
 
-        <aside className="rp-right" aria-label="Validation and export">
-          <section className="ai-card" aria-label="Validation">
-            <div className="panel-head"><h4>Validation</h4>{validation ? <span className={`chip`}>{validation.ok ? (warnings > 0 ? `${warnings} warning` : 'OK') : 'Blocked'}</span> : null}</div>
-            {validation ? <ValidationList validation={validation} /> : <p className="small muted">Report 를 생성하면 검증 결과가 표시됩니다.</p>}
-            {res && res.document.diagnostics.hiddenSections.length > 0 ? (
-              <details className="small"><summary>제외된 section {res.document.diagnostics.hiddenSections.length}개</summary>
-                <ul className="plain-list">{res.document.diagnostics.hiddenSections.map((h) => <li key={h.sectionId}><strong>{h.title}</strong>: {h.reason}</li>)}</ul></details>
-            ) : null}
-          </section>
-          <ExportCard pdf={r.pdf} filename={res?.renderModel.meta.filename ?? null} disabled={!res} onPdf={r.downloadPdf} onHtml={r.downloadHtml} onJson={r.downloadJson}
-            reportId={res?.model.metadata.reportId ?? null} renderHash={res ? renderHashOf(res.renderModel) : null} />
-          {res ? (
-            <section className="ai-card" aria-label="Snapshot">
-              <div className="panel-head"><h4>Snapshot</h4></div>
-              <dl className="stat-dl small">
-                <div><dt>Context</dt><dd className="num">{res.model.metadata.snapshot.contextSnapshotId}</dd></div>
-                <div><dt>Valuation</dt><dd className="num">{res.model.metadata.snapshot.valuationSnapshotId}</dd></div>
-                <div><dt>Historical as of</dt><dd className="num">{res.model.metadata.snapshot.historicalAsOf?.slice(0, 10) ?? '-'}</dd></div>
-                <div><dt>Market as of</dt><dd className="num">{res.model.metadata.snapshot.marketAsOf?.slice(0, 10) ?? '-'}</dd></div>
-                <div><dt>Created</dt><dd className="num">{res.model.metadata.createdAt.slice(0, 19)}</dd></div>
-              </dl>
-            </section>
-          ) : null}
-        </aside>
       </div>
     </div>
   );

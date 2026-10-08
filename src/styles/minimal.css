@@ -142,9 +142,7 @@ h1 { font-size: 26px; letter-spacing: -.025em; }
 .fin-table { line-height: 1.4; }
 .fin-table th, .fin-table td { padding: 9px 16px; }
 @media (max-width: 860px) { .vc-top { flex-wrap: wrap; } }
-/* AI Analyst: 좌우 여백을 거의 없애 화면을 넓게 쓴다 (왼쪽: 기록 · 근거 · 문서, 오른쪽: 질문과 답변) */
-.main:has(.ai-page) { max-width: none; padding-left: 16px; padding-right: 16px; }
-.shell:has(.ai-page) .topnav-row, .shell:has(.ai-page) .subnav { max-width: none; padding-left: 16px; padding-right: 16px; }
+/* AI Analyst: 왼쪽 열(기록 · 근거 · 문서), 오른쪽(질문과 답변). 본문 폭은 다른 페이지와 같다 */
 .ai-grid.no-right .ai-evidence-group { display: none; }   /* 답변이 생기기 전에는 빈 근거 패널을 보이지 않는다 */
 
 /* ---- 재무제표 기준(연결/개별) 선택 ---- */
@@ -152,3 +150,11 @@ h1 { font-size: 26px; letter-spacing: -.025em; }
 .basis-choice .row { gap: 12px; }
 .basis-choice .seg button { padding: 4px 12px; font-size: 12.5px; }
 .basis-choice .seg button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ---- Report: 왼쪽 열(설정 · Validation · Export · 분석 선택 · Snapshot)의 블록은 배경보다 살짝만 진하게 ---- */
+.rp-left .ai-card { background: color-mix(in srgb, var(--surface) 94%, var(--ink)); border-color: var(--line-strong); }
+.rp-left .ai-card .chip { background: color-mix(in srgb, var(--surface) 86%, var(--ink)); }
+
+/* ---- AI Analyst: 분석 이후 나타나는 블록(Evidence · Sources · Data Basis · Warnings)도 Report 와 같은 톤으로 살짝만 진하게 ---- */
+.ai-evidence-group .ai-card { background: color-mix(in srgb, var(--surface) 94%, var(--ink)); border-color: var(--line-strong); }
+.ai-evidence-group .ai-card .chip { background: color-mix(in srgb, var(--surface) 86%, var(--ink)); }

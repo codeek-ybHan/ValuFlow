@@ -2,7 +2,7 @@
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildSync } from 'esbuild';
@@ -158,4 +158,20 @@ test('Report 화면은 Project 를 바꾸지 않는다 (렌더 전후 저장 상
   h.renderReport(before, { generated: true });
   assert.equal(persisted(p), before);
   assert.ok(withSelectedCompany);
+});
+
+test('레이아웃: Validation · Export(· Snapshot)는 왼쪽 열에 있고 오른쪽 패널은 없다, 왼쪽 블록은 살짝 진한 배경', () => {
+  for (const html of [h.renderReport(persisted(full()), { generated: true }), h.renderReport(persisted(full()))]) {
+    const left = html.slice(html.indexOf('<aside class="rp-left"'), html.indexOf('</aside>'));
+    assert.match(left, /aria-label="Validation"/);
+    assert.match(left, /Download PDF/);
+    assert.match(left, /Report settings/);
+    assert.ok(left.indexOf('Validation') < left.indexOf('Download PDF'), 'Validation → Export 순서');
+    assert.doesNotMatch(html, /rp-right|Validation and export/);
+    const rest = html.slice(html.indexOf('</aside>'));
+    assert.doesNotMatch(rest, /<h4>Validation<\/h4>|Download PDF/, '오른쪽(Preview)에는 Validation · Export 가 없다');
+  }
+  assert.match(h.renderReport(persisted(full()), { generated: true }).slice(0, 100000), /aria-label="Snapshot"/);
+  const css = readFileSync(new URL('../styles/minimal.css', import.meta.url), 'utf8');
+  assert.match(css, /\.rp-left \.ai-card \{ background: color-mix\(in srgb, var\(--surface\) 94%, var\(--ink\)\)/, '블록 색은 표면보다 약간만 진하다');
 });
