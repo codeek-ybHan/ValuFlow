@@ -286,17 +286,19 @@ Node 22.6 이상이 필요합니다. 엔진 테스트가 TypeScript 파일을 �
 ## 라우트
 
 ```text
-/dashboard                 제품 Dashboard (기본 화면)
-/workspace                 기업·재무데이터 (삼성전자 FY2023~2025 불러오기)
+/dashboard                 Dashboard — 기업 선택 후 핵심 KPI 4개 · Workflow 상태 (기업 선택 전에는 빈 상태)
+/workspace                 기업 검색 · 선택 → 재무제표 기준(자동·연결·개별) → OpenDART 재무데이터 불러오기 · 재무제표/분석 표
 /valuation/:stage          historical | forecast | wacc | dcf | result | validation  ← Workflow Stepper
-/analysis                  → /valuation/validation 으로 이동 (민감도 · 시나리오 · 상대가치는 Validation 단계)
-/ai                        AI Analyst (질문 · Workflow 진행 · Claim/Evidence · Knowledge Documents)
-/report                    Valuation Report (이후 STEP, placeholder)
-/learn                     학습 홈
+/analysis                  → /valuation/validation (민감도 · 시나리오 · 상대가치는 Validation 단계)
+/ai                        AI Analyst (질문 · Workflow 진행 · Claim/Evidence · Knowledge Documents(PDF 업로드/삭제))
+/report                    Valuation Report 생성 · Preview · Sources · PDF/HTML/JSON Export
+/learn                     학습 홈 (보조 메뉴)
 /learn/roadmap             학습 로드맵
 /learn/report              학습 기록 리포트
 /learn/step-01 … step-04   overview 및 /lesson/:id · /quiz · /practice · /build · /reflection
 ```
+
+기업을 선택하기 전에는 Dashboard · Valuation · AI · Report 모두 "기업을 선택해 기업가치평가를 시작하세요." 빈 상태만 보입니다.
 
 기존 `/step/N/...`, `/learn/step/N/...`, `/roadmap` 주소는 새 주소로 자동 이동합니다.
 
@@ -306,11 +308,11 @@ Node 22.6 이상이 필요합니다. 엔진 테스트가 TypeScript 파일을 �
 
 | 화면 | 상태 |
 |---|---|
-| App Layout / Sidebar | 완료. Analysis 메뉴는 Valuation 의 Validation 단계로 연결 |
+| App Layout (상단 내비) | 완료. Analysis 메뉴는 Valuation 의 Validation 단계로 연결, Learn 은 보조 링크 |
 | Dashboard | 완료. Workflow Progress 와 KPI 는 실제 PROJECT 상태에서 계산 (결과가 없으면 `—`, stale 결과를 보여주지 않음) |
 | Workspace | 삼성전자 Historical Data 불러오기, 재무제표 탭, 파생지표 |
 | Valuation | 6단계 Workflow: Historical → Forecast → WACC → DCF/Equity → Result → Validation |
-| Report | 이후 STEP 용 placeholder |
+| Report | 완료. 생성 · Preview · Sources · PDF/HTML/JSON Export (STEP 09) |
 | AI Analyst | 실제 페이지 (STEP 08-7) |
 
 **Valuation Workspace** (`/valuation/:stage`)
@@ -357,21 +359,52 @@ MVP 순서: ① Dashboard + Valuation + Learn → ② Sensitivity · Comparable 
 ## 구조
 
 ```text
-src/
-├── content/      STEP / Lesson / Quiz / Practice / Build 데이터 (bodiesNN.ts = Lesson 해설)
-├── data/         fixture: 삼성전자 Historical(공시 기반), STEP 04 학습용 가정(가상값)
-│   ├── dart/           External API 경계 + Raw Model (DartRawAccount …). HTTP 구현은 STEP 06-2
-│   ├── normalization/  계정 매핑 · 단위(→KRW million) · 기간(2023A) · 연결/별도 · 품질(warnings) → HistoricalData
-│   └── repository/     FinancialRepository interface + Fixture 구현(삼성전자 adapter)
-├── valuation/    Valuation Engine v1 (결정적 계산, 공개 API: valuation/index.ts) — 자세한 사용법은 valuation/README.md
-├── store/        LEARN 상태(state.tsx) / PROJECT 상태(project.tsx + projectModel.ts: historicalData · valuationAssumptions · valuationResult · sensitivityResult · relativeInputs), 가정 완성도(assumptions.ts), 워크플로 상태(workflowStatus.ts)
-├── engine/       LEARN 학습용 계산기 + Workspace 화면의 순수 로직(입력 폼 검증, 표시 모델: forecastForm · waccForm · dcfForm · relativeForm · validationView …)
-├── styles/       디자인 토큰(tokens.css) · 기반 · 레이아웃 · 컴포넌트 · 페이지 CSS
-├── routes.ts     LEARN 라우트 헬퍼 (step-01 ↔ stepId)
-├── build/        STEP별 Project Build 위젯
-├── pages/        라우트 페이지 (Dashboard, Valuation, Learn 계열)
-└── components/   레이아웃, 차트, 공통 UI, valuation/ (Stepper, 단계 슬롯, workflow.ts 단계 정의 — 계산식 없음)
+.
+├── src/                       Frontend (React 18 + Vite + TypeScript) — 정적 번들, secret 없음
+│   ├── pages/                 라우트 페이지 (Dashboard · Workspace · Valuation · AiAnalyst · ReportPage · Learn 계열)
+│   ├── components/            Layout(상단 내비) · 공통 UI · 차트 · valuation/(Stepper · 단계) · analyst/ · report/
+│   ├── store/                 PROJECT 상태(project.tsx + projectModel.ts) · AI 대화(analyst.tsx) · Report(report.tsx) · LEARN 상태
+│   ├── valuation/             Valuation Engine v1 (결정적 계산, 공개 API: valuation/index.ts)
+│   ├── engine/                순수 로직(입력 폼 검증 · 표시 모델 · Historical 분석 · 열 순서) + LEARN 학습용 계산기
+│   ├── data/                  데이터 계층
+│   │   ├── dart/ · normalization/ · repository/   OpenDART 경계 · 계정 정규화 · Repository(Database/DART/Fixture)
+│   │   ├── persist/           관리자 전용 분석/Report 저장 client (공개 화면은 사용하지 않음)
+│   │   └── fixtures/          학습용(삼성전자 fixture · STEP 04 가정) — 기업 선택 없이 화면에 나오지 않는다
+│   ├── ai/                    AI Analyst: 질문 분류 · 검색 라우팅(retrievalRoute) · Tool(tools/) · Agent Workflow(agent/) · Grounding(grounding/) · UI 모델(analyst/) · 평가(eval/)
+│   ├── report/                Report Automation: sections · templates · narrative · presentation · render · qa · export(PDF client) · ui
+│   ├── content/ · build/      LEARN 콘텐츠(STEP/Lesson/Quiz) · STEP별 Project Build 위젯
+│   └── styles/                tokens · base · layout(상단 내비) · components · pages · analyst · report · minimal
+├── backend/                   Backend (FastAPI + SQLAlchemy/Alembic + PostgreSQL/pgvector) — 모든 secret 은 여기 환경변수에만
+│   ├── app/
+│   │   ├── main.py            라우트 · 앱 조립      security.py  endpoint 정책(PUBLIC / PUBLIC_RATE_LIMITED / ADMIN_ONLY) · rate limit · CORS
+│   │   ├── dart/              OpenDART client · 기업/재무/공시 · 사업보고서 문서 파싱 · D&A 주석 fallback(da_notes.py)
+│   │   ├── normalization/     Raw 계정 → HistoricalData + DataQuality (규칙: rules.json — 프론트 TS 와 golden 테스트로 동치 검증)
+│   │   ├── services/          Historical 조회(DB 우선 → OpenDART) · 재무 저장 · 분석/Report snapshot 저장
+│   │   ├── rag/ · knowledge/  공시/PDF chunking · embedding · Hybrid 검색 · rerank · 사용자 PDF 업로드/삭제(삭제 토큰)
+│   │   ├── ai/                LLM Gateway · Tool catalog(프론트 정책에서 export) · backend 검색 Tool · 상태 서명
+│   │   ├── external/          시장·금리·뉴스 provider (production 에서는 development 등급 차단)
+│   │   ├── report/            Report PDF (reportlab · 한글 폰트 · 차트)
+│   │   └── db/                ORM 모델 · 세션
+│   ├── alembic/               DB 마이그레이션 (컨테이너 시작 시 `alembic upgrade head`)
+│   ├── scripts/               운영/검증 스크립트 (prod_smoke · 원본 계정 조사 · 평가 · PDF 검증)
+│   └── tests/                 pytest (smoke/ 는 실제 API 를 쓰는 라이브 테스트 — 키가 없으면 skip)
+├── scripts/                   프론트 도구 (TS): export-ai · export-normalization(규칙 내보내기) · 평가/QA 스크립트
+├── docs/                      설계 · 단계별 보고 · 운영 문서 (아래 목차)
+├── vercel.json · docker-compose.yml · .env.example   배포 / 로컬 실행 설정
+└── README.md
 ```
+
+### 문서 목차 (`docs/`)
+
+| 문서 | 내용 |
+|---|---|
+| [`PUBLIC_PORTFOLIO_MODE.md`](docs/PUBLIC_PORTFOLIO_MODE.md) | 공개 접근 정책(endpoint 별 PUBLIC / RATE_LIMITED / ADMIN) · rate limit · 업로드/삭제 정책 |
+| [`STEP10_production.md`](docs/STEP10_production.md) | 배포 구조 · 보안 · Health · 운영 절차 · 한계 |
+| `STEP09*.md` | Report 아키텍처 · 템플릿 · 자동화 |
+| `STEP08*.md` | AI Analyst · RAG · 외부 데이터 · Agent · Grounding · 평가 |
+| `STEP06-*.md` | OpenDART 원본 계정 조사 · 다기업 검증 |
+
+기능을 바꾸면 해당 문서와 위 구조/라우트를 함께 갱신합니다 (정책 변경은 `PUBLIC_PORTFOLIO_MODE.md`).
 
 설계 원칙:
 
