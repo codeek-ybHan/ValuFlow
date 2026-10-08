@@ -1,13 +1,13 @@
 /* ===== AI Analyst (STEP 08-7) =====
    Workspace 기능 중 하나처럼 보이도록 기존 토큰만 쓴다. 색은 의미(상태 · 신뢰도)에만 쓰고, 모든 상태는 글자도 함께 표시한다. */
-.ai-grid { display: grid; grid-template-columns: 240px minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
-.ai-left, .ai-right { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 76px; max-height: calc(100vh - 92px); overflow-y: auto; scrollbar-width: thin; }
+.ai-grid { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 16px; align-items: start; }
+.ai-left { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 76px; max-height: calc(100vh - 92px); overflow-y: auto; scrollbar-width: thin; }
 .ai-center { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 .ai-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow-1); margin: 0; }
 .ai-card h4 { margin: 0; font-size: 14px; }
 .ai-card .panel-head { margin-bottom: 10px; min-height: 0; }
 .ai-card summary { cursor: pointer; font-weight: 600; font-size: 13.5px; }
-.ai-close, .ai-drawer-btn { display: none; }
+.ai-evidence-group { display: flex; flex-direction: column; gap: 16px; }
 .ai-note { background: var(--surface-2); border: 1px solid var(--line); border-left: 3px solid var(--faint); border-radius: var(--radius-sm); padding: 8px 12px; margin: 0; font-size: 13.5px; color: var(--ink-2); }
 .ai-notice { margin: 0; padding: 10px 14px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); font-size: 13.5px; color: var(--ink-2); }
 .ai-empty { padding: 28px 4px; }
@@ -132,16 +132,9 @@
 .danger { color: var(--neg); }
 .k-error { color: var(--neg); }
 
-@media (max-width: 1180px) {
-  .ai-grid { grid-template-columns: 220px minmax(0, 1fr); }
-  .ai-drawer-btn { display: inline-flex; }
-  .ai-right { position: fixed; top: 0; right: 0; bottom: 0; width: min(380px, 92vw); max-height: none; z-index: 60; background: var(--bg); padding: 16px; box-shadow: var(--shadow-2); transform: translateX(105%); transition: transform .18s; }
-  .ai-right.open { transform: none; }
-  .ai-close { display: inline-flex; align-self: flex-end; }
-}
+@media (max-width: 1100px) { .ai-grid { grid-template-columns: 300px minmax(0, 1fr); } }
 @media (max-width: 860px) {
   .ai-grid { grid-template-columns: minmax(0, 1fr); }
-  .ai-left { position: static; max-height: none; order: 2; }
+  .ai-left { position: static; max-height: none; order: 2; }   /* 좁은 화면: 질문과 답변이 먼저, 근거 · 기록은 아래 */
   .wacc-panel { grid-template-columns: minmax(0, 1fr); }
 }
-@media (prefers-reduced-motion: reduce) { .ai-right { transition: none; } }

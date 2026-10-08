@@ -60,7 +60,6 @@ function AiAnalystView() {
   const kn = useKnowledge();
   const [question, setQuestion] = useState('');
   const [selectedClaim, setSelectedClaim] = useState<string | null>(null);
-  const [drawer, setDrawer] = useState(false);
   const [debug, setDebug] = useState(false);
 
   const ctx = useMemo(() => buildAiContext(project, { historicalStatus }), [project, historicalStatus]);
@@ -80,21 +79,19 @@ function AiAnalystView() {
 
   return (
     <div className="ai-page">
-      <PageHeader title="AI Analyst" actions={<>
-        <button type="button" className="btn small ai-drawer-btn" aria-expanded={drawer} onClick={() => setDrawer((v) => !v)}>Evidence · Sources</button>
-      </>}>
+      <PageHeader title="AI Analyst">
         <p className="muted">계산은 ValuFlow 가, 해석은 AI 가 합니다. 모든 답변은 근거와 함께 표시됩니다.</p>
       </PageHeader>
 
       <div className={`ai-grid${active ? '' : ' no-right'}`}>
-        <aside className="ai-left" aria-label="대화 기록과 문서">
+        <aside className="ai-left" aria-label="대화 기록 · 근거 · 문서">
           <section className="ai-card">
             <div className="panel-head"><h4>History</h4><span className="small muted">{session.turns.length}</span></div>
             {session.turns.length === 0 ? <p className="small muted">아직 질문이 없습니다.</p> : (
               <ul className="hist">
                 {[...session.turns].reverse().map((t) => (
                   <li key={t.id}>
-                    <button type="button" className={t.id === active?.id ? 'active' : ''} aria-current={t.id === active?.id} onClick={() => { select(t.id); setDrawer(false); }}>
+                    <button type="button" className={t.id === active?.id ? 'active' : ''} aria-current={t.id === active?.id} onClick={() => select(t.id)}>
                       <span className="hist-q">{t.question}</span>
                       <span className="small muted">{t.company?.name ?? '기업 없음'} · {t.workflowLabel ?? MODE_INFO[t.mode].name} · {fmtTime(t.askedAt)}</span>
                       <span className={`hist-st st-${effectiveStatus(t)}`}>{STATUS_INFO[effectiveStatus(t)].label}</span>
@@ -104,6 +101,19 @@ function AiAnalystView() {
               </ul>
             )}
           </section>
+          <div className="ai-evidence-group" role="region" aria-label="Evidence, Sources, Warnings">
+            <section className="ai-card">
+              <div className="panel-head"><h4>Evidence</h4></div>
+              {!active ? <p className="small muted">답변을 선택하면 근거가 표시됩니다.</p>
+                : claim ? (<><p className="small"><strong>{claim.kind === 'fact' ? 'FACT' : 'JUDGMENT'}</strong> {claim.text}</p>
+                  {evidence.length === 0 ? <p className="small muted">이 claim 에 연결된 구체적 근거가 없습니다.</p> : <ul className="ev-list">{evidence.map((e) => <EvidenceCard key={e.id} e={e} />)}</ul>}
+                  {claim.notes.length > 0 ? <ul className="plain-list small">{claim.notes.map((n) => <li key={n}>{n}</li>)}</ul> : null}</>)
+                  : <p className="small muted">{active.mode === 'quick' ? 'Quick Answer 는 문장별 근거 연결을 제공하지 않습니다. 아래 Sources 를 확인하세요.' : 'Claim 을 선택하면 연결된 근거를 보여 줍니다.'}</p>}
+            </section>
+            <section className="ai-card"><div className="panel-head"><h4>Sources</h4></div><SourceList sources={active?.sources ?? []} /></section>
+            <section className="ai-card"><div className="panel-head"><h4>Data Basis</h4></div><TimeBasis basis={active?.timeBasis ?? null} /></section>
+            <section className="ai-card"><div className="panel-head"><h4>Warnings</h4></div><WarningList warnings={active?.warnings ?? []} /></section>
+          </div>
           <KnowledgePanel kn={kn} />
         </aside>
 
@@ -143,25 +153,11 @@ function AiAnalystView() {
               {otherCompany ? <p className="ai-note" role="note">현재 선택한 기업과 다른 기업({active.company?.name ?? '없음'})에 대한 답변입니다.</p> : null}
               {active.steps.length > 0 ? <details open={active.status === 'failed' || active.status === 'tool-limit'} className="ai-card"><summary>진행 단계 · {active.workflowLabel}</summary><WorkflowProgress title={active.workflowLabel} steps={active.steps} /></details> : null}
               {active.usedSources.length > 0 ? <p className="small"><strong>Used Data Sources</strong> {active.usedSources.join(' · ')}</p> : null}
-              <Answer turn={active} selected={selectedClaim} onSelect={(id) => { setSelectedClaim(id); setDrawer(true); }} debug={debug} onDecide={decide} />
+              <Answer turn={active} selected={selectedClaim} onSelect={(id) => setSelectedClaim(id)} debug={debug} onDecide={decide} />
             </>
           ) : !running ? <p className="ai-empty muted">질문을 입력하면 Tool 로 확인한 근거와 함께 답합니다.</p> : null}
         </section>
 
-        <aside className={`ai-right${drawer ? ' open' : ''}`} aria-label="Evidence, Sources, Warnings">
-          <button type="button" className="btn small ai-close" onClick={() => setDrawer(false)}>닫기</button>
-          <section className="ai-card">
-            <div className="panel-head"><h4>Evidence</h4></div>
-            {!active ? <p className="small muted">답변을 선택하면 근거가 표시됩니다.</p>
-              : claim ? (<><p className="small"><strong>{claim.kind === 'fact' ? 'FACT' : 'JUDGMENT'}</strong> {claim.text}</p>
-                {evidence.length === 0 ? <p className="small muted">이 claim 에 연결된 구체적 근거가 없습니다.</p> : <ul className="ev-list">{evidence.map((e) => <EvidenceCard key={e.id} e={e} />)}</ul>}
-                {claim.notes.length > 0 ? <ul className="plain-list small">{claim.notes.map((n) => <li key={n}>{n}</li>)}</ul> : null}</>)
-                : <p className="small muted">{active.mode === 'quick' ? 'Quick Answer 는 문장별 근거 연결을 제공하지 않습니다. 아래 Sources 를 확인하세요.' : 'Claim 을 선택하면 연결된 근거를 보여 줍니다.'}</p>}
-          </section>
-          <section className="ai-card"><div className="panel-head"><h4>Sources</h4></div><SourceList sources={active?.sources ?? []} /></section>
-          <section className="ai-card"><div className="panel-head"><h4>Data Basis</h4></div><TimeBasis basis={active?.timeBasis ?? null} /></section>
-          <section className="ai-card"><div className="panel-head"><h4>Warnings</h4></div><WarningList warnings={active?.warnings ?? []} /></section>
-        </aside>
       </div>
     </div>
   );

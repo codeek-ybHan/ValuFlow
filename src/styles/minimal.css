@@ -142,9 +142,10 @@ h1 { font-size: 26px; letter-spacing: -.025em; }
 .fin-table { line-height: 1.4; }
 .fin-table th, .fin-table td { padding: 9px 16px; }
 @media (max-width: 860px) { .vc-top { flex-wrap: wrap; } }
-.ai-grid.no-right { grid-template-columns: 240px minmax(0, 1fr); }
-@media (max-width: 960px) { .ai-grid.no-right { grid-template-columns: minmax(0, 1fr); } }
-.ai-grid.no-right .ai-right { display: none; }   /* 답변이 생기기 전에는 빈 근거 패널을 보이지 않는다 */
+/* AI Analyst: 좌우 여백을 거의 없애 화면을 넓게 쓴다 (왼쪽: 기록 · 근거 · 문서, 오른쪽: 질문과 답변) */
+.main:has(.ai-page) { max-width: none; padding-left: 16px; padding-right: 16px; }
+.shell:has(.ai-page) .topnav-row, .shell:has(.ai-page) .subnav { max-width: none; padding-left: 16px; padding-right: 16px; }
+.ai-grid.no-right .ai-evidence-group { display: none; }   /* 답변이 생기기 전에는 빈 근거 패널을 보이지 않는다 */
 
 /* ---- 재무제표 기준(연결/개별) 선택 ---- */
 .basis-choice { margin: 0 0 12px; }

@@ -166,3 +166,15 @@ test('PDF 관리 화면: 목록 · 상태(Ready / Indexing / Failed / Already ex
   assert.match(err, /role="alert"/);
   assert.doesNotMatch(err, /문서 목록을 불러오는 중/);
 });
+
+test('레이아웃: Evidence · Sources · Data Basis · Warnings 는 모두 왼쪽 열(ai-left)에 있고 오른쪽 패널은 없다', () => {
+  const html = h.renderPage(persisted(samsung()));
+  const left = html.slice(html.indexOf('<aside class="ai-left"'), html.indexOf('</aside>'));
+  for (const re of [/History/, /Evidence/, /Sources/, /Data Basis/, /Warnings/, /Knowledge Documents/]) assert.match(left, re, String(re));
+  assert.ok(left.indexOf('Evidence') < left.indexOf('Knowledge Documents'), '근거 블록이 문서 목록보다 위에 있다');
+  assert.doesNotMatch(html, /ai-right|ai-drawer-btn|ai-close/, '오른쪽 패널 · 서랍 버튼은 없다');
+  const rest = html.slice(html.indexOf('</aside>'));
+  assert.doesNotMatch(rest, /<h4>Evidence<\/h4>|<h4>Warnings<\/h4>/, '답변 영역(오른쪽)에는 근거 블록이 없다');
+  const css = readFileSync(new URL('../styles/minimal.css', import.meta.url), 'utf8');
+  assert.match(css, /\.main:has\(\.ai-page\) \{ max-width: none; padding-left: 16px; padding-right: 16px; \}/, 'AI 화면은 좌우 여백이 거의 없다');
+});
