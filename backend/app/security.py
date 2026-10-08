@@ -146,12 +146,6 @@ def install_security(app: FastAPI, settings: Settings, limiter: RateLimiter | No
     limiter = limiter or RateLimiter()
     state = access_state(settings)
 
-    if settings.cors_origins or not settings.is_production:
-        origins = list(settings.cors_origins)
-        regex = None if settings.is_production else r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
-        app.add_middleware(CORSMiddleware, allow_origins=origins, allow_origin_regex=regex, allow_methods=["GET", "POST", "DELETE"],
-                           allow_headers=["Content-Type", ACCESS_HEADER, "X-Request-ID"], expose_headers=["Content-Disposition", "X-Report-Pages", "X-Report-Font", "X-Request-ID"], max_age=600)
-
     @app.middleware("http")
     async def guard(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         started = time.perf_counter()
@@ -191,5 +185,12 @@ def install_security(app: FastAPI, settings: Settings, limiter: RateLimiter | No
         log.info(json.dumps({"requestId": rid, "method": method, "route": getattr(route, "path", path if denied is not None else "unmatched"), "status": response.status_code,
                              "durationMs": round((time.perf_counter() - started) * 1000, 1), "bucket": bucket_rl, "policy": pol, "denied": denied is not None}, ensure_ascii=False))
         return response
+
+    # CORS 는 guard 보다 바깥쪽(나중에 등록)이어야 한다: 안쪽이면 guard 가 만든 거부 응답(401 · 403 · 413 · 429)에 CORS 헤더가 없어 브라우저가 "서버에 연결할 수 없음"으로만 보여 준다.
+    if settings.cors_origins or not settings.is_production:
+        origins = list(settings.cors_origins)
+        regex = None if settings.is_production else r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+        app.add_middleware(CORSMiddleware, allow_origins=origins, allow_origin_regex=regex, allow_methods=["GET", "POST", "DELETE"],
+                           allow_headers=["Content-Type", ACCESS_HEADER, "X-Request-ID"], expose_headers=["Content-Disposition", "X-Report-Pages", "X-Report-Font", "X-Request-ID", "Retry-After"], max_age=600)
 
     return limiter

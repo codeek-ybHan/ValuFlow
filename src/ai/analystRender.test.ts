@@ -12,7 +12,7 @@ import { addTurn, emptySession, type AnalystSession } from './analyst/session.ts
 import type { AnalystTurn } from './analyst/view.ts';
 import { emptyProjectState, toPersisted, withPracticeAssumptions, withSamsungHistorical, type ProjectState } from '../store/projectModel.ts';
 
-type Harness = { renderPage(p: string | null, s?: AnalystSession, path?: string): string; renderKnowledge(d: unknown[] | null, e?: string | null): string };
+type Harness = { renderPage(p: string | null, s?: AnalystSession, path?: string): string; renderKnowledge(d: unknown[] | null, e?: string | null, manage?: boolean): string };
 let h: Harness;
 
 before(() => {
@@ -150,8 +150,13 @@ test('Evidence / Sources / Warnings 영역: 선택 전 안내 · 출처 배지 �
 
 test('PDF 관리 화면: 목록 · 상태(Ready / Indexing / Failed / Already exists) · Re-index · Delete · 빈 상태 · 오류', () => {
   const doc = (id: number, state: string, title: string) => ({ documentId: id, sourceType: 'user-upload', title, documentType: 'research', corpName: null, businessYear: 2026, uploadedAt: null, filingDate: null, chunkCount: 42, sectionCount: 3, embeddingModel: 'm', originalFilename: `${title}.pdf`, state });
-  const html = h.renderKnowledge([doc(1, 'ready', 'Outlook'), doc(2, 'indexing', 'Draft'), doc(3, 'failed', 'Broken'), doc(4, 'already-exists', 'Dup')]);
+  const docs = [doc(1, 'ready', 'Outlook'), doc(2, 'indexing', 'Draft'), doc(3, 'failed', 'Broken'), doc(4, 'already-exists', 'Dup')];
+  const html = h.renderKnowledge(docs, null, true);   // 관리 모드(관리자)
   for (const re of [/Outlook/, /Ready/, /Indexing/, /Failed/, /Already exists/, /Re-index/, /Delete/, /42 chunks/]) assert.match(html, re, String(re));
+  // 공개 화면: 목록과 업로드만 있고 삭제 · 재인덱싱(관리자 전용)은 보이지 않는다
+  const pub = h.renderKnowledge(docs);
+  for (const re of [/Outlook/, /Ready/, /Upload PDF/]) assert.match(pub, re, String(re));
+  assert.doesNotMatch(pub, /Re-index|Delete|삭제/);
   assert.match(h.renderKnowledge([]), /리서치 문서를 업로드하면 AI 분석에 포함됩니다/);
   const err = h.renderKnowledge(null, 'ValuFlow 서버에 연결할 수 없습니다.');
   assert.match(err, /role="alert"/);

@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ProjectProvider } from '../store/project';
 import { Dashboard } from './Dashboard';
 import { Valuation } from './Valuation';
+import { Workspace } from './Workspace';
 
 export function renderGate(path: string, persistedProject: string | null): string {
   const store = { getItem: () => persistedProject, setItem: () => undefined, removeItem: () => undefined };
@@ -15,6 +16,7 @@ export function renderGate(path: string, persistedProject: string | null): strin
           <Routes>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/valuation/:stage?" element={<Valuation />} />
+            <Route path="/workspace" element={<Workspace />} />
           </Routes>
         </ProjectProvider>
       </MemoryRouter>,

@@ -68,6 +68,8 @@ export function ComingSoon({ comingIn, children }: { comingIn: string; children?
 
 export const BackLink = ({ to, children }: { to: string; children: ReactNode }) => <Link className="back" to={to}>← {children}</Link>;
 
+export { newestFirstOrder } from '../engine/columnOrder.ts';
+
 // ---- 숫자 포맷 ----
 export const fmtNum = (n: number | null | undefined, digits = 0) =>
   n == null || !Number.isFinite(n) ? '—' : n.toLocaleString('ko-KR', { minimumFractionDigits: digits, maximumFractionDigits: digits });

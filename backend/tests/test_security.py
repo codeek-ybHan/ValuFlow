@@ -222,3 +222,31 @@ def test_settings_production_defaults():
     assert load_settings({}).reranker == "auto"
     assert load_settings({"ACCESS_TOKEN": " t "}).access_token == "t"
     assert load_settings({}).max_upload_mb == 20 and load_settings({}).max_user_documents == 30
+
+
+def test_denied_responses_carry_cors_headers_so_the_browser_shows_the_real_message():
+    """guard 가 만든 거부 응답(401 · 413 · 429)에도 CORS 헤더가 있어야 한다. 없으면 브라우저는 응답을 숨기고 "서버에 연결할 수 없습니다" 로만 보인다 (삭제 · 한도 안내가 사라진다)."""
+    origin = "https://valuflow.example.com"
+    c = make(app_env="production", access_token=TOKEN, cors_origins=(origin,))
+    h = {"Origin": origin}
+    denied = c.delete("/api/knowledge/documents/1", headers=h)
+    assert denied.status_code == 401 and denied.json()["error"]["code"] == "access-required"
+    assert denied.headers.get("access-control-allow-origin") == origin, "관리자 전용 거부(401)에도 CORS 헤더"
+    big = c.post("/api/report/pdf", json={"version": "1.0", "meta": {}, "blocks": [], "pad": "x" * (9 * 1024 * 1024)}, headers=h)
+    assert big.status_code == 413 and big.headers.get("access-control-allow-origin") == origin
+    assert c.get("/api/analyses", headers=h).headers.get("access-control-allow-origin") == origin
+    assert "access-control-allow-origin" not in c.delete("/api/knowledge/documents/1", headers={"Origin": "https://evil.example"}).headers, "허용하지 않은 origin 은 그대로 막힌다"
+    pre = c.options("/api/knowledge/documents/1", headers={**h, "Access-Control-Request-Method": "DELETE"})
+    assert pre.status_code == 200 and pre.headers["access-control-allow-origin"] == origin
+
+
+@pytest.mark.real_limits
+def test_rate_limited_429_is_readable_cross_origin_with_retry_after():
+    origin = "https://valuflow.example.com"
+    c = make(app_env="production", cors_origins=(origin,))
+    h = {"Origin": origin}
+    for _ in range(security.LIMITS["report-pdf"][0]):
+        assert c.post("/api/report/pdf", json=minimal_model(), headers=h).status_code == 200
+    r = c.post("/api/report/pdf", json=minimal_model(), headers=h)
+    assert r.status_code == 429 and r.headers.get("access-control-allow-origin") == origin
+    assert "retry-after" in r.headers and "retry-after" in r.headers.get("access-control-expose-headers", "").lower()

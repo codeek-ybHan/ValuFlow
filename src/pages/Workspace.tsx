@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { PageHeader, fmtNum, fmtPct } from '../components/ui';
+import { PageHeader, fmtNum, fmtPct, newestFirstOrder } from '../components/ui';
 import { useProject } from '../store/project';
 import { analyzeHistorical, type MetricSeries } from '../engine/historicalAnalysis';
 import type { HistoricalData } from '../data/types';
@@ -14,13 +14,14 @@ type Tab = (typeof TABS)[number];
 type Row = { label: string; values: (number | null)[]; total?: boolean };
 
 function FinTable({ period, rows, note }: { period: string[]; rows: Row[]; note?: string }) {
+  const order = newestFirstOrder(period);   // 최근 연도가 왼쪽
   return (
     <>
       <div className="table-wrap"><table className="fin-table">
-        <thead><tr><th>KRW million</th>{period.map((p) => <th key={p} className="num">{p}</th>)}</tr></thead>
+        <thead><tr><th>KRW million</th>{order.map((i) => <th key={period[i]} className="num">{period[i]}</th>)}</tr></thead>
         <tbody>{rows.map((r) => (
           <tr key={r.label} className={r.total ? 'total' : undefined}>
-            <th>{r.label}</th>{r.values.map((v, i) => <td key={i} className="num">{fmtNum(v)}</td>)}
+            <th>{r.label}</th>{order.map((i) => <td key={i} className="num">{fmtNum(r.values[i])}</td>)}
           </tr>
         ))}</tbody>
       </table></div>
@@ -56,13 +57,14 @@ function Statements({ tab, h }: { tab: Tab; h: HistoricalData }) {
 function Analysis({ h }: { h: HistoricalData }) {
   const a = useMemo(() => analyzeHistorical(h), [h]);
   const m = a.metrics;
-  const ratio = (s: MetricSeries) => s.values.map((v, i) => <td key={i} className="num">{fmtPct(v)}</td>);
-  const amount = (s: MetricSeries) => s.values.map((v, i) => <td key={i} className="num">{fmtNum(v)}</td>);
+  const order = newestFirstOrder(a.periods);   // 최근 연도가 왼쪽
+  const ratio = (s: MetricSeries) => order.map((i) => <td key={i} className="num">{fmtPct(s.values[i])}</td>);
+  const amount = (s: MetricSeries) => order.map((i) => <td key={i} className="num">{fmtNum(s.values[i])}</td>);
   const unavailable = a.forecastReference.unavailable;
   return (
     <>
       <div className="table-wrap"><table className="fin-table">
-        <thead><tr><th>Metric</th>{a.periods.map((p) => <th key={p} className="num">{p}</th>)}</tr></thead>
+        <thead><tr><th>Metric</th>{order.map((i) => <th key={a.periods[i]} className="num">{a.periods[i]}</th>)}</tr></thead>
         <tbody>
           <tr><th>Revenue Growth (YoY)</th>{ratio(m.revenueGrowth)}</tr>
           <tr><th>Operating Margin</th>{ratio(m.operatingMargin)}</tr>

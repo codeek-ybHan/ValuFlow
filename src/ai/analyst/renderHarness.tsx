@@ -27,6 +27,6 @@ export function renderPage(persistedProject: string | null, session: AnalystSess
   } finally { delete (globalThis as { localStorage?: unknown }).localStorage; }
 }
 
-export function renderKnowledge(documents: KnowledgeDocument[] | null, error: string | null = null): string {
-  return renderToStaticMarkup(<KnowledgePanel kn={{ documents, error, reload: async () => undefined, client: defaultKnowledgeClient, setDocuments: () => undefined }} />);
+export function renderKnowledge(documents: KnowledgeDocument[] | null, error: string | null = null, manage = false): string {
+  return renderToStaticMarkup(<KnowledgePanel manage={manage} kn={{ documents, error, reload: async () => undefined, client: defaultKnowledgeClient, setDocuments: () => undefined }} />);
 }

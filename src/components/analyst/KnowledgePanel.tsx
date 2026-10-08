@@ -16,8 +16,11 @@ export function useKnowledge(client: KnowledgeClient = defaultKnowledgeClient): 
   return { documents, error, reload, client, setDocuments };
 }
 
-/** Knowledge Documents: 사용자 PDF 의 업로드 · 목록 · 삭제 · 재인덱싱. */
-export function KnowledgePanel({ kn }: { kn: ReturnType<typeof useKnowledge> }) {
+/**
+ * Knowledge Documents: 사용자 PDF 의 업로드 · 목록. 삭제 · 재인덱싱(`manage`)은 관리자 전용 API 라서 공개 화면에는 보이지 않는다
+ * (공유 저장소라 사용자별 소유권이 없다: 한 방문자의 삭제가 다른 방문자의 문서에 영향을 주지 않도록). 관리자는 access key 로 API 를 직접 호출한다.
+ */
+export function KnowledgePanel({ kn, manage = false }: { kn: ReturnType<typeof useKnowledge>; manage?: boolean }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [pending, setPending] = useState<number | null>(null);
@@ -58,6 +61,8 @@ export function KnowledgePanel({ kn }: { kn: ReturnType<typeof useKnowledge> }) 
               <div className="small muted">{[d.documentType, d.businessYear ? `${d.businessYear}` : null, `${d.chunkCount} chunks`].filter(Boolean).join(' · ')}</div>
               <div className="doc-actions">
                 <span className={`doc-state doc-${d.state}`}>{STATE_TEXT[d.state]}</span>
+                {manage ? (
+                  <>
                 <button type="button" className="link" disabled={busy !== null} onClick={() => run(`re-${d.documentId}`, async () => { await kn.client.reindex(d.documentId); return `다시 인덱싱했습니다: ${d.title}`; })}>Re-index</button>
                 {pending === d.documentId ? (
                   <>
@@ -65,6 +70,8 @@ export function KnowledgePanel({ kn }: { kn: ReturnType<typeof useKnowledge> }) 
                     <button type="button" className="link" onClick={() => setPending(null)}>취소</button>
                   </>
                 ) : <button type="button" className="link" disabled={busy !== null} onClick={() => setPending(d.documentId)}>Delete</button>}
+                  </>
+                ) : null}
               </div>
             </li>
           ))}

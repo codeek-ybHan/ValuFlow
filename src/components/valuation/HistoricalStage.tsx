@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useProject } from '../../store/project';
 import { buildHistoricalView, type HistoricalRow } from '../../engine/historicalView';
 import { BarChart, LineChart } from '../Charts';
-import { fmtNum, fmtPct } from '../ui';
+import { fmtNum, fmtPct, newestFirstOrder } from '../ui';
 import { DataQualityPanel, HistoricalFailureNotice, HistoricalLoadControls, ProvenanceList } from '../HistoricalSource';
 import { provenanceView } from '../../store/historicalLoad';
 import { stages } from './workflow';
@@ -16,16 +16,17 @@ function cell(row: HistoricalRow, v: number | null) {
 }
 
 function FinTable({ periods, rows, unit }: { periods: string[]; rows: HistoricalRow[]; unit: string }) {
+  const order = newestFirstOrder(periods);   // 최근 연도가 왼쪽 (DART 재무제표와 같다)
   return (
     <>
       <div className="table-wrap">
         <table className="fin-table">
           <thead>
-            <tr><th>Unit: {unit}</th>{periods.map((p) => <th key={p} className="num">{p}</th>)}</tr>
+            <tr><th>Unit: {unit}</th>{order.map((i) => <th key={periods[i]} className="num">{periods[i]}</th>)}</tr>
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.key}><th>{r.label}</th>{r.values.map((v, i) => <td key={i} className="num">{cell(r, v)}</td>)}</tr>
+              <tr key={r.key}><th>{r.label}</th>{order.map((i) => <td key={i} className="num">{cell(r, r.values[i] ?? null)}</td>)}</tr>
             ))}
           </tbody>
         </table>

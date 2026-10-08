@@ -31,6 +31,8 @@ export class KnowledgeError extends Error {
 export const KNOWLEDGE_ERROR_TEXT: Record<string, string> = {
   'backend-unreachable': 'ValuFlow 서버에 연결할 수 없습니다.',
   'rate-limited': 'Demo PDF 업로드 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.',
+  'access-required': '삭제와 재인덱싱은 관리자 전용 기능입니다.',
+  'access-not-configured': '삭제와 재인덱싱은 관리자 전용 기능입니다.',
   'document-limit': '데모에 올릴 수 있는 문서 수 한도에 도달했습니다.',
   'payload-too-large': '파일이 너무 큽니다.',
   'ai-not-configured': '문서 검색이 설정되어 있지 않습니다. 서버의 데이터베이스와 AI 서비스 설정이 필요합니다.',
