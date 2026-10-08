@@ -36,7 +36,7 @@ Report Preview 는 브라우저에서 만들어지므로 backend endpoint 가 �
 ## 3. User PDF Upload (공개 + 강한 제한)
 
 - PDF 만 (Content-Type + `%PDF-` 서명), 빈 파일/손상/암호 PDF 거부, 파일명은 표시용으로만 정리하고 저장 경로에 쓰지 않음, SHA-256 중복은 기존 문서를 돌려줌 (재 embedding 없음).
-- 크기 `MAX_UPLOAD_MB` 기본 **5MB** (multipart 여유 포함 선검사 → 413), IP 당 **2회/hour**, 업로드 문서 총 **30개** 상한(`MAX_USER_DOCUMENTS`, 초과 시 409 `document-limit`; 이미 있는 파일은 상한과 무관하게 기존 문서를 돌려줌).
+- 크기 `MAX_UPLOAD_MB` 기본 **20MB** (multipart 여유 포함 선검사 → 413), IP 당 **2회/hour**, 업로드 문서 총 **30개** 상한(`MAX_USER_DOCUMENTS`, 초과 시 409 `document-limit`; 이미 있는 파일은 상한과 무관하게 기존 문서를 돌려줌).
 - 공개 사용자는 **upload 와 질문까지만** 가능하다. 삭제/재인덱싱은 사용자별 소유권이 없어 ADMIN_ONLY.
 
 ## 4. Persistence

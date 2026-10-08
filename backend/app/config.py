@@ -64,7 +64,7 @@ class Settings:
     rate_ttl: int = 86400
     news_ttl: int = 900
     # 사용자 PDF 업로드
-    max_upload_mb: int = 5
+    max_upload_mb: int = 20
     max_user_documents: int = 30      # 공개 데모: 업로드된 사용자 PDF 총 개수 상한 (사용자별 분리가 없으므로 저장소 폭주를 막는다)
     # 공개 포트폴리오: 핵심 기능은 access key 없이 쓰고(비용이 드는 기능은 IP rate limit), ADMIN_ONLY(저장/조회 persistence · 문서 삭제/재인덱싱 · 공시 수집 · 진단)만 이 token 이 필요하다.
     # production 에서 ACCESS_TOKEN 이 없으면 ADMIN_ONLY API 는 잠긴다. development 는 token 이 없으면 열려 있다.
@@ -128,7 +128,7 @@ def load_settings(env: dict[str, str] | None = None, dotenv_path: Path | None = 
         rerank_candidates=int(source.get("RERANK_CANDIDATES") or 15),
         rerank_min_score=float(source["RERANK_MIN_SCORE"]) if source.get("RERANK_MIN_SCORE") else None,
         reranker_cache_dir=source.get("RERANKER_CACHE_DIR") or dotenv.get("RERANKER_CACHE_DIR", ""),
-        max_upload_mb=int(source.get("MAX_UPLOAD_MB") or 5), max_user_documents=int(source.get("MAX_USER_DOCUMENTS") or 30),
+        max_upload_mb=int(source.get("MAX_UPLOAD_MB") or 20), max_user_documents=int(source.get("MAX_USER_DOCUMENTS") or 30),
         app_env=app_env,
         external_data=(source.get("EXTERNAL_DATA") or dotenv.get("EXTERNAL_DATA", "") or "true").lower() not in ("0", "false", "no", "off"),
         market_ttl=int(source.get("MARKET_TTL_SECONDS") or 300), fundamentals_ttl=int(source.get("FUNDAMENTALS_TTL_SECONDS") or 86400),

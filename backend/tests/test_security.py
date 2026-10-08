@@ -152,8 +152,8 @@ def test_request_size_limits():
     assert r.status_code == 413 and r.json()["error"]["code"] == "payload-too-large"
     ai = c.post("/api/ai/query", content=b"{" + b" " * 1_100_000 + b"}", headers={"content-type": "application/json"})
     assert ai.status_code == 413
-    pdf = c.post("/api/knowledge/documents", files={"file": ("a.pdf", b"%PDF-" + b"0" * (7 * 1024 * 1024), "application/pdf")})
-    assert pdf.status_code == 413, "기본 업로드 한도는 5MB (+multipart 여유)"
+    pdf = c.post("/api/knowledge/documents", files={"file": ("a.pdf", b"%PDF-" + b"0" * (22 * 1024 * 1024), "application/pdf")})
+    assert pdf.status_code == 413, "기본 업로드 한도는 20MB (+multipart 여유)"
 
 
 def test_cors_production_only_configured_origin():
@@ -221,4 +221,4 @@ def test_settings_production_defaults():
     assert load_settings({"APP_ENV": "production", "RERANKER": "cohere"}).reranker == "cohere", "명시하면 따른다"
     assert load_settings({}).reranker == "auto"
     assert load_settings({"ACCESS_TOKEN": " t "}).access_token == "t"
-    assert load_settings({}).max_upload_mb == 5 and load_settings({}).max_user_documents == 30
+    assert load_settings({}).max_upload_mb == 20 and load_settings({}).max_user_documents == 30

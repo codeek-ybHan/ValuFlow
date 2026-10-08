@@ -172,7 +172,7 @@ curl localhost:8000/api/knowledge/documents                           # 목록 (
 curl -X POST localhost:8000/api/knowledge/documents/3/reindex         # 저장된 chunk 를 현재 embedding model 로 다시 embedding
 curl -X DELETE localhost:8000/api/knowledge/documents/3               # 문서 + chunk + embedding 삭제
 ```
-- **검증:** PDF Content-Type + `%PDF-` 확인, 크기(`MAX_UPLOAD_MB`, 기본 5), 업로드 문서 수 상한(`MAX_USER_DOCUMENTS`, 기본 30), IP 당 업로드 2회/hour, 빈 파일 · 손상 · 암호 PDF 거부, 파일 이름은 신뢰하지 않음(표시용으로만 정리해 저장, 파일 자체는 저장하지 않음). 스캔 PDF(OCR)는 `text-unavailable`.
+- **검증:** PDF Content-Type + `%PDF-` 확인, 크기(`MAX_UPLOAD_MB`, 기본 20), 업로드 문서 수 상한(`MAX_USER_DOCUMENTS`, 기본 30), IP 당 업로드 2회/hour, 빈 파일 · 손상 · 암호 PDF 거부, 파일 이름은 신뢰하지 않음(표시용으로만 정리해 저장, 파일 자체는 저장하지 않음). 스캔 PDF(OCR)는 `text-unavailable`.
 - **기업 연결은 선택:** `corpCode` 를 주면 그 기업 질문에서만, 주지 않으면(산업 리포트 등) 기업과 무관한 문서로 모든 기업 질문에서 검색됩니다. 다른 기업에 연결된 문서는 검색되지 않습니다.
 - **검색 Tool(backend):** `searchDisclosures`(공시) · `searchUploadedDocuments`(업로드 PDF) · `searchKnowledge`(둘 다). 모두 같은 파이프라인을 쓰고, 답변 출처에는 공시는 보고서 · section · 접수번호, 업로드는 문서 제목 · page 가 들어갑니다.
 - **Reranker:** 후보 15개를 (질문, chunk) cross-encoder 로 다시 정렬합니다. `pip install -r backend/requirements-rerank.txt` 후 `RERANKER=auto`(기본)면 로컬 모델(`jina-reranker-v2-base-multilingual`, 첫 호출 때 ~1.1GB 다운로드, CC-BY-NC)을 쓰고, 설치하지 않으면 Hybrid 만 씁니다. API 방식은 `RERANKER=cohere` + `COHERE_API_KEY`. 지연은 CPU 에서 후보 15개에 약 2초입니다.
