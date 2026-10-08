@@ -56,8 +56,8 @@ export const REPORT_CSS = `
 .valuflow-report .banner{border:2px solid #7a5a12;background:#f6eed8;padding:10px 14px;margin:16px 0;display:flex;flex-direction:column;gap:2px}
 .valuflow-report .notice{border-left:4px solid #7a5a12;background:#faf5e6;padding:6px 10px;margin:8px 0;font-size:12.5px}
 .valuflow-report .muted{color:#666;font-size:12px}
-.valuflow-report .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:12px 0}
-.valuflow-report .kpi{border:1px solid #d0d0cb;padding:10px 12px;break-inside:avoid}.valuflow-report .kpi-label{font-size:11px;color:#555}.valuflow-report .kpi-value{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}.valuflow-report .kpi-alt{font-size:11px;color:#666}
+.valuflow-report .kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+.valuflow-report .kpi{border:1px solid #d0d0cb;padding:10px 12px;break-inside:avoid;min-width:0;overflow-wrap:anywhere}.valuflow-report .kpi-label{font-size:11px;color:#555}.valuflow-report .kpi-value{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}.valuflow-report .kpi-alt{font-size:11px;color:#666}
 .valuflow-report figure{margin:14px 0;break-inside:avoid}.valuflow-report figcaption{font-weight:650;font-size:12.5px;margin-bottom:4px}
 .valuflow-report table{border-collapse:collapse;width:100%;font-size:12px}
 .valuflow-report th,.valuflow-report td{border-bottom:1px solid #e0e0dc;padding:5px 8px;text-align:left;vertical-align:top}
