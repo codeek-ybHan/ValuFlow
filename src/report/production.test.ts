@@ -1,4 +1,4 @@
-// STEP 10: 프론트 production 계약 — API 주소 · access key 헤더 · 저장/조회 client · 저장된 분석 병합 · 과거 Report 재현 · secret 비노출.
+// 공개 포트폴리오 프론트 계약 — API 주소 · access key 없음 · 저장 비활성(세션 메모리) · 저장/조회 client · 저장된 분석 병합 · 과거 Report 재현 · secret 비노출.
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -6,8 +6,7 @@ import { mkdtempSync, readFileSync, readdirSync, statSync, existsSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildSync } from 'esbuild';
-import { PersistenceClient, PERSIST_NOTE, type SavedAnalysisSummary } from '../data/persist/client.ts';
-import { ACCESS_HEADER, getAccessKey, setAccessKey } from '../data/access.ts';
+import { PersistenceClient, PERSIST_NOTE, defaultPersistence, type SavedAnalysisSummary } from '../data/persist/client.ts';
 import { apiBase, apiFetch } from '../data/http.ts';
 import { analysisChoices, withSavedAnalyses, defaultAnalysisId } from './ui/model.ts';
 import { buildReportInput, generateReport, reopenReport, renderReportHtml, runReportQa, type GenerateOk } from './index.ts';
@@ -34,24 +33,20 @@ function memorySession() {
   return m;
 }
 
-test('access key: 탭 저장소에만 두고, /api 요청에만 헤더로 보낸다 (다른 주소 · 빈 값은 보내지 않는다)', async () => {
+test('방문자 요청에는 access key 가 없다: sessionStorage 에 값이 남아 있어도 헤더로 보내지 않는다', async () => {
   const store = memorySession();
+  store.set('valuflow:access', 'stale-key-from-old-version');
   const calls: { url: string; headers: Record<string, string> }[] = [];
   (globalThis as { fetch?: unknown }).fetch = async (url: string, init: { headers: Record<string, string> }) => { calls.push({ url, headers: init.headers }); return new Response('{}'); };
   await apiFetch('/api/health');
-  assert.equal(calls[0]!.headers[ACCESS_HEADER], undefined, '키가 없으면 헤더 없음');
-  setAccessKey('  my-demo-key  ');
-  assert.equal(getAccessKey(), 'my-demo-key');
-  assert.equal(store.get('valuflow:access'), 'my-demo-key');
   await apiFetch('/api/report/pdf', { method: 'POST', body: '{}' });
-  assert.equal(calls[1]!.headers[ACCESS_HEADER], 'my-demo-key');
-  await apiFetch('https://other.example/x');
-  assert.equal(calls[2]!.headers[ACCESS_HEADER], undefined, '외부 주소로는 키를 보내지 않는다');
-  setAccessKey('');
-  assert.equal(getAccessKey(), '');
+  assert.ok(calls.every((c) => Object.keys(c.headers).every((k) => k.toLowerCase() !== 'x-valuflow-access')), 'access 헤더 없음');
   delete (globalThis as { sessionStorage?: unknown }).sessionStorage;
-  assert.equal(getAccessKey(), '', 'sessionStorage 를 못 쓰면 빈 값');
   delete (globalThis as { fetch?: unknown }).fetch;
+});
+
+test('공개 화면은 저장소를 쓰지 않는다: 기본 persistence 는 null (분석 · Report 는 세션 메모리)', () => {
+  assert.equal(defaultPersistence(), null);
 });
 
 test('API 주소: VITE_API_BASE_URL 이 있으면 /api 앞에 붙인다 (끝 슬래시 제거)', () => {
@@ -127,19 +122,27 @@ test('Report 화면: 저장된 Report 목록 · 저장소 안내 · 저장된 �
   assert.match(html, /저장된 질문/);
   assert.match(html, /저장됨/);
   assert.match(html, /이 세션에서만 유지됩니다/);
-  assert.match(h.renderReport(persisted), /저장된 Report 가 없습니다/);
+  assert.match(h.renderReport(persisted, { admin: true }), /저장된 Report 가 없습니다/);
 });
 
-test('오류 문구: access / rate limit 코드는 사용자 문구로 안내하고 내부 값을 노출하지 않는다', async () => {
-  for (const code of ['access-required', 'access-not-configured', 'rate-limited', 'payload-too-large']) {
+test('공개 Report 화면: Saved reports · 저장소 안내 · Access key 문구가 보이지 않는다', () => {
+  const html = h.renderReport(JSON.stringify({ selectedCompany: null }));
+  assert.doesNotMatch(html, /Saved reports|저장된 Report|Access key|access key|서버 저장소/);
+});
+
+test('오류 문구: rate limit(429) 은 데모 한도 문구로 안내하고 Access key 를 요구하지 않는다', async () => {
+  for (const code of ['rate-limited', 'payload-too-large']) {
     assert.ok(PDF_ERROR_TEXT[code], `pdf ${code}`);
     assert.ok(!knowledgeErrorText(code).startsWith('문서를 처리하지 못했습니다'), `knowledge ${code}`);
   }
-  const r = await requestPdf(ok().renderModel, { fetch: async () => ({ ok: false, status: 401, headers: { get: () => null }, blob: async () => new Blob(), json: async () => ({ error: { code: 'access-required', message: 'Access key 가 필요합니다.' } }) }) });
-  assert.ok(!r.ok && r.code === 'access-required' && /Access key/.test(r.message));
+  assert.match(PDF_ERROR_TEXT['rate-limited']!, /Demo PDF 내보내기 한도에 도달했습니다/);
+  assert.match(knowledgeErrorText('rate-limited'), /Demo PDF 업로드 한도에 도달했습니다/);
+  assert.ok(![...Object.values(PDF_ERROR_TEXT), knowledgeErrorText('access-required')].some((t) => /Access key/i.test(t)), '방문자에게 Access key 안내가 없다');
+  const r = await requestPdf(ok().renderModel, { fetch: async () => ({ ok: false, status: 429, headers: { get: () => null }, blob: async () => new Blob(), json: async () => ({ error: { code: 'rate-limited', message: 'x' } }) }) });
+  assert.ok(!r.ok && r.code === 'rate-limited' && /한도에 도달했습니다/.test(r.message));
 });
 
-test('frontend 에 secret 이 없다: 소스 · 설정 · 빌드 결과 (access key 는 사용자가 입력하는 값이다)', () => {
+test('frontend 에 secret 이 없다: 소스 · 설정 · 빌드 결과 (관리자 access key 는 브라우저 번들에 없다)', () => {
   const root = new URL('../../', import.meta.url).pathname;
   const walk = (d: string): string[] => readdirSync(d).flatMap((n) => (statSync(join(d, n)).isDirectory() ? walk(join(d, n)) : [join(d, n)]));
   const env = readFileSync(join(root, '.env.example'), 'utf8');

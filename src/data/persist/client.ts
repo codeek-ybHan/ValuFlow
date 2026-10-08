@@ -54,7 +54,11 @@ export class PersistenceClient {
   }
 }
 
+/** 공개 포트폴리오 화면의 기본 저장 정책: 저장하지 않는다 (null). 사용자 소유권 모델이 없어 공개 persistence 는 다른 방문자의 데이터 노출 위험이 있다.
+ *  분석/Report 는 이 세션 메모리에만 유지된다. 저장/조회 API(/api/analyses · /api/report-snapshots)는 관리자 access key 로 운영자가 직접 호출한다 (브라우저 번들에 key 없음). */
+export function defaultPersistence(): PersistenceClient | null { return null; }
+
 export const PERSIST_NOTE: Record<PersistFailure, string> = {
-  unavailable: '서버에 저장소가 없어 이 세션에서만 유지됩니다.', 'access-required': '저장하려면 Access key 가 필요합니다. 이 세션에서만 유지됩니다.', 'rate-limited': '저장 요청이 많아 잠시 후 다시 시도됩니다.',
+  unavailable: '서버에 저장소가 없어 이 세션에서만 유지됩니다.', 'access-required': '저장은 관리자 전용입니다. 이 세션에서만 유지됩니다.', 'rate-limited': '저장 요청이 많아 잠시 후 다시 시도됩니다.',
   'too-large': '데이터가 커서 저장하지 못했습니다.', invalid: '저장 형식이 올바르지 않습니다.', 'not-found': '저장된 항목을 찾을 수 없습니다.', unreachable: '서버에 연결할 수 없어 이 세션에서만 유지됩니다.',
 };

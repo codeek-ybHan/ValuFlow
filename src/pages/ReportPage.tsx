@@ -38,7 +38,7 @@ export function ReportPage() {
           </section>
           <section className="ai-card"><AnalysisPicker choices={r.choices} selected={r.selectedAnalysisId} onSelect={r.select} /></section>
           <section className="ai-card"><SectionToggles hidden={r.hideOptional} onToggle={r.toggleSection} /></section>
-          <section className="ai-card" aria-label="Saved reports">
+          {r.persistenceEnabled ? <section className="ai-card" aria-label="Saved reports">
             <div className="panel-head"><h4>Saved reports</h4></div>
             {r.savedReports.length === 0 ? <p className="small muted">저장된 Report 가 없습니다. 생성한 Report 는 서버 저장소가 있으면 자동으로 저장됩니다.</p> : (
               <ul className="plain-list rp-saved">
@@ -51,7 +51,7 @@ export function ReportPage() {
               </ul>
             )}
             {r.persistNote ? <p className="small muted" role="status">{r.persistNote}</p> : null}
-          </section>
+          </section> : null}
         </aside>
 
         <section className="rp-center" aria-label="Preview">

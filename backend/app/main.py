@@ -148,7 +148,7 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
         def _corp_name(code: str) -> str | None:
             return next((r.corp_name for r in cache.get() if r.corp_code == code), None)
 
-        knowledge = KnowledgeService(embedder, disclosure_store, max_bytes=settings.max_upload_mb * 1024 * 1024, corp_name_lookup=_corp_name)
+        knowledge = KnowledgeService(embedder, disclosure_store, max_bytes=settings.max_upload_mb * 1024 * 1024, corp_name_lookup=_corp_name, max_documents=settings.max_user_documents)
     backend_tools = make_retrieval_tools(retriever) if retriever is not None else {}
     if external is None and settings.external_data:
         external = build_external(settings)   # provider 별 Key 가 없으면 그 Tool 만 unavailable
@@ -218,7 +218,7 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
                 "dartConfigured": settings.has_api_key, "databaseConfigured": historical.persistence_enabled, "aiConfigured": ai is not None,
                 "disclosureSearchConfigured": retriever is not None, "ragAvailable": retriever is not None, "knowledgeUploadConfigured": knowledge is not None,
                 "rerankerConfigured": reranker is not None, "persistenceAvailable": snapshots is not None and db == "ok",
-                "reportService": {"available": True, "font": load_fonts().kind}, "accessProtection": access_state(settings),
+                "reportService": {"available": True, "font": load_fonts().kind}, "publicDemo": True, "adminProtection": access_state(settings), "rateLimit": "disabled" if settings.rate_limit_disabled else "enabled",
                 "externalToolsConfigured": external is not None, "externalProviders": _provider_report(external), "corpCodesFetchedAt": cache.fetched_at}
 
     @app.get("/api/companies")

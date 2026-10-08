@@ -4,7 +4,7 @@ import { askAnalyst, cancelledTurn, resolveMode, type Progress } from '../ai/ana
 import { activeTurn, addTurn, decideCheckpoint, emptySession, selectTurn, type AnalystSession } from '../ai/analyst/session.ts';
 import type { AnalystTurn, CheckpointDecision, ModePreference } from '../ai/analyst/view.ts';
 import { buildAiContext } from '../ai/context.ts';
-import { PersistenceClient } from '../data/persist/client.ts';
+import { defaultPersistence, type PersistenceClient } from '../data/persist/client.ts';
 import { useProject } from './project';
 
 // AI Analyst 의 대화 state. Project(valuation) state 와 분리되어 있고, 여기서 Project 를 바꾸는 함수는 하나도 쓰지 않는다 (읽기 전용).
@@ -28,7 +28,7 @@ export function AnalystProvider({ children, client, initial, persistence }: { ch
   const [running, setRunning] = useState<Progress | null>(null);
   const [preference, setPreference] = useState<ModePreference>('auto');
   const gateway = useMemo(() => client ?? new BackendAiClient(), [client]);
-  const store = useMemo(() => (persistence === undefined ? new PersistenceClient() : persistence), [persistence]);   // null 이면 저장하지 않는다 (테스트 · 화면 렌더링)
+  const store = useMemo(() => (persistence === undefined ? defaultPersistence() : persistence), [persistence]);   // 공개 화면 기본은 null: 저장하지 않고 이 세션 메모리만 쓴다
   const seq = useRef(0);                                  // 취소했거나 늦게 도착한 결과는 버린다
   const abort = useRef<{ aborted: boolean } | null>(null);
   const pending = useRef<{ question: string } | null>(null);

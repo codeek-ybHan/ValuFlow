@@ -10,9 +10,7 @@ type FetchFn = (input: string, init?: { method?: string; headers?: Record<string
 
 /** 오류 코드 → 사용자 문구 (원문 오류 · 내부 메시지를 그대로 보이지 않는다). */
 export const PDF_ERROR_TEXT: Record<string, string> = {
-  'access-required': 'PDF 를 만들려면 Access key 가 필요합니다. 상단의 Access key 에서 입력하세요.',
-  'access-not-configured': '이 서버는 PDF 생성이 잠겨 있습니다 (access key 미설정).',
-  'rate-limited': '요청이 너무 많습니다. 잠시 후 다시 시도하세요.',
+  'rate-limited': 'Demo PDF 내보내기 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.',
   'payload-too-large': 'Report 가 너무 커서 PDF 로 만들 수 없습니다.',
   'backend-unreachable': 'ValuFlow 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인한 뒤 다시 시도하세요.',
   'pdf-render-failed': 'PDF 를 만들지 못했습니다. 잠시 후 다시 시도하세요.',

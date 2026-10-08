@@ -150,6 +150,10 @@ test('오류 UX: backend · LLM · rate limit · 취소를 사용자 문구로 �
     assert.ok(!/RAW|stack|sk-secret|\{/.test(`${t.error!.title} ${t.error!.detail}`), '내부 오류 원문이 노출되지 않는다');
   }
   assert.equal(errorView('whatever').kind, 'unknown');
+  const limited = errorView('rate-limited');   // 공개 데모의 IP 한도 (HTTP 429)
+  assert.equal(limited.kind, 'rate-limit');
+  assert.match(`${limited.title} ${limited.detail}`, /Demo AI 사용 한도에 도달했습니다.*잠시 후 다시 시도해 주세요/);
+  assert.doesNotMatch(`${limited.title} ${limited.detail}`, /Access key/i);
   const cancelled = await ask('최근 영업이익률을 분석해줘.', liveBase(), historicalRun(), { signal: { aborted: true } });
   assert.equal(cancelled.status, 'cancelled');
 });

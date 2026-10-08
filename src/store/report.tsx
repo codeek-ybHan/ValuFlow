@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { PERSIST_NOTE, PersistenceClient, type PersistFailure, type SavedReportSummary, type SavedAnalysisSummary } from '../data/persist/client.ts';
+import { PERSIST_NOTE, defaultPersistence, type PersistenceClient, type PersistFailure, type SavedReportSummary, type SavedAnalysisSummary } from '../data/persist/client.ts';
 import { buildAiContext } from '../ai/context.ts';
 import { snapshotId } from '../ai/agent/run.ts';
 import { buildReportInput } from '../report/input.ts';
@@ -30,6 +30,8 @@ interface Ctx {
   /** 저장된 과거 Report 목록 · 저장소 상태 안내 (저장소가 없으면 이 세션에서만 유지) */
   savedReports: SavedReportSummary[];
   persistNote: string | null;
+  /** 저장소(관리자 전용)를 쓰는 화면인가. 공개 화면은 false 이며 Saved reports 를 보이지 않는다. */
+  persistenceEnabled: boolean;
   opening: boolean;
   openSaved: (reportId: string) => Promise<void>;
   select: (id: string | null) => void;
@@ -56,7 +58,7 @@ export function ReportProvider({ children, initial = {}, pdfBaseUrl, persistence
   const [pdf, setPdf] = useState<PdfStatus>(initial.pdf ?? { status: 'idle' });
   const [picked, setPicked] = useState<{ touched: boolean; id: string | null }>({ touched: initial.touched ?? false, id: initial.selectedAnalysisId ?? null });
   const [hideOptional, setHide] = useState<SectionId[]>(initial.hideOptional ?? []);
-  const store = useMemo(() => (persistence === undefined ? new PersistenceClient() : persistence), [persistence]);
+  const store = useMemo(() => (persistence === undefined ? defaultPersistence() : persistence), [persistence]);   // 공개 화면 기본은 null (세션 메모리만)
   const [savedAnalyses, setSavedAnalyses] = useState<SavedAnalysisSummary[]>(initial.saved?.analyses ?? []);
   const [savedReports, setSavedReports] = useState<SavedReportSummary[]>(initial.saved?.reports ?? []);
   const [persistNote, setPersistNote] = useState<string | null>(initial.saved?.note ?? null);
@@ -129,9 +131,9 @@ export function ReportProvider({ children, initial = {}, pdfBaseUrl, persistence
 
   const value = useMemo<Ctx>(() => ({
     generated, blocked, choices, selectedAnalysisId, hideOptional, currentSnapshotId, stale: isReportStale(generated?.result.model.metadata.snapshot.contextSnapshotId ?? null, currentSnapshotId), pdf,
-    savedReports, persistNote, opening, openSaved,
+    savedReports, persistNote, opening, openSaved, persistenceEnabled: store !== null,
     select: (id) => setPicked({ touched: true, id }), toggleSection: (id) => setHide((h) => (h.includes(id) ? h.filter((x) => x !== id) : [...h, id])), generate, downloadPdf, downloadHtml, downloadJson,
-  }), [generated, blocked, choices, selectedAnalysisId, hideOptional, currentSnapshotId, pdf, savedReports, persistNote, opening, openSaved, generate, downloadPdf, downloadHtml, downloadJson]);
+  }), [generated, blocked, choices, selectedAnalysisId, hideOptional, currentSnapshotId, pdf, savedReports, persistNote, opening, openSaved, store, generate, downloadPdf, downloadHtml, downloadJson]);
   return <ReportCtx.Provider value={value}>{children}</ReportCtx.Provider>;
 }
 

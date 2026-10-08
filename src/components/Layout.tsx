@@ -8,7 +8,6 @@ import { useProject } from '../store/project';
 import { nextAction, overallProgress, stepProgress } from '../store/progress';
 import { ProgressBar, fmtPct } from './ui';
 import { ThemeToggle } from './ThemeToggle';
-import { AccessKeyControl } from './AccessKeyControl';
 import { IconAi, IconAnalysis, IconDashboard, IconLearn, IconMenu, IconReport, IconRoadmap, IconValuation, IconWorkspace } from './Icons';
 
 interface Crumb { area: string; page: string }
@@ -105,11 +104,10 @@ export function Layout() {
             <Link to="/workspace" className={`company-chip${company ? ' on' : ''}`} title="Workspace 로 이동">
               <i aria-hidden />{company ? `${company.name} · ${company.ticker}` : '기업 미선택'}
             </Link>
-            <AccessKeyControl />
             <ThemeToggle />
           </div>
         </header>
-        <main className="main"><Outlet /></main>
+        <main className="main"><Outlet /><p className="demo-note muted">Public portfolio demo — AI and upload usage is rate-limited.</p></main>
       </div>
     </div>
   );

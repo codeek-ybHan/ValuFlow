@@ -47,8 +47,8 @@ def parse_meta(title: str | None = None, corp_code: str | None = None, corp_name
 
 class KnowledgeService:
     def __init__(self, embedder: EmbeddingProvider, store: DisclosureStore, max_bytes: int = MAX_UPLOAD_BYTES, corp_name_lookup: Callable[[str], str | None] | None = None,
-                 clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
-        self._embedder, self._store, self._max, self._lookup, self._clock = embedder, store, max_bytes, corp_name_lookup, clock
+                 clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc), max_documents: int | None = None):
+        self._embedder, self._store, self._max, self._lookup, self._clock, self._max_docs = embedder, store, max_bytes, corp_name_lookup, clock, max_documents
 
     def upload_pdf(self, data: bytes, content_type: str | None, filename: str | None, meta: PdfMeta) -> dict[str, Any]:
         """반환 {"status": "ingested" | "already-exists", "document": {...}}. 실패는 PdfError(코드) 또는 AiGatewayError(embedding)."""
@@ -57,6 +57,8 @@ class KnowledgeService:
         existing = self._store.find_upload_by_hash(digest)
         if existing:  # 같은 파일은 다시 추출 · embedding 하지 않는다
             return {"status": "already-exists", "document": existing}
+        if self._max_docs is not None and self._store.count_uploads() >= self._max_docs:
+            raise PdfError("document-limit", "데모에 올릴 수 있는 문서 수 한도에 도달했습니다.", 409)
         if meta.corp_code and self._lookup:
             try:
                 official = self._lookup(meta.corp_code)

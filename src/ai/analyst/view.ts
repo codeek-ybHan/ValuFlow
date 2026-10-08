@@ -351,6 +351,7 @@ export function errorView(code: string | null | undefined): ErrorView {
     case 'backend-unreachable': return { kind: 'backend-unavailable', title: 'ValuFlow 서버에 연결할 수 없습니다', detail: 'backend 가 실행 중인지 확인한 뒤 다시 시도하세요.' };
     case 'ai-not-configured': return { kind: 'llm-unavailable', title: 'AI Analyst 가 설정되어 있지 않습니다', detail: '서버에 AI 서비스 설정이 필요합니다. 관리자에게 문의하세요.' };
     case 'provider-error': case 'invalid-model-output': return { kind: 'llm-unavailable', title: 'AI 서비스를 사용할 수 없습니다', detail: '잠시 후 다시 시도하세요.' };
+    case 'rate-limited': return { kind: 'rate-limit', title: 'Demo AI 사용 한도에 도달했습니다', detail: '잠시 후 다시 시도해 주세요.' };   // 공개 데모의 IP 기준 한도 (HTTP 429)
     case 'provider-rate-limit': return { kind: 'rate-limit', title: '요청이 너무 많습니다', detail: 'AI 서비스 요청 한도를 초과했습니다. 잠시 후 다시 시도하세요.' };
     case 'cancelled': return { kind: 'cancelled', title: '분석을 취소했습니다', detail: '' };
     case 'no-company': return { kind: 'no-company', title: '기업이 선택되지 않았습니다', detail: 'Workspace 에서 기업을 선택하고 재무데이터를 불러오세요.' };

@@ -441,6 +441,18 @@ def test_duplicate_opendart_ingestion_and_duplicate_pdf_hash(kn):
     assert kn.svc.delete(first["document"]["documentId"]) and kn.svc.upload_pdf(make_pdf(INDUSTRY), PDF, "a.pdf", parse_meta("T"))["status"] == "ingested"
 
 
+def test_public_demo_caps_the_number_of_uploaded_documents_but_still_returns_duplicates(kn):
+    capped = KnowledgeService(kn.embedder, kn.store, max_documents=2)
+    a = capped.upload_pdf(make_pdf(INDUSTRY), PDF, "a.pdf", parse_meta("A"))
+    capped.upload_pdf(make_pdf(INDUSTRY + ["두 번째 문서의 내용입니다."]), PDF, "b.pdf", parse_meta("B"))
+    with pytest.raises(PdfError) as err:
+        capped.upload_pdf(make_pdf(INDUSTRY + ["세 번째 문서의 내용입니다."]), PDF, "c.pdf", parse_meta("C"))
+    assert err.value.code == "document-limit" and err.value.status == 409
+    assert kn.store.count_uploads() == 2
+    dup = capped.upload_pdf(make_pdf(INDUSTRY), PDF, "a-copy.pdf", parse_meta("A2"))   # 이미 있는 파일은 한도와 상관없이 기존 문서를 돌려준다
+    assert dup["status"] == "already-exists" and dup["document"]["documentId"] == a["document"]["documentId"]
+
+
 # ---------- 25 deletion keeps other sources ----------
 def test_deleting_an_upload_leaves_opendart_documents_searchable(kn):
     industry, _, _ = seed(kn)

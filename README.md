@@ -4,7 +4,21 @@
 
 OpenDART 재무제표에서 DCF 가치평가, 근거 있는 AI 분석, PDF 보고서까지 이어지는 **기업가치평가 업무지원 Workspace** 입니다.
 
-> **Demo:** _배포 URL 은 운영자가 배포한 뒤 여기에 기재합니다_ (배포 절차: [`docs/STEP10_production.md`](docs/STEP10_production.md)). 데모 데이터는 학습용 가정을 포함하며 **실제 투자 · 가치평가 보고서가 아닙니다.**
+> **Live Demo:** https://valu-flow.vercel.app (배포 절차: [`docs/STEP10_production.md`](docs/STEP10_production.md)). 데모 데이터는 학습용 가정을 포함하며 **실제 투자 · 가치평가 보고서가 아닙니다.**
+
+## Live Demo
+
+ValuFlow is publicly available as a portfolio demo. **No access key is required.**
+
+Available:
+- OpenDART financial analysis
+- DCF / WACC valuation
+- Sensitivity / scenario
+- AI Analyst
+- Disclosure / PDF RAG
+- Report preview / PDF export
+
+Usage-heavy features (AI, PDF upload, PDF export) are rate-limited per IP. Saved analyses and report snapshots are maintained as admin/testing capabilities and are not exposed as public multi-user features — in the public UI, analyses and reports live in the session only and disappear on refresh. Endpoint-level policy: [`docs/PUBLIC_PORTFOLIO_MODE.md`](docs/PUBLIC_PORTFOLIO_MODE.md).
 
 ## Problem
 
@@ -51,7 +65,7 @@ Frontend 는 정적 번들이고 모든 secret 은 FastAPI 쪽 환경변수에�
 - **Provider 신뢰 등급**: 비공식(Yahoo · Google News)은 development 로 표시하고 `APP_ENV=production` 에서 차단. 기업 재무 Actual 은 항상 OpenDART/ValuFlow
 - **Human checkpoint**: 변경 제안은 사람이 판단, AI 가 Project 를 바꾸지 않음
 - **Grounding · Guardrail · Evaluation**: 고정 질문 40개 · Guardrail 17종 · Report QA(718개 검사) 를 `npm test` / 스크립트로 반복 실행
-- **공개 배포 보호**: access key · rate limit · 요청 크기 제한 · CORS 제한 · 오류/로그 정제
+- **공개 배포 보호**: 방문자 기능은 key 없이 쓰고, 비용이 드는 기능은 IP rate limit · 요청 크기 제한 · PDF 검증 · 문서 수 상한으로 보호, 저장/삭제/수집은 관리자 key 전용 · CORS 제한 · 오류/로그 정제
 
 ## Evaluation (STEP 08, 이 환경 · 이 데이터셋에서의 관찰)
 
@@ -61,7 +75,7 @@ Frontend 는 정적 번들이고 모든 secret 은 FastAPI 쪽 환경변수에�
 
 - **시장 · Peer · 뉴스 provider 는 production 에서 unavailable** 입니다. Current market reference provider is unavailable in production until an approved provider is configured. (개발 환경의 Yahoo/FRED/Google News 는 비공식 데모 fallback)
 - 무위험수익률의 한국 공식 출처(한국은행 ECOS)는 통계표 · 항목 코드와 이용 조건을 확인하지 못해 구현하지 않았습니다.
-- 인증은 **공유 demo access key** 뿐이고 사용자별 분리(multi-user isolation)가 없습니다. rate limit 은 서버 프로세스 메모리 기준입니다.
+- 사용자 인증과 사용자별 분리(multi-user isolation)가 없습니다. 그래서 공개 화면은 분석/Report 를 저장하지 않고(세션 메모리), 업로드된 PDF 는 공유 데모 저장소에 들어가며(삭제/재인덱싱은 관리자 전용) 문서 수 상한이 있습니다. rate limit 은 **서버 프로세스 메모리 기준**이라 instance 가 여러 개이거나 재시작하면 한도가 분리/초기화됩니다 (분산 limiter 없음). Render 등 proxy 뒤에서는 `TRUST_PROXY=true` 여야 IP 별로 구분됩니다.
 - 학습용 fixture/가정 기반 Report 이며 실제 가치평가 의견이 아닙니다 (모든 출력에 고지).
 - Reranker 는 production 기본 off (로컬 모델 ~1.1GB, 지연 · 라이선스). Hybrid 로 동작합니다.
 - 큰 Report 의 비동기 생성, production observability(메트릭 · 알림), 더 큰 평가 데이터셋은 범위 밖입니다. 전체 목록: [`docs/STEP10_production.md`](docs/STEP10_production.md) §13.
@@ -158,7 +172,7 @@ curl localhost:8000/api/knowledge/documents                           # 목록 (
 curl -X POST localhost:8000/api/knowledge/documents/3/reindex         # 저장된 chunk 를 현재 embedding model 로 다시 embedding
 curl -X DELETE localhost:8000/api/knowledge/documents/3               # 문서 + chunk + embedding 삭제
 ```
-- **검증:** PDF Content-Type + `%PDF-` 확인, 크기(`MAX_UPLOAD_MB`, 기본 20), 빈 파일 · 손상 · 암호 PDF 거부, 파일 이름은 신뢰하지 않음(표시용으로만 정리해 저장, 파일 자체는 저장하지 않음). 스캔 PDF(OCR)는 `text-unavailable`.
+- **검증:** PDF Content-Type + `%PDF-` 확인, 크기(`MAX_UPLOAD_MB`, 기본 5), 업로드 문서 수 상한(`MAX_USER_DOCUMENTS`, 기본 30), IP 당 업로드 2회/hour, 빈 파일 · 손상 · 암호 PDF 거부, 파일 이름은 신뢰하지 않음(표시용으로만 정리해 저장, 파일 자체는 저장하지 않음). 스캔 PDF(OCR)는 `text-unavailable`.
 - **기업 연결은 선택:** `corpCode` 를 주면 그 기업 질문에서만, 주지 않으면(산업 리포트 등) 기업과 무관한 문서로 모든 기업 질문에서 검색됩니다. 다른 기업에 연결된 문서는 검색되지 않습니다.
 - **검색 Tool(backend):** `searchDisclosures`(공시) · `searchUploadedDocuments`(업로드 PDF) · `searchKnowledge`(둘 다). 모두 같은 파이프라인을 쓰고, 답변 출처에는 공시는 보고서 · section · 접수번호, 업로드는 문서 제목 · page 가 들어갑니다.
 - **Reranker:** 후보 15개를 (질문, chunk) cross-encoder 로 다시 정렬합니다. `pip install -r backend/requirements-rerank.txt` 후 `RERANKER=auto`(기본)면 로컬 모델(`jina-reranker-v2-base-multilingual`, 첫 호출 때 ~1.1GB 다운로드, CC-BY-NC)을 쓰고, 설치하지 않으면 Hybrid 만 씁니다. API 방식은 `RERANKER=cohere` + `COHERE_API_KEY`. 지연은 CPU 에서 후보 15개에 약 2초입니다.

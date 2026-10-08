@@ -58,6 +58,10 @@ class DisclosureStore:
             d = s.get(DisclosureDocument, document_id)
             return self._describe(d) if d else None
 
+    def count_uploads(self) -> int:
+        with self._sf() as s:
+            return int(s.execute(select(func.count()).select_from(DisclosureDocument).where(DisclosureDocument.source_type == SOURCE_UPLOAD)).scalar_one())
+
     def find_upload_by_hash(self, file_hash: str) -> dict[str, Any] | None:
         with self._sf() as s:
             d = s.execute(select(DisclosureDocument).where(DisclosureDocument.file_hash == file_hash)).scalar_one_or_none()

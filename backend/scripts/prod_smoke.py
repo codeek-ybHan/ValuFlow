@@ -1,8 +1,8 @@
-"""배포된(또는 production 모드로 띄운) backend 의 smoke 점검. 실제 secret 은 쓰지 않고, 공개 URL 에서 읽기 · 보호 동작 · PDF 를 확인한다.
+"""배포된(또는 production 모드로 띄운) backend 의 smoke 점검. 공개 URL 에서 방문자 기능(access key 없이) · 관리자 보호 · PDF 를 확인한다.
 
-   python -m scripts.prod_smoke <baseUrl> [--token ACCESS_TOKEN] [--origin https://frontend.example]
+   python -m scripts.prod_smoke <baseUrl> [--token ADMIN_ACCESS_TOKEN] [--origin https://frontend.example]
 
-점검: health(secret 비노출) · 보호 API 가 token 없이 거부되는가 · token 으로 Report PDF 가 만들어지는가 · 분석/Report 저장 왕복 · API 문서가 닫혀 있는가 · CORS · 내부 오류 비노출.
+점검: health(secret 비노출) · 방문자는 key 없이 Report PDF · ADMIN_ONLY(저장/조회)는 key 없이 거부 · (--token) 관리자 저장 왕복 · API 문서가 닫혀 있는가 · CORS · 내부 오류 비노출.
 """
 from __future__ import annotations
 
@@ -35,16 +35,17 @@ def main() -> int:
     h = http.get("/api/health")
     body = h.json() if h.headers.get("content-type", "").startswith("application/json") else {}
     check("health 200 · status ok", h.status_code == 200 and body.get("status") in ("ok", "degraded"), h.text[:120])
-    print(f"      env={body.get('appEnv')} version={body.get('version')} db={body.get('database')} ai={body.get('aiConfigured')} dart={body.get('dartConfigured')} rag={body.get('ragAvailable')} access={body.get('accessProtection')} font={body.get('reportService', {}).get('font')}")
+    print(f"      env={body.get('appEnv')} version={body.get('version')} db={body.get('database')} ai={body.get('aiConfigured')} dart={body.get('dartConfigured')} rag={body.get('ragAvailable')} publicDemo={body.get('publicDemo')} admin={body.get('adminProtection')} rateLimit={body.get('rateLimit')} font={body.get('reportService', {}).get('font')}")
     check("health 에 credential 값 없음", not KEY_LIKE.search(h.text))
     check("API 문서 닫힘 (production)", body.get("appEnv") != "production" or http.get("/docs").status_code == 404)
+    check("health: publicDemo", body.get("publicDemo") is True and "accessProtection" not in body)
     r = http.post("/api/report/pdf", json=MODEL)
-    check("보호 API 는 token 없이 거부 (401/403)", r.status_code in (401, 403), f"status {r.status_code}")
+    check("Report PDF 는 key 없이 가능 (공개 + rate limit)", r.status_code == 200 and r.content.startswith(b"%PDF"), f"status {r.status_code}")
+    print(f"      pages={r.headers.get('x-report-pages')} font={r.headers.get('x-report-font')}")
+    r = http.get("/api/analyses")
+    check("ADMIN_ONLY(저장/조회)는 key 없이 거부 (401/403)", r.status_code in (401, 403), f"status {r.status_code}")
     check("거부 응답에 내부 정보 없음", not any(f in r.text for f in FORBIDDEN) and not KEY_LIKE.search(r.text))
     if a.token:
-        r = http.post("/api/report/pdf", json=MODEL, headers=auth)
-        check("Report PDF (token)", r.status_code == 200 and r.content.startswith(b"%PDF"), f"status {r.status_code}")
-        print(f"      pages={r.headers.get('x-report-pages')} font={r.headers.get('x-report-font')}")
         bad = http.post("/api/report/pdf", json={"version": "9"}, headers=auth)
         check("잘못된 payload 는 정제된 오류", bad.status_code in (400, 422) and not any(f in bad.text for f in FORBIDDEN), bad.text[:100])
         listing = http.get("/api/analyses", headers=auth)
