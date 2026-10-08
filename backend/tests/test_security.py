@@ -32,7 +32,8 @@ def test_endpoint_access_policy_table():
     assert p("POST", "/api/ai/tool-result") == (L, "ai-step") and p("POST", "/api/ai/regenerate") == (L, "ai-step")
     assert p("POST", "/api/knowledge/documents") == (L, "upload")
     assert p("POST", "/api/report/pdf") == (L, "report-pdf")
-    assert p("DELETE", "/api/knowledge/documents/3")[0] == A and p("POST", "/api/knowledge/documents/3/reindex")[0] == A
+    assert p("POST", "/api/knowledge/documents/3/reindex")[0] == A
+    assert p("DELETE", "/api/knowledge/documents/3") == (L, "delete"), "삭제: 업로드한 사람의 삭제 토큰 또는 관리자 key — 권한은 handler 가 검사하고 시도 횟수는 제한한다"
     assert p("POST", "/api/companies/00126380/disclosures/ingest")[0] == A and p("POST", "/api/companies/refresh")[0] == A
     assert p("POST", "/api/companies/00126380/historical/renormalize")[0] == A and p("GET", "/api/companies/00126380/fetches")[0] == A
     for m, path in [("GET", "/api/analyses"), ("POST", "/api/analyses"), ("GET", "/api/analyses/x"), ("POST", "/api/report-snapshots"), ("GET", "/api/report-snapshots/x")]:
@@ -44,7 +45,7 @@ def test_endpoint_access_policy_table():
 
 def test_production_without_admin_token_locks_only_admin_apis():
     client = make(app_env="production")
-    for method, path in [("GET", "/api/analyses"), ("POST", "/api/report-snapshots"), ("DELETE", "/api/knowledge/documents/1"), ("POST", "/api/companies/refresh")]:
+    for method, path in [("GET", "/api/analyses"), ("POST", "/api/report-snapshots"), ("POST", "/api/knowledge/documents/1/reindex"), ("POST", "/api/companies/refresh")]:
         r = client.request(method, path, json={} if method == "POST" else None)
         assert r.status_code == 403 and r.json()["error"]["code"] == "access-not-configured", (path, r.text)
     # 방문자 기능은 token 없이도 잠기지 않는다 (AI · 업로드는 설정이 없을 때 503 ai-not-configured 로 자기 사정을 알린다)
@@ -68,7 +69,7 @@ def test_public_features_need_no_key_even_when_admin_token_is_set():
 def test_admin_apis_require_token_and_accept_the_right_one():
     c = make(access_token=TOKEN)
     for method, path in [("GET", "/api/analyses"), ("GET", "/api/report-snapshots"), ("POST", "/api/analyses"), ("POST", "/api/report-snapshots"),
-                         ("DELETE", "/api/knowledge/documents/1"), ("POST", "/api/knowledge/documents/1/reindex"), ("POST", "/api/companies/refresh")]:
+                         ("POST", "/api/knowledge/documents/1/reindex"), ("POST", "/api/companies/refresh")]:
         r = c.request(method, path, json={} if method == "POST" else None)
         assert r.status_code == 401 and r.json()["error"]["code"] == "access-required", (method, path, r.status_code)
         bad = c.request(method, path, json={} if method == "POST" else None, headers={security.ACCESS_HEADER: "wrong"})
@@ -229,13 +230,15 @@ def test_denied_responses_carry_cors_headers_so_the_browser_shows_the_real_messa
     origin = "https://valuflow.example.com"
     c = make(app_env="production", access_token=TOKEN, cors_origins=(origin,))
     h = {"Origin": origin}
-    denied = c.delete("/api/knowledge/documents/1", headers=h)
+    denied = c.post("/api/knowledge/documents/1/reindex", headers=h)
     assert denied.status_code == 401 and denied.json()["error"]["code"] == "access-required"
     assert denied.headers.get("access-control-allow-origin") == origin, "관리자 전용 거부(401)에도 CORS 헤더"
     big = c.post("/api/report/pdf", json={"version": "1.0", "meta": {}, "blocks": [], "pad": "x" * (9 * 1024 * 1024)}, headers=h)
     assert big.status_code == 413 and big.headers.get("access-control-allow-origin") == origin
     assert c.get("/api/analyses", headers=h).headers.get("access-control-allow-origin") == origin
-    assert "access-control-allow-origin" not in c.delete("/api/knowledge/documents/1", headers={"Origin": "https://evil.example"}).headers, "허용하지 않은 origin 은 그대로 막힌다"
+    assert "access-control-allow-origin" not in c.post("/api/knowledge/documents/1/reindex", headers={"Origin": "https://evil.example"}).headers, "허용하지 않은 origin 은 그대로 막힌다"
+    pre_token = c.options("/api/knowledge/documents/1", headers={**h, "Access-Control-Request-Method": "DELETE", "Access-Control-Request-Headers": "x-valuflow-delete-token"})
+    assert pre_token.status_code == 200 and "x-valuflow-delete-token" in pre_token.headers.get("access-control-allow-headers", "").lower()
     pre = c.options("/api/knowledge/documents/1", headers={**h, "Access-Control-Request-Method": "DELETE"})
     assert pre.status_code == 200 and pre.headers["access-control-allow-origin"] == origin
 

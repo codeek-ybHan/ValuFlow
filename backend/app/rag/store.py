@@ -67,7 +67,7 @@ class DisclosureStore:
             d = s.execute(select(DisclosureDocument).where(DisclosureDocument.file_hash == file_hash)).scalar_one_or_none()
             return self._describe(d) if d else None
 
-    def save_upload(self, doc: NormalizedDocument, chunks: Sequence[Chunk], embeddings: Sequence[Sequence[float]], embedding_model: str) -> dict[str, Any]:
+    def save_upload(self, doc: NormalizedDocument, chunks: Sequence[Chunk], embeddings: Sequence[Sequence[float]], embedding_model: str, owner_token_hash: str | None = None) -> dict[str, Any]:
         """사용자 PDF 를 문서 + chunk(page 번호 포함) + embedding 으로 한 transaction 저장한다."""
         if len(chunks) != len(embeddings):
             raise ValueError("chunks / embeddings length mismatch")
@@ -77,7 +77,7 @@ class DisclosureStore:
                 receipt_no=None, company_id=None, corp_code=doc.corp_code, corp_name=doc.corp_name, report_name=doc.title, report_type=doc.document_type or "other", is_correction=False,
                 filing_date=None, business_year=doc.business_year, source=SOURCE_UPLOAD, source_type=SOURCE_UPLOAD, title=doc.title, source_name=doc.source_name, notes=meta.get("notes"),
                 original_filename=meta.get("originalFilename"), file_hash=meta.get("fileHash"), uploaded_at=doc.uploaded_at or datetime.now(timezone.utc), status="ready", url=None,
-                section_count=len(doc.sections), chunk_count=len(chunks), char_count=doc.char_count, embedding_model=embedding_model)
+                section_count=len(doc.sections), chunk_count=len(chunks), char_count=doc.char_count, embedding_model=embedding_model, owner_token_hash=owner_token_hash)
             s.add(row)
             s.flush()
             if chunks:
@@ -87,6 +87,12 @@ class DisclosureStore:
             s.flush()
             s.refresh(row)
             return self._describe(row)
+
+    def owner_hash(self, document_id: int) -> tuple[bool, str | None]:
+        """(문서가 있는가, 삭제 토큰 해시). 해시는 외부로 내보내지 않고 권한 검사에만 쓴다."""
+        with self._sf() as s:
+            d = s.get(DisclosureDocument, document_id)
+            return (d is not None, d.owner_token_hash if d is not None else None)
 
     def delete_document(self, document_id: int) -> bool:
         """문서와 그 chunk · embedding 을 함께 지운다. 있었으면 True."""

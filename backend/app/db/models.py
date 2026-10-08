@@ -182,6 +182,7 @@ class DisclosureDocument(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     original_filename: Mapped[str | None] = mapped_column(Text, nullable=True)   # 표시용. 저장 경로에는 쓰지 않는다
     file_hash: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    owner_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)   # 업로드한 사람의 삭제 토큰(SHA-256). 원문 토큰은 저장하지 않는다. NULL 이면 관리자만 삭제
     uploaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="ready")
     business_year: Mapped[int | None] = mapped_column(Integer, nullable=True)

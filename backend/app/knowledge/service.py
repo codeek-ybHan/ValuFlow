@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
+import hmac
 import logging
 import re
+import secrets
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -18,6 +21,10 @@ from app.rag.store import DisclosureStore
 log = logging.getLogger("valuflow.knowledge")
 _CORP = re.compile(r"^\d{8}$")
 _DOCTYPE = re.compile(r"^[\w가-힣\- ]{1,32}$")
+
+
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def _clean(value: str | None, limit: int) -> str | None:
@@ -71,16 +78,23 @@ class KnowledgeService:
             raise PdfError("text-unavailable", "검색에 쓸 수 있는 텍스트가 없습니다.", 422)
         vectors = self._embedder.embed([c.embed_text for c in chunks])
         try:
-            saved = self._store.save_upload(doc, chunks, vectors, self._embedder.model)
+            token = secrets.token_urlsafe(24)   # 업로드한 사람에게 한 번만 돌려주는 삭제 토큰 (서버에는 해시만 저장)
+            saved = self._store.save_upload(doc, chunks, vectors, self._embedder.model, owner_token_hash=_hash_token(token))
         except IntegrityError:  # 같은 파일이 동시에 업로드된 경우: 먼저 저장된 문서를 돌려준다
             existing = self._store.find_upload_by_hash(digest)
             if existing:
                 return {"status": "already-exists", "document": existing}
             raise
         log.info("uploaded pdf indexed: document=%s chunks=%d", saved["documentId"], len(chunks))  # 본문 · 파일 이름은 로그에 남기지 않는다
-        return {"status": "ingested", "document": saved}
+        return {"status": "ingested", "document": saved, "deleteToken": token}
 
-    def delete(self, document_id: int) -> bool:
+    def delete(self, document_id: int, token: str | None = None, admin: bool = False) -> bool:
+        """문서 삭제. 관리자이거나, 업로드할 때 받은 삭제 토큰이 맞을 때만 지운다. 토큰이 없는 기존 문서는 관리자만 지운다."""
+        exists, owner = self._store.owner_hash(document_id)
+        if not exists:
+            return False
+        if not admin and not (token and owner and hmac.compare_digest(_hash_token(token), owner)):
+            raise PdfError("delete-forbidden", "이 브라우저에서 업로드한 문서만 삭제할 수 있습니다.", 403)
         return self._store.delete_document(document_id)
 
     def reindex(self, document_id: int) -> dict[str, Any] | None:

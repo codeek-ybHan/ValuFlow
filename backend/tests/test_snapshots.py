@@ -130,6 +130,6 @@ def test_migrations_apply_from_empty_database(pg_url):
     e = create_engine(pg_url)
     with e.connect() as c:
         assert c.execute(text("SELECT 1 FROM pg_extension WHERE extname='vector'")).scalar() == 1
-        assert c.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0004"
+        assert c.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0005"
     assert {"ai_analysis_runs", "report_snapshots", "disclosure_chunks"} <= set(inspect(e).get_table_names())
     e.dispose()

@@ -1,6 +1,7 @@
 """ValuFlow backend. React 는 이 서버만 호출하고, OpenDART 와 API Key 는 이 서버 안에만 있다."""
 from __future__ import annotations
 
+import hmac
 import logging
 import re
 from datetime import datetime, timezone
@@ -34,7 +35,7 @@ from app.external.errors import ProviderError
 from app.external.providers import provider_info
 from app.external.registry import build_external
 from app.secrets import install_redaction
-from app.security import access_state, install_security
+from app.security import ACCESS_HEADER, DELETE_TOKEN_HEADER, access_state, install_security
 from app.services.snapshot_store import SnapshotError, SnapshotStore
 from sqlalchemy import text as sql_text
 from app.dart.filings import DartDisclosureSource, FilingsSource
@@ -327,9 +328,12 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
         return {"items": disclosure_store.list_knowledge(sourceType, corpCode) if disclosure_store is not None else []}
 
     @app.delete("/api/knowledge/documents/{document_id}")
-    def delete_knowledge_document(document_id: int) -> dict[str, Any]:
-        """문서와 chunk · embedding 을 함께 삭제한다."""
-        if not _require_knowledge().delete(document_id):
+    def delete_knowledge_document(document_id: int, request: Request) -> dict[str, Any]:
+        """문서와 chunk · embedding 을 함께 삭제한다. 업로드할 때 받은 삭제 토큰(X-ValuFlow-Delete-Token) 또는 관리자 key 가 있을 때만."""
+        state = access_state(settings)
+        given = request.headers.get(ACCESS_HEADER, "")
+        admin = state == "open" or (state == "token" and hmac.compare_digest(given.encode(), settings.access_token.encode()))
+        if not _require_knowledge().delete(document_id, request.headers.get(DELETE_TOKEN_HEADER), admin):
             raise PdfError("document-not-found", "문서를 찾을 수 없습니다.", 404)
         return {"deleted": document_id}
 

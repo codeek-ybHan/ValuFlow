@@ -17,8 +17,8 @@ export function useKnowledge(client: KnowledgeClient = defaultKnowledgeClient): 
 }
 
 /**
- * Knowledge Documents: 사용자 PDF 의 업로드 · 목록. 삭제 · 재인덱싱(`manage`)은 관리자 전용 API 라서 공개 화면에는 보이지 않는다
- * (공유 저장소라 사용자별 소유권이 없다: 한 방문자의 삭제가 다른 방문자의 문서에 영향을 주지 않도록). 관리자는 access key 로 API 를 직접 호출한다.
+ * Knowledge Documents: 사용자 PDF 의 업로드 · 목록 · 삭제. 삭제는 이 브라우저에서 업로드한 문서(삭제 토큰 보유)에만 보인다 — 공유 저장소라 계정이 없어,
+ * 한 방문자가 다른 방문자의 문서를 지우지 못하게 한다. 재인덱싱(`manage`)은 관리자 전용이라 공개 화면에는 없다. 관리자는 access key 로 API 를 직접 호출한다.
  */
 export function KnowledgePanel({ kn, manage = false }: { kn: ReturnType<typeof useKnowledge>; manage?: boolean }) {
   const [busy, setBusy] = useState<string | null>(null);
@@ -61,22 +61,21 @@ export function KnowledgePanel({ kn, manage = false }: { kn: ReturnType<typeof u
               <div className="small muted">{[d.documentType, d.businessYear ? `${d.businessYear}` : null, `${d.chunkCount} chunks`].filter(Boolean).join(' · ')}</div>
               <div className="doc-actions">
                 <span className={`doc-state doc-${d.state}`}>{STATE_TEXT[d.state]}</span>
-                {manage ? (
-                  <>
-                <button type="button" className="link" disabled={busy !== null} onClick={() => run(`re-${d.documentId}`, async () => { await kn.client.reindex(d.documentId); return `다시 인덱싱했습니다: ${d.title}`; })}>Re-index</button>
-                {pending === d.documentId ? (
-                  <>
-                    <button type="button" className="link danger" disabled={busy !== null} onClick={() => { setPending(null); void run(`del-${d.documentId}`, async () => { await kn.client.remove(d.documentId); return `삭제했습니다: ${d.title}`; }); }}>삭제 확인</button>
-                    <button type="button" className="link" onClick={() => setPending(null)}>취소</button>
-                  </>
-                ) : <button type="button" className="link" disabled={busy !== null} onClick={() => setPending(d.documentId)}>Delete</button>}
-                  </>
+                {manage ? <button type="button" className="link" disabled={busy !== null} onClick={() => run(`re-${d.documentId}`, async () => { await kn.client.reindex(d.documentId); return `다시 인덱싱했습니다: ${d.title}`; })}>Re-index</button> : null}
+                {manage || kn.client.canDelete(d.documentId) ? (
+                  pending === d.documentId ? (
+                    <>
+                      <button type="button" className="link danger" disabled={busy !== null} onClick={() => { setPending(null); void run(`del-${d.documentId}`, async () => { await kn.client.remove(d.documentId); return `삭제했습니다: ${d.title}`; }); }}>삭제 확인</button>
+                      <button type="button" className="link" onClick={() => setPending(null)}>취소</button>
+                    </>
+                  ) : <button type="button" className="link" disabled={busy !== null} onClick={() => setPending(d.documentId)}>Delete</button>
                 ) : null}
               </div>
             </li>
           ))}
         </ul>
       ) : null}
+      {kn.documents && kn.documents.length > 0 ? <p className="small muted">삭제는 이 브라우저에서 업로드한 문서만 할 수 있습니다.</p> : null}
     </section>
   );
 }

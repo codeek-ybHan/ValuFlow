@@ -14,7 +14,8 @@ ValuFlow 는 공개 포트폴리오 프로젝트이므로 방문자가 **access 
 | `POST /api/ai/tool-result` · `/api/ai/regenerate` (한 질문 안의 후속 왕복) | PUBLIC_RATE_LIMITED | ai-step · 80/hour |
 | `POST /api/knowledge/documents` (PDF 업로드 · indexing) | PUBLIC_RATE_LIMITED | upload · **2/hour** |
 | `POST /api/report/pdf` (Report PDF Export) | PUBLIC_RATE_LIMITED | report-pdf · **4/hour** |
-| `DELETE /api/knowledge/documents/{id}` · `POST …/{id}/reindex` | ADMIN_ONLY | admin · 60/min |
+| `DELETE /api/knowledge/documents/{id}` | PUBLIC_RATE_LIMITED (+ 소유 검사) | delete · 30/hour — 업로드할 때 받은 삭제 토큰(`X-ValuFlow-Delete-Token`) 또는 관리자 key 가 있어야 하고, 아니면 403 `delete-forbidden` |
+| `POST …/{id}/reindex` | ADMIN_ONLY | admin · 60/min |
 | `POST /api/companies/{corp}/disclosures/ingest` · `POST /api/companies/refresh` | ADMIN_ONLY | ingest · 6/10min |
 | `POST /api/companies/{corp}/historical/renormalize` · `GET /api/companies/{corp}/fetches` | ADMIN_ONLY | admin |
 | `POST/GET /api/analyses…` (AI 분석 persistence) | ADMIN_ONLY | persist · 60/min |
@@ -37,7 +38,8 @@ Report Preview 는 브라우저에서 만들어지므로 backend endpoint 가 �
 
 - PDF 만 (Content-Type + `%PDF-` 서명), 빈 파일/손상/암호 PDF 거부, 파일명은 표시용으로만 정리하고 저장 경로에 쓰지 않음, SHA-256 중복은 기존 문서를 돌려줌 (재 embedding 없음).
 - 크기 `MAX_UPLOAD_MB` 기본 **20MB** (multipart 여유 포함 선검사 → 413), IP 당 **2회/hour**, 업로드 문서 총 **30개** 상한(`MAX_USER_DOCUMENTS`, 초과 시 409 `document-limit`; 이미 있는 파일은 상한과 무관하게 기존 문서를 돌려줌).
-- 공개 사용자는 **upload 와 질문까지만** 가능하다. 삭제/재인덱싱은 사용자별 소유권이 없어 ADMIN_ONLY.
+- 공개 사용자는 upload · 질문 · **자기가 올린 PDF 삭제**가 가능하다. 계정이 없으므로 소유권은 삭제 토큰으로 정한다: 업로드 응답이 추측할 수 없는 토큰을 **한 번만** 돌려주고(업로드한 브라우저의 localStorage 에 보관), 서버(`owner_token_hash`)에는 SHA-256 해시만 둔다. 토큰이 없으면(다른 방문자 · 다른 브라우저 · 같은 파일 재업로드 · 토큰 도입 전 문서) 삭제할 수 없고, 관리자 key 는 모든 문서를 삭제한다. 재인덱싱은 ADMIN_ONLY.
+- 한계: 브라우저 저장소를 지우거나 다른 기기에서 접속하면 자기 문서라도 삭제 권한을 잃는다(관리자에게 요청).
 
 ## 4. Persistence
 

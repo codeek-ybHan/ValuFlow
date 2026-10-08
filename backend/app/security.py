@@ -25,6 +25,7 @@ from fastapi.responses import JSONResponse, Response
 from app.config import Settings
 
 ACCESS_HEADER = "X-ValuFlow-Access"
+DELETE_TOKEN_HEADER = "X-ValuFlow-Delete-Token"   # 업로드한 사람만 자기 PDF 를 지우는 토큰 (업로드 응답으로 한 번만 받는다)
 log = logging.getLogger("valuflow.access")
 
 # bucket → (허용 횟수, 창(초)). 공개 포트폴리오 기준: 비용이 드는 기능은 IP 당 시간 단위로 강하게 제한한다.
@@ -32,12 +33,13 @@ LIMITS: dict[str, tuple[int, int]] = {
     "ai": (10, 3600),          # AI 질문 (/api/ai/query) IP 당 10회/hour
     "ai-step": (80, 3600),     # 한 질문 안의 tool-result · regenerate 왕복 (질문당 최대 ~10회)
     "upload": (2, 3600),       # 사용자 PDF 업로드 IP 당 2회/hour
+    "delete": (30, 3600),      # 업로드한 PDF 삭제 시도 IP 당 30회/hour (토큰 추측 방지 포함)
     "report-pdf": (4, 3600),   # Report PDF IP 당 4회/hour
     "ingest": (6, 600), "persist": (60, 60), "admin": (60, 60), "dart": (90, 60), "denied": (20, 600),
 }
 LIMIT_MESSAGES = {
     "ai": "Demo AI 사용 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.", "ai-step": "Demo AI 사용 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.",
-    "upload": "Demo PDF 업로드 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.", "report-pdf": "Demo PDF 내보내기 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.",
+    "upload": "Demo PDF 업로드 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.", "delete": "삭제 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.", "report-pdf": "Demo PDF 내보내기 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.",
 }
 PUBLIC, PUBLIC_RATE_LIMITED, ADMIN_ONLY = "PUBLIC", "PUBLIC_RATE_LIMITED", "ADMIN_ONLY"
 MB = 1024 * 1024
@@ -56,7 +58,9 @@ def policy(method: str, path: str) -> tuple[str, str | None]:
         return PUBLIC_RATE_LIMITED, "upload"
     if path == "/api/report/pdf" and m == "POST":
         return PUBLIC_RATE_LIMITED, "report-pdf"
-    if path.startswith("/api/knowledge/documents/") and m in ("POST", "DELETE"):   # 삭제 · 재인덱싱: 사용자별 소유권이 없으므로 운영자만
+    if path.startswith("/api/knowledge/documents/") and m == "DELETE":   # 삭제: 업로드한 사람(삭제 토큰) 또는 관리자 key — 검사는 handler 가 한다. 여기서는 시도 횟수만 제한
+        return PUBLIC_RATE_LIMITED, "delete"
+    if path.startswith("/api/knowledge/documents/") and m == "POST":   # 재인덱싱: 운영자만
         return ADMIN_ONLY, "admin"
     if path.endswith("/disclosures/ingest") and m == "POST":
         return ADMIN_ONLY, "ingest"
@@ -191,6 +195,6 @@ def install_security(app: FastAPI, settings: Settings, limiter: RateLimiter | No
         origins = list(settings.cors_origins)
         regex = None if settings.is_production else r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
         app.add_middleware(CORSMiddleware, allow_origins=origins, allow_origin_regex=regex, allow_methods=["GET", "POST", "DELETE"],
-                           allow_headers=["Content-Type", ACCESS_HEADER, "X-Request-ID"], expose_headers=["Content-Disposition", "X-Report-Pages", "X-Report-Font", "X-Request-ID", "Retry-After"], max_age=600)
+                           allow_headers=["Content-Type", ACCESS_HEADER, DELETE_TOKEN_HEADER, "X-Request-ID"], expose_headers=["Content-Disposition", "X-Report-Pages", "X-Report-Font", "X-Request-ID", "Retry-After"], max_age=600)
 
     return limiter

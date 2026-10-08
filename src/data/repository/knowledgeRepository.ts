@@ -46,11 +46,28 @@ export const KNOWLEDGE_ERROR_TEXT: Record<string, string> = {
   'text-too-large': '문서의 텍스트 양이 너무 많습니다.',
   'invalid-metadata': '문서 정보 형식이 올바르지 않습니다.',
   'document-not-found': '문서를 찾을 수 없습니다.',
+  'delete-forbidden': '이 브라우저에서 업로드한 문서만 삭제할 수 있습니다.',
 };
 export const knowledgeErrorText = (code: string) => KNOWLEDGE_ERROR_TEXT[code] ?? '문서를 처리하지 못했습니다. 잠시 후 다시 시도하세요.';
 
 type Json = Record<string, unknown>;
-type FetchFn = (input: string, init?: { method?: string; body?: unknown }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
+type FetchFn = (input: string, init?: { method?: string; body?: unknown; headers?: Record<string, string> }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
+
+/**
+ * 업로드한 PDF 의 삭제 토큰 보관소. 소유권 모델(계정)이 없어서, 업로드할 때 서버가 한 번만 돌려주는 토큰을 이 브라우저가 가지고 있어야 자기 문서를 지울 수 있다.
+ * 토큰은 문서 id 별로 localStorage 에만 두고 서버에는 해시만 있다. 접근할 수 없는 환경이면 삭제 기능만 꺼진다.
+ */
+export interface DeleteTokenStore { get(documentId: number): string | null; set(documentId: number, token: string): void; remove(documentId: number): void }
+const TOKENS_KEY = 'valuflow:upload-owner';
+export const browserTokenStore: DeleteTokenStore = (() => {
+  const read = (): Record<string, string> => { try { const v = JSON.parse(localStorage.getItem(TOKENS_KEY) ?? '{}'); return typeof v === 'object' && v !== null && !Array.isArray(v) ? v : {}; } catch { return {}; } };
+  const write = (v: Record<string, string>) => { try { localStorage.setItem(TOKENS_KEY, JSON.stringify(v)); } catch { /* 저장 불가: 삭제 기능만 꺼진다 */ } };
+  return {
+    get: (id) => (typeof read()[String(id)] === 'string' ? read()[String(id)]! : null),
+    set: (id, token) => write({ ...read(), [String(id)]: token }),
+    remove: (id) => { const v = read(); delete v[String(id)]; write(v); },
+  };
+})();
 
 export function toDocument(raw: Json, state?: DocumentState): KnowledgeDocument {
   const s = (k: string) => (typeof raw[k] === 'string' ? (raw[k] as string) : null);
@@ -66,12 +83,17 @@ export function toDocument(raw: Json, state?: DocumentState): KnowledgeDocument 
 export class KnowledgeClient {
   private readonly fetchFn: FetchFn;
   private readonly baseUrl: string;
-  constructor(options: { fetch?: FetchFn; baseUrl?: string } = {}) {
+  private readonly tokens: DeleteTokenStore;
+  constructor(options: { fetch?: FetchFn; baseUrl?: string; tokens?: DeleteTokenStore } = {}) {
     this.fetchFn = options.fetch ?? ((input, init) => apiFetch(input, init));
     this.baseUrl = options.baseUrl ?? '';
+    this.tokens = options.tokens ?? browserTokenStore;
   }
 
-  private async call(path: string, init: { method?: string; body?: unknown } = {}): Promise<{ json: Json; status: number }> {
+  /** 이 브라우저가 올린 문서인가 (삭제 토큰이 있다). 삭제 버튼은 이 문서에만 보인다. */
+  canDelete(documentId: number): boolean { return this.tokens.get(documentId) !== null; }
+
+  private async call(path: string, init: { method?: string; body?: unknown; headers?: Record<string, string> } = {}): Promise<{ json: Json; status: number }> {
     let res;
     try { res = await this.fetchFn(`${this.baseUrl}${path}`, init); } catch { throw new KnowledgeError('backend-unreachable', knowledgeErrorText('backend-unreachable')); }
     let json: unknown = null;
@@ -96,10 +118,18 @@ export class KnowledgeClient {
     form.append('file', file);
     if (meta.title?.trim()) form.append('title', meta.title.trim());
     const { json } = await this.call('/api/knowledge/documents', { method: 'POST', body: form });
-    return toDocument((json.document ?? {}) as Json, json.status === 'already-exists' ? 'already-exists' : 'ready');
+    const doc = toDocument((json.document ?? {}) as Json, json.status === 'already-exists' ? 'already-exists' : 'ready');
+    if (typeof json.deleteToken === 'string' && json.deleteToken && doc.documentId >= 0) this.tokens.set(doc.documentId, json.deleteToken);   // 업로드한 사람에게만 한 번 온다
+    return doc;
   }
 
-  async remove(documentId: number): Promise<void> { await this.call(`/api/knowledge/documents/${documentId}`, { method: 'DELETE' }); }
+  /** 삭제: 이 브라우저가 업로드할 때 받은 토큰으로만 된다 (관리자는 API 로 직접). 지워졌거나 권한이 없으면 토큰을 버려 버튼이 사라진다. */
+  async remove(documentId: number): Promise<void> {
+    const token = this.tokens.get(documentId);
+    try { await this.call(`/api/knowledge/documents/${documentId}`, { method: 'DELETE', ...(token ? { headers: { 'X-ValuFlow-Delete-Token': token } } : {}) }); }
+    catch (e) { if (e instanceof KnowledgeError && (e.code === 'document-not-found' || e.code === 'delete-forbidden')) this.tokens.remove(documentId); throw e; }
+    this.tokens.remove(documentId);
+  }
 
   async reindex(documentId: number): Promise<KnowledgeDocument> {
     const { json } = await this.call(`/api/knowledge/documents/${documentId}/reindex`, { method: 'POST' });

@@ -5,7 +5,7 @@ import { ProjectProvider } from '../../store/project';
 import { AnalystProvider } from '../../store/analyst';
 import { AiAnalyst } from '../../pages/AiAnalyst';
 import { KnowledgePanel } from '../../components/analyst/KnowledgePanel';
-import { defaultKnowledgeClient, type KnowledgeDocument } from '../../data/repository/knowledgeRepository';
+import { KnowledgeClient, type KnowledgeDocument } from '../../data/repository/knowledgeRepository';
 import type { AnalystSession } from './session';
 
 /** 테스트용 선택 기업. 저장된 Project 에 선택 기업이 없으면 넣어 준다 (기업을 선택하기 전에는 화면이 빈 상태이므로). `noCompany` 로 빈 상태를 재현한다. */
@@ -27,6 +27,8 @@ export function renderPage(persistedProject: string | null, session: AnalystSess
   } finally { delete (globalThis as { localStorage?: unknown }).localStorage; }
 }
 
-export function renderKnowledge(documents: KnowledgeDocument[] | null, error: string | null = null, manage = false): string {
-  return renderToStaticMarkup(<KnowledgePanel manage={manage} kn={{ documents, error, reload: async () => undefined, client: defaultKnowledgeClient, setDocuments: () => undefined }} />);
+/** `owned`: 이 브라우저가 업로드한 문서 id (삭제 토큰이 있는 문서). */
+export function renderKnowledge(documents: KnowledgeDocument[] | null, error: string | null = null, manage = false, owned: number[] = []): string {
+  const client = new KnowledgeClient({ tokens: { get: (id) => (owned.includes(id) ? 't' : null), set: () => undefined, remove: () => undefined } });
+  return renderToStaticMarkup(<KnowledgePanel manage={manage} kn={{ documents, error, reload: async () => undefined, client, setDocuments: () => undefined }} />);
 }

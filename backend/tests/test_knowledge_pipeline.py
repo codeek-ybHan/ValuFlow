@@ -13,7 +13,7 @@ from reportlab.lib.pdfencrypt import StandardEncryption
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfgen import canvas
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app.ai.errors import AiGatewayError
 from app.ai.gateway import AiGateway
@@ -438,7 +438,7 @@ def test_duplicate_opendart_ingestion_and_duplicate_pdf_hash(kn):
     # 다른 내용의 PDF 는 새 문서
     assert upload(kn, INDUSTRY + ["추가 페이지의 내용입니다. 반도체 수요가 계속 늘어납니다."], fname="b.pdf")["status"] == "ingested"
     # 삭제 후 같은 파일을 다시 올릴 수 있다
-    assert kn.svc.delete(first["document"]["documentId"]) and kn.svc.upload_pdf(make_pdf(INDUSTRY), PDF, "a.pdf", parse_meta("T"))["status"] == "ingested"
+    assert kn.svc.delete(first["document"]["documentId"], admin=True) and kn.svc.upload_pdf(make_pdf(INDUSTRY), PDF, "a.pdf", parse_meta("T"))["status"] == "ingested"
 
 
 def test_public_demo_caps_the_number_of_uploaded_documents_but_still_returns_duplicates(kn):
@@ -456,7 +456,7 @@ def test_public_demo_caps_the_number_of_uploaded_documents_but_still_returns_dup
 # ---------- 25 deletion keeps other sources ----------
 def test_deleting_an_upload_leaves_opendart_documents_searchable(kn):
     industry, _, _ = seed(kn)
-    kn.svc.delete(industry["documentId"])
+    kn.svc.delete(industry["documentId"], admin=True)
     with kn.sf() as s:
         assert s.scalar(select(func.count()).select_from(DisclosureChunk).where(DisclosureChunk.document_id == industry["documentId"])) == 0
     hits = kn.retriever.retrieve("설비투자", Scope(SAMSUNG, True), 10).hits
@@ -511,3 +511,52 @@ def test_uploaded_document_search_tool_never_returns_another_company_pdf_and_exp
     assert lone["status"] in ("unavailable", "ok")
     if lone["status"] == "ok":
         assert all(i["sourceType"] == "user-upload" and i["documentId"] in {str(industry["documentId"])} for i in lone["data"]["results"]), "기업 미귀속(일반) 문서만"
+
+
+def test_uploader_can_delete_only_their_own_pdf_with_the_delete_token(kn):
+    """공개 데모의 삭제: 업로드할 때 한 번 받은 삭제 토큰이 있는 사람(업로드한 브라우저)만 지운다. 서버에는 토큰의 해시만 있다. 관리자는 모두 지운다."""
+    prod = dict(app_env="production", access_token="admin-key-123456")
+    c = api(kn.store_fin, kn, **prod)
+    up = lambda pages, name: c.post("/api/knowledge/documents", files={"file": (name, make_pdf(pages), PDF)})   # noqa: E731
+    a, b = up(INDUSTRY, "a.pdf"), up(INDUSTRY + ["두 번째 문서의 내용입니다."], "b.pdf")
+    assert a.status_code == 201 and b.status_code == 201
+    ta, tb = a.json()["deleteToken"], b.json()["deleteToken"]
+    ida, idb = a.json()["document"]["documentId"], b.json()["document"]["documentId"]
+    assert ta != tb and len(ta) >= 24
+    # 토큰 원문은 어디에도 저장 · 노출되지 않는다: 목록/문서 응답에 없고 DB 에는 해시만 있다
+    listing = c.get("/api/knowledge/documents", params={"sourceType": "user-upload"})
+    assert ta not in listing.text and "deleteToken" not in listing.text and "owner" not in listing.text
+    with kn.sf() as s:
+        hashes = set(s.scalars(select(DisclosureDocument.owner_token_hash)))
+    assert ta not in hashes and all(h and len(h) == 64 for h in hashes)
+    D = lambda i, token=None, admin=False: c.delete(f"/api/knowledge/documents/{i}", headers={**({"X-ValuFlow-Delete-Token": token} if token else {}), **({"X-ValuFlow-Access": "admin-key-123456"} if admin else {})})   # noqa: E731
+    # 토큰이 없거나 틀리거나 남의 토큰이면 403 이고 문서는 그대로다
+    for r in (D(ida), D(ida, "wrong-token"), D(ida, tb), D(ida, admin=False, token="")):
+        assert r.status_code == 403 and r.json()["error"]["code"] == "delete-forbidden", r.text
+    assert D(ida, "x", admin=False).status_code == 403
+    assert {d["documentId"] for d in c.get("/api/knowledge/documents", params={"sourceType": "user-upload"}).json()["items"]} == {ida, idb}
+    # 자기 토큰이면 삭제된다 (남의 문서는 그대로)
+    assert D(ida, ta).json() == {"deleted": ida}
+    assert {d["documentId"] for d in c.get("/api/knowledge/documents", params={"sourceType": "user-upload"}).json()["items"]} == {idb}
+    assert D(ida, ta).status_code == 404, "이미 지운 문서"
+    # 잘못된 관리자 key 는 관리자가 아니다 / 올바른 관리자 key 는 토큰 없이도 삭제
+    assert c.delete(f"/api/knowledge/documents/{idb}", headers={"X-ValuFlow-Access": "wrong"}).status_code == 403
+    assert D(idb, admin=True).json() == {"deleted": idb}
+
+
+def test_duplicate_upload_does_not_grant_delete_rights_and_legacy_documents_are_admin_only(kn):
+    c = api(kn.store_fin, kn, app_env="production", access_token="admin-key-123456")
+    first = c.post("/api/knowledge/documents", files={"file": ("a.pdf", make_pdf(INDUSTRY), PDF)})
+    dup = c.post("/api/knowledge/documents", files={"file": ("copy.pdf", make_pdf(INDUSTRY), PDF)})
+    assert dup.status_code == 200 and dup.json()["status"] == "already-exists"
+    assert "deleteToken" not in dup.json(), "같은 파일을 다시 올려도 남의 문서의 삭제 권한을 얻지 못한다"
+    doc_id = first.json()["document"]["documentId"]
+    # 토큰이 없는 기존 문서(owner_token_hash NULL)는 어떤 토큰으로도 지울 수 없다 (관리자만)
+    with kn.sf.begin() as s:
+        s.execute(update(DisclosureDocument).where(DisclosureDocument.id == doc_id).values(owner_token_hash=None))
+    r = c.delete(f"/api/knowledge/documents/{doc_id}", headers={"X-ValuFlow-Delete-Token": first.json()["deleteToken"]})
+    assert r.status_code == 403
+    assert c.delete(f"/api/knowledge/documents/{doc_id}", headers={"X-ValuFlow-Access": "admin-key-123456"}).status_code == 200
+    # 재인덱싱은 공개되지 않는다 (관리자 전용)
+    again = c.post("/api/knowledge/documents", files={"file": ("a.pdf", make_pdf(INDUSTRY), PDF)}).json()
+    assert c.post(f"/api/knowledge/documents/{again['document']['documentId']}/reindex", headers={"X-ValuFlow-Delete-Token": again["deleteToken"]}).status_code == 401

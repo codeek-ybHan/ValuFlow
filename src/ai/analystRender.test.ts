@@ -12,7 +12,7 @@ import { addTurn, emptySession, type AnalystSession } from './analyst/session.ts
 import type { AnalystTurn } from './analyst/view.ts';
 import { emptyProjectState, toPersisted, withPracticeAssumptions, withSamsungHistorical, type ProjectState } from '../store/projectModel.ts';
 
-type Harness = { renderPage(p: string | null, s?: AnalystSession, path?: string): string; renderKnowledge(d: unknown[] | null, e?: string | null, manage?: boolean): string };
+type Harness = { renderPage(p: string | null, s?: AnalystSession, path?: string): string; renderKnowledge(d: unknown[] | null, e?: string | null, manage?: boolean, owned?: number[]): string };
 let h: Harness;
 
 before(() => {
@@ -153,10 +153,14 @@ test('PDF 관리 화면: 목록 · 상태(Ready / Indexing / Failed / Already ex
   const docs = [doc(1, 'ready', 'Outlook'), doc(2, 'indexing', 'Draft'), doc(3, 'failed', 'Broken'), doc(4, 'already-exists', 'Dup')];
   const html = h.renderKnowledge(docs, null, true);   // 관리 모드(관리자)
   for (const re of [/Outlook/, /Ready/, /Indexing/, /Failed/, /Already exists/, /Re-index/, /Delete/, /42 chunks/]) assert.match(html, re, String(re));
-  // 공개 화면: 목록과 업로드만 있고 삭제 · 재인덱싱(관리자 전용)은 보이지 않는다
+  // 공개 화면: 목록과 업로드가 있고, 재인덱싱(관리자 전용)은 없다. 삭제는 이 브라우저가 업로드한 문서에만 보인다
   const pub = h.renderKnowledge(docs);
-  for (const re of [/Outlook/, /Ready/, /Upload PDF/]) assert.match(pub, re, String(re));
-  assert.doesNotMatch(pub, /Re-index|Delete|삭제/);
+  for (const re of [/Outlook/, /Ready/, /Upload PDF/, /삭제는 이 브라우저에서 업로드한 문서만/]) assert.match(pub, re, String(re));
+  assert.doesNotMatch(pub, /Re-index|>Delete<|삭제 확인/, '내가 올리지 않은 문서에는 삭제 버튼이 없다');
+  const mine = h.renderKnowledge(docs, null, false, [2]);
+  assert.equal((mine.match(/>Delete</g) ?? []).length, 1, '내가 올린 문서(id 2)에만 Delete');
+  assert.match(mine.slice(mine.indexOf('Draft')), />Delete</);
+  assert.doesNotMatch(mine, /Re-index/);
   assert.match(h.renderKnowledge([]), /리서치 문서를 업로드하면 AI 분석에 포함됩니다/);
   const err = h.renderKnowledge(null, 'ValuFlow 서버에 연결할 수 없습니다.');
   assert.match(err, /role="alert"/);
