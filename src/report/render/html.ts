@@ -70,7 +70,7 @@ export const REPORT_CSS = `
 .valuflow-report tbody th small.kind{display:inline;margin-left:4px}
 .valuflow-report small.note,.valuflow-report .tbl-note{color:#666;font-size:11px;display:block}
 .valuflow-report .alt{color:#666;font-size:11px}
-.valuflow-report sup.fn{font-size:9px;margin-left:1px}.valuflow-report sup.fn a{color:#2a2e35;text-decoration:none;font-weight:700}
+.valuflow-report sup.fn{font-size:9px;margin-left:1px}.valuflow-report .kpi sup.fn{display:block;margin:3px 0 0;font-size:10px;line-height:1.3;vertical-align:baseline;overflow-wrap:anywhere}.valuflow-report sup.fn a{color:#2a2e35;text-decoration:none;font-weight:700}
 .valuflow-report .kvs dl{margin:0}.valuflow-report .kvs dl>div{display:flex;gap:16px;border-bottom:1px solid #e0e0dc;padding:4px 0}.valuflow-report .kvs dt{flex:0 0 220px;color:#444}.valuflow-report .kvs dd{margin:0;font-weight:600}
 .valuflow-report .narr li,.valuflow-report .lst li{margin:6px 0}.valuflow-report .narr ul,.valuflow-report .lst ul{padding-left:18px}
 .valuflow-report .badge{font-size:10px;font-weight:800;letter-spacing:.06em;border:1px solid #2a2e35;padding:0 5px}
