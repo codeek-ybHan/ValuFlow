@@ -139,3 +139,10 @@ cd backend && .venv/bin/python -m scripts.prod_smoke https://<backend> --token "
 
 고쳐야 하는 것: 실제 공개 배포 + 공개 URL smoke · 브라우저 end-to-end(실제 키) QA · Docker 이미지 빌드/폰트 경로 확인 · 공식 market/peer/news provider · ECOS(또는 다른 공식 Rf 출처) 확인 후 연결.
 포트폴리오 범위 밖: 실제 인증/사용자별 격리 · 분산 rate limit(Redis 등) · 대용량 Report 비동기 생성 · 메트릭/알림 · CSP · 더 큰 평가 데이터셋 · 대화 이력 영속화.
+
+
+## 14. 최종 인수 검증 (컨테이너, 2026-10-08)
+- **Access 상태코드**: 헤더 없음 · 잘못된 키 → 401(`access-required`), production 에서 `ACCESS_TOKEN` 미설정 → 403(`access-not-configured`), 잘못된 키 반복 → 429.
+- **Docker**: `docker build backend` 성공(731MB), `fonts-nanum` 설치 확인(NanumGothic*.ttf), 컨테이너가 빈 PostgreSQL(pgvector)에서 alembic 0001→0004 적용 후 기동, `/api/health` ok · `font=ttf-embedded`.
+- **컨테이너 대상 `prod_smoke`: 12/12 PASS**, 컨테이너 안 Report PDF 11쪽 · key text 232/232, 컨테이너 재시작 후 저장된 분석 유지.
+- **미실행**: 외부 호스팅(Vercel 연결 · managed PostgreSQL · 공개 URL) 배포, 공개 URL smoke, 브라우저 QA. 이 환경에는 hosting 계정 · CLI 접근이 없다.
