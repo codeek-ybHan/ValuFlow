@@ -101,6 +101,12 @@ def _classify_part(rule: dict, part: dict, a: FinancialAccount) -> str | None:
 _EMPTY = {"value": None, "ambiguous": False, "weak": False, "notes": [], "sources": [], "trace": None}
 
 
+def _origin(a: FinancialAccount) -> dict:
+    """재무제표 계정이 아닌 출처(예: 사업보고서 주석)에서 온 행이면 sourceType · 접수번호를 trace 에 남긴다. 일반 계정 행에는 키가 없다."""
+    st = a.raw.get("sourceType") if isinstance(a.raw, dict) else None
+    return {k: v for k, v in (("sourceType", st), ("receiptNo", a.raw.get("receiptNo") if st else None), ("note", a.raw.get("note") if st else None)) if v}
+
+
 def _apply_rule(rule: dict, rows: list[_Row], year: int) -> dict:
     mine = [r.account for r in rows if r.year == year and r.account.amount is not None]
 
@@ -141,11 +147,11 @@ def _apply_rule(rule: dict, rows: list[_Row], year: int) -> dict:
         total = 0
         for p in picked:
             total = total + p["value"]
-        components = [{"accountName": p["account"].account_name, "accountId": p["account"].account_id or None, "value": p["value"], "matchType": p["tier"]} for p in picked]
+        components = [{"accountName": p["account"].account_name, "accountId": p["account"].account_id or None, "value": p["value"], "matchType": p["tier"], **_origin(p["account"])} for p in picked]
         first = picked[0]["account"]
         return {
             "value": total, "ambiguous": conflict, "weak": False, "notes": notes, "sources": [p["account"].account_name for p in picked],
-            "trace": {"value": total, "sourceAccountName": " + ".join(p["account"].account_name for p in picked), "sourceAccountId": None, "matchType": "sum", "rawStatementType": _raw_type(first), "components": components},
+            "trace": {"value": total, "sourceAccountName": " + ".join(p["account"].account_name for p in picked), "sourceAccountId": None, "matchType": "sum", "rawStatementType": _raw_type(first), **_origin(first), "components": components},
         }
 
     cands = []
@@ -170,7 +176,7 @@ def _apply_rule(rule: dict, rows: list[_Row], year: int) -> dict:
     elif len(top) > 1:
         kinds = list(dict.fromkeys(_raw_type(c[0]) for c in top))
         selection = f"same value in {' and '.join(kinds)}; counted once, {_raw_type(chosen[0])} preferred"
-    trace = {"value": values[0], "sourceAccountName": chosen[0].account_name, "sourceAccountId": chosen[0].account_id or None, "matchType": best, "rawStatementType": _raw_type(chosen[0])}
+    trace = {"value": values[0], "sourceAccountName": chosen[0].account_name, "sourceAccountId": chosen[0].account_id or None, "matchType": best, "rawStatementType": _raw_type(chosen[0]), **_origin(chosen[0])}
     if selection:
         trace["selection"] = selection
     return {"value": values[0], "ambiguous": conflict, "weak": best == "weak", "notes": notes, "sources": [chosen[0].account_name], "trace": trace}

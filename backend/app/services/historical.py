@@ -9,6 +9,7 @@ from typing import Any, Callable
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.dart.corp_codes import CorpCodeCache
+from app.dart.da_notes import AnnualReportNoteSource
 from app.dart.financials import ANNUAL_REPORT, FinancialsService
 from app.dart.models import DartApiError, FinancialAccount, FinancialsQuality
 from app.normalization.normalize import normalize_financials
@@ -25,7 +26,9 @@ def _fetch_info(q: FinancialsQuality) -> dict[str, Any]:
 
 
 class HistoricalService:
-    def __init__(self, financials: FinancialsService, corp_cache: CorpCodeCache, store: FinancialStore | None = None, clock: Callable[[], datetime] | None = None):
+    def __init__(self, financials: FinancialsService, corp_cache: CorpCodeCache, store: FinancialStore | None = None, clock: Callable[[], datetime] | None = None,
+                 notes: AnnualReportNoteSource | None = None):
+        self._notes = notes   # D&A 가 재무제표 계정에 없을 때 사업보고서 주석에서 읽는다 (없으면 source unavailable)
         self._financials = financials
         self._corp_cache = corp_cache
         self._store = store
@@ -61,7 +64,7 @@ class HistoricalService:
         # 1) Database 우선 (refresh 가 아니면). 여기서 OpenDART 를 호출하지 않는다.
         if self._store is not None and not refresh:
             hit = self._store.find_current(key)
-            if hit:
+            if hit and not self._stale_without_note_da(hit):
                 return self._response(corp_code, hit["result"], hit["fetch"], source="database", fetched_at=hit["fetchedAt"], persisted=True, fetch_id=hit["fetchId"])
 
         # 2) OpenDART → 정규화
@@ -69,6 +72,7 @@ class HistoricalService:
         accounts, fetch_quality, _, _ = self._financials.collect(corp_code, list(years), mode, ANNUAL_REPORT, refresh=refresh)  # type: ignore[arg-type]
         if not accounts:
             raise DartApiError("no-data", "해당 기업의 사업보고서 재무제표가 없습니다.")
+        accounts = self._with_note_da(corp_code, accounts, sorted(set(years)), fetch_quality)
         fetched_at = self._clock()
         result = self._normalize(accounts, company, sorted(set(years)), mode, fetch_quality, fetched_at)
 
@@ -82,6 +86,30 @@ class HistoricalService:
                 log.exception("failed to persist financial fetch for %s", corp_code)
                 persist_error = "database-error"
         return self._response(corp_code, result, _fetch_info(fetch_quality), source="opendart", fetched_at=utc_iso(fetched_at), persisted=persisted, fetch_id=fetch_id, persist_error=persist_error)
+
+    def _stale_without_note_da(self, hit: dict) -> bool:
+        """저장된 결과에 D&A 가 없고 주석 fallback 을 아직 시도한 흔적(경고)이 없으면 한 번 다시 수집한다. fallback 도입 전에 저장된 결과를 새로고침 없이 갱신하기 위함이다.
+        fallback 을 시도했는데도 없으면(source unavailable) 그 결과를 그대로 쓴다 (매 요청마다 다시 받지 않는다)."""
+        if self._notes is None or not hit["result"].get("ok"):
+            return False
+        q = hit["result"].get("quality", {})
+        if q.get("fields", {}).get("depreciationAmortization", {}).get("status") != "missing":
+            return False
+        warnings = [*q.get("warnings", []), *hit.get("fetch", {}).get("warnings", [])]
+        return not any("annual report" in w or "D&A source unavailable" in w or "D&A annual-report note unavailable" in w for w in warnings)
+
+    def _with_note_da(self, corp_code: str, accounts: list[FinancialAccount], years: list[int], fetch_quality: FinancialsQuality) -> list[FinancialAccount]:
+        """사용한 기준(연결/별도)의 재무제표에 D&A 계정이 없는 연도만 사업보고서 주석으로 채운다. 어떤 오류도 조회를 막지 않는다."""
+        if self._notes is None or fetch_quality.basis_used is None:
+            return accounts
+        try:
+            extra, warnings = self._notes.enrich(corp_code, accounts, years, fetch_quality.basis_used)
+        except Exception:  # noqa: BLE001  (주석 fallback 은 보조 경로다: 실패해도 재무제표 결과는 그대로 돌려준다)
+            log.warning("D&A note fallback failed for %s", corp_code)
+            return accounts
+        fetch_quality.warnings.extend(w for w in warnings if w not in fetch_quality.warnings)
+        fetch_quality.raw_account_count += len(extra)
+        return [*accounts, *extra]
 
     @staticmethod
     def _normalize(accounts: list[FinancialAccount], company: dict, years: list[int], mode: str, fetch_quality: FinancialsQuality, now: datetime) -> dict:

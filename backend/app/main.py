@@ -16,6 +16,7 @@ from app.config import Settings, load_settings
 from app.dart.client import DartHttpClient
 from app.dart.company import parse_company
 from app.dart.corp_codes import CorpCodeCache, search_companies
+from app.dart.da_notes import AnnualReportNoteSource
 from app.dart.financials import FinancialsService
 from app.db.session import create_db_engine, make_session_factory
 from app.services.financial_store import FinancialStore
@@ -133,7 +134,7 @@ def create_app(settings: Settings | None = None, dart: DartHttpClient | None = N
     financials = financials or FinancialsService(dart.fetch_financials)
     if store is None and settings.has_database:
         store = FinancialStore(make_session_factory(create_db_engine(settings)))  # connect 는 첫 사용 시점
-    historical = historical or HistoricalService(financials, cache, store)
+    historical = historical or HistoricalService(financials, cache, store, notes=AnnualReportNoteSource(disclosure_source or DartDisclosureSource(dart)))
     # 공시 Retrieval: DB(pgvector)와 embedding provider 가 모두 있을 때만 켜진다 (embedding 호출은 backend 에서만)
     if embedder is None and settings.has_ai:
         embedder = OpenAiEmbeddings(settings.openai_api_key, settings.embedding_model, settings.openai_base_url)

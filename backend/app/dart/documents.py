@@ -51,6 +51,7 @@ class _DartParser(HTMLParser):
         self._stack: list[tuple[int, str]] = []  # (level, title)
         self._cur = self.sections[0]
         self._in_title = False
+        self._tg_depth = 0               # TABLE-GROUP(재무제표 주석 등) 안에서는 TITLE 이 상위 섹션 제목을 덮어쓰지 않고 하위 섹션을 만든다
         self._title_buf: list[str] = []
         self._p_depth = 0
         self._p_buf: list[str] = []
@@ -70,6 +71,8 @@ class _DartParser(HTMLParser):
             self._stack.append((level, ""))
             self._cur = Section([t for _, t in self._stack])
             self.sections.append(self._cur)
+        elif tag == "table-group":
+            self._tg_depth += 1
         elif tag == "title":
             self._in_title, self._title_buf = True, []
         elif tag == "table":
@@ -89,10 +92,16 @@ class _DartParser(HTMLParser):
         if tag == "title" and self._in_title:
             self._in_title = False
             title = clean_text("".join(self._title_buf))
-            if self._stack and title:
+            if self._tg_depth > 0 and self._stack and title:
+                # 주석 제목("21. 비용의 성격별 분류 (연결)")을 경로 끝에 붙인 별도 섹션 — 인용 · 검색 출처가 주석 단위가 된다
+                self._cur = Section([*[t for _, t in self._stack], title])
+                self.sections.append(self._cur)
+            elif self._stack and title:
                 level = self._stack[-1][0]
                 self._stack[-1] = (level, title)
                 self._cur.path = [t for _, t in self._stack]
+        elif tag == "table-group" and self._tg_depth > 0:
+            self._tg_depth -= 1
         elif tag in ("td", "th", "te", "tu") and self._table_depth == 1 and self._cell is not None:
             text = clean_text("".join(self._cell))
             if self._rows:
