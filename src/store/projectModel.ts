@@ -253,6 +253,7 @@ function sanitizeProvenance(raw: unknown): HistoricalProvenance | null {
     source: r.source as HistoricalProvenance['source'], persisted: r.persisted === true,
     ...(str(r.fetchedAt) ? { fetchedAt: str(r.fetchedAt) as string } : {}), ...(typeof r.fetchId === 'string' || r.fetchId === null ? { fetchId: r.fetchId as string | null } : {}),
     ...(str(r.corpCode) ? { corpCode: str(r.corpCode) as string } : {}), ...(years ? { fiscalYears: years } : {}),
+    ...(r.basisChoice === 'auto' || r.basisChoice === 'consolidated' || r.basisChoice === 'separate' ? { basisChoice: r.basisChoice } : {}),
   };
 }
 

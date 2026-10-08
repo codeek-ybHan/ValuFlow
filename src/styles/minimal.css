@@ -145,3 +145,9 @@ h1 { font-size: 26px; letter-spacing: -.025em; }
 .ai-grid.no-right { grid-template-columns: 240px minmax(0, 1fr); }
 @media (max-width: 960px) { .ai-grid.no-right { grid-template-columns: minmax(0, 1fr); } }
 .ai-grid.no-right .ai-right { display: none; }   /* 답변이 생기기 전에는 빈 근거 패널을 보이지 않는다 */
+
+/* ---- 재무제표 기준(연결/개별) 선택 ---- */
+.basis-choice { margin: 0 0 12px; }
+.basis-choice .row { gap: 12px; }
+.basis-choice .seg button { padding: 4px 12px; font-size: 12.5px; }
+.basis-choice .seg button:disabled { opacity: .5; cursor: not-allowed; }

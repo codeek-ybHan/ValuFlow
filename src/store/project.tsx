@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AssumptionsDraft } from './assumptions';
-import type { HistoricalData, SelectedCompany } from '../data/types';
+import type { BasisChoice, HistoricalData, SelectedCompany } from '../data/types';
 import { defaultFinancialRepository } from '../data/repository/defaultRepository';
 import type { FinancialRepository } from '../data/repository/financialRepository';
 import { applyLoadOutcome, loadHistorical as loadHistoricalFor, type HistoricalLoadStatus } from './historicalLoad';
@@ -58,6 +58,9 @@ interface Ctx {
   historicalStatus: HistoricalLoadStatus;
   /** 선택한 기업의 실제 재무데이터를 명시적으로 불러온다. refresh 면 DB 를 건너뛰고 OpenDART 를 다시 조회한다. 실패해도 기존 Historical 은 유지된다. */
   loadHistorical: (options?: { refresh?: boolean }) => Promise<void>;
+  /** 재무제표 기준 선택: auto(연결 우선) · consolidated(연결) · separate(개별). 다음 [재무데이터 불러오기] 부터 적용된다. */
+  basisChoice: BasisChoice;
+  setBasisChoice: (b: BasisChoice) => void;
   /** Historical 만 제거 (기업 선택 · Valuation 가정은 유지) */
   removeHistorical: () => void;
   /** STEP 04 학습용 가정 적용 + 계산. 기업 선택과 Historical 로드 이후에만 동작한다 (명시적으로 눌렀을 때만 가정이 들어온다). */
@@ -70,6 +73,10 @@ const ProjectCtx = createContext<Ctx | null>(null);
 export function ProjectProvider({ children, repository = defaultFinancialRepository }: { children: ReactNode; repository?: FinancialRepository }) {
   const [project, setProject] = useState<ProjectState>(load);
   const [historicalStatus, setHistoricalStatus] = useState<HistoricalLoadStatus>({ kind: 'idle' });
+  const [basisChoice, setBasisChoiceState] = useState<BasisChoice>(() => load().historicalProvenance?.basisChoice ?? 'auto');   // 저장된 Historical 이 있으면 그때 고른 기준
+  const basisRef = useRef(basisChoice);
+  basisRef.current = basisChoice;
+  const setBasisChoice = useCallback((b: BasisChoice) => setBasisChoiceState(b), []);
   const seq = useRef(0); // 늦게 도착한 이전 응답이 최신 상태를 덮어쓰지 않게 한다
   const latest = useRef(project);
   latest.current = project;
@@ -86,7 +93,7 @@ export function ProjectProvider({ children, repository = defaultFinancialReposit
 
   const setSelectedCompany = useCallback((c: SelectedCompany | null) => {
     // 다른 기업(또는 해제)으로 바뀌면 진행 중이던 이전 기업의 Historical 요청 결과를 버리고 상태 표시도 초기화한다
-    if (c === null || latest.current.selectedCompany?.corpCode !== c.corpCode) { seq.current += 1; setHistoricalStatus({ kind: 'idle' }); }
+    if (c === null || latest.current.selectedCompany?.corpCode !== c.corpCode) { seq.current += 1; setHistoricalStatus({ kind: 'idle' }); setBasisChoiceState('auto'); }   // 다른 기업이면 기준 선택도 처음(연결 우선)으로
     setProject((p) => withSelectedCompany(p, c));
   }, []);
   const setHistoricalData = useCallback((h: HistoricalData | null) => setProject((p) => withHistoricalData(p, h)), []);
@@ -108,7 +115,7 @@ export function ProjectProvider({ children, repository = defaultFinancialReposit
     if (!company) return;
     const mine = ++seq.current;
     setHistoricalStatus({ kind: 'loading', refresh: options.refresh === true });
-    const outcome = await loadHistoricalFor(repository, company, { refresh: options.refresh, fiscalYears: latest.current.historicalProvenance?.corpCode === company.corpCode ? latest.current.historicalProvenance.fiscalYears : undefined });
+    const outcome = await loadHistoricalFor(repository, company, { refresh: options.refresh, basis: basisRef.current, fiscalYears: latest.current.historicalProvenance?.corpCode === company.corpCode ? latest.current.historicalProvenance.fiscalYears : undefined });
     if (mine !== seq.current) return;
     if (outcome.ok) {
       setProject((p) => applyLoadOutcome(p, outcome));
@@ -125,7 +132,7 @@ export function ProjectProvider({ children, repository = defaultFinancialReposit
     const mine = ++seq.current;
     const company = p.selectedCompany;
     setHistoricalStatus({ kind: 'loading', refresh: false });
-    void loadHistoricalFor(repository, company, { fiscalYears: p.historicalProvenance.fiscalYears }).then((outcome) => {
+    void loadHistoricalFor(repository, company, { fiscalYears: p.historicalProvenance.fiscalYears, ...(p.historicalProvenance.basisChoice ? { basis: p.historicalProvenance.basisChoice } : {}) }).then((outcome) => {
       if (mine !== seq.current) return;
       if (outcome.ok) { setProject((s) => applyLoadOutcome(s, outcome)); setHistoricalStatus({ kind: 'idle' }); }
       else {
@@ -138,8 +145,8 @@ export function ProjectProvider({ children, repository = defaultFinancialReposit
   }, []);
 
   const value = useMemo(
-    () => ({ project, historicalStatus, loadHistorical, removeHistorical, setSelectedCompany, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, setDcfInputs, setRelativeInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, applyPracticeAssumptions, reset }),
-    [project, historicalStatus, loadHistorical, removeHistorical, setSelectedCompany, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, setDcfInputs, setRelativeInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, applyPracticeAssumptions, reset],
+    () => ({ project, historicalStatus, basisChoice, setBasisChoice, loadHistorical, removeHistorical, setSelectedCompany, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, setDcfInputs, setRelativeInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, applyPracticeAssumptions, reset }),
+    [project, historicalStatus, basisChoice, setBasisChoice, loadHistorical, removeHistorical, setSelectedCompany, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, setDcfInputs, setRelativeInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, applyPracticeAssumptions, reset],
   );
   return <ProjectCtx.Provider value={value}>{children}</ProjectCtx.Provider>;
 }

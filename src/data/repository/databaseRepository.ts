@@ -33,7 +33,7 @@ export class DatabaseFinancialRepository implements FinancialRepository {
     const years = request.fiscalYears ?? defaultFiscalYears(this.now());
     let res: DartHistoricalResponse<HistoricalData, DataQuality>;
     try {
-      res = await this.client.getHistorical({ corpCode: request.corpCode, years, basis: request.preferredBasis === 'Separate' ? 'separate' : 'auto', refresh: request.refresh }) as DartHistoricalResponse<HistoricalData, DataQuality>;
+      res = await this.client.getHistorical({ corpCode: request.corpCode, years, basis: request.basisMode ?? (request.preferredBasis === 'Separate' ? 'separate' : 'auto'), refresh: request.refresh }) as DartHistoricalResponse<HistoricalData, DataQuality>;
     } catch (e) {
       const message = e instanceof DartClientError ? e.message : '재무제표를 가져오지 못했습니다.';
       return { ok: false, reason: e instanceof DartClientError && e.code === 'no-data' ? 'not-found' : 'unavailable', message };

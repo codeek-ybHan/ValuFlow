@@ -41,7 +41,7 @@ export class DartFinancialRepository implements FinancialRepository {
 
     let res;
     try {
-      res = await this.client.fetchFinancials({ corpCode: request.corpCode, years, basis: preferred === 'Separate' ? 'separate' : 'auto' });
+      res = await this.client.fetchFinancials({ corpCode: request.corpCode, years, basis: request.basisMode ?? (preferred === 'Separate' ? 'separate' : 'auto') });
     } catch (e) {
       const message = e instanceof DartClientError ? e.message : '재무제표를 가져오지 못했습니다.';
       return { ok: false, reason: e instanceof DartClientError && e.code === 'no-data' ? 'not-found' : 'unavailable', message };

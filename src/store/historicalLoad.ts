@@ -1,7 +1,7 @@
 // 실제 Historical 불러오기 흐름 (React 비의존). 화면은 이 결과를 그대로 상태에 반영하고 표시한다.
 //   selectedCompany.corpCode → repository.getHistoricalFinancials → historicalData · historicalQuality · historicalProvenance
 // 정책: 실패(unsupported / incomplete / unavailable)해도 기존 Historical 은 지우지 않고 오류만 표시한다. fixture 로 대체하지 않는다.
-import type { DataQuality, HistoricalData, HistoricalProvenance, SelectedCompany } from '../data/types.ts';
+import type { BasisChoice, DataQuality, HistoricalData, HistoricalProvenance, SelectedCompany } from '../data/types.ts';
 import type { FinancialRepository, HistoricalFinancialsResult } from '../data/repository/financialRepository.ts';
 import { withHistoricalLoaded, type ProjectState } from './projectModel.ts';
 
@@ -51,14 +51,17 @@ export function toLoadOutcome(res: HistoricalFinancialsResult, company: Selected
 
 /** 선택한 기업의 Historical 을 repository 로 불러온다. 예외는 던지지 않고 failure 로 돌려준다. */
 export async function loadHistorical(
-  repo: FinancialRepository, company: SelectedCompany, options: { refresh?: boolean; fiscalYears?: number[] } = {},
+  repo: FinancialRepository, company: SelectedCompany, options: { refresh?: boolean; fiscalYears?: number[]; basis?: BasisChoice } = {},
 ): Promise<HistoricalLoadOutcome> {
   try {
     const res = await repo.getHistoricalFinancials({
       corpCode: company.corpCode, ...(company.stockCode ? { stockCode: company.stockCode } : {}), companyName: company.corpName,
       ...(options.fiscalYears ? { fiscalYears: options.fiscalYears } : {}), ...(options.refresh ? { refresh: true } : {}),
+      ...(options.basis ? { basisMode: options.basis } : {}),
     });
-    return toLoadOutcome(res, company);
+    const out = toLoadOutcome(res, company);
+    // 사용자가 고른 기준을 출처에 남긴다 (새로고침 때 같은 기준으로 다시 조회). 실제로 쓴 기준은 data.company.basis 다.
+    return out.ok && options.basis ? { ...out, provenance: { ...out.provenance, basisChoice: options.basis } } : out;
   } catch {
     return { ok: false, failure: { kind: 'unavailable', message: '재무데이터를 불러오지 못했습니다.', quality: null } };
   }

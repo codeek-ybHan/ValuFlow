@@ -1,7 +1,7 @@
 import { useProject } from '../store/project';
 import { UNSUPPORTED_UX, provenanceView, type HistoricalFailure } from '../store/historicalLoad';
 import { buildQualityView } from '../engine/qualityView';
-import type { HistoricalData, HistoricalProvenance, DataQuality } from '../data/types';
+import { BASIS_CHOICES, type BasisChoice, type HistoricalData, type HistoricalProvenance, type DataQuality } from '../data/types';
 
 // Historical 의 출처 · 불러오기 상태 · 데이터 품질 표시. 계산은 하지 않고 store / engine 의 결과를 렌더링한다.
 
@@ -27,9 +27,29 @@ export function HistoricalFailureNotice({ failure }: { failure: HistoricalFailur
   );
 }
 
+export const BASIS_LABEL: Record<BasisChoice, string> = { auto: '자동 (연결 우선)', consolidated: '연결', separate: '개별' };
+const BASIS_NAME = { Consolidated: '연결', Separate: '개별' } as const;
+
+/** 연결 / 개별 재무제표 선택. 연결 재무제표가 있는 기업은 연결 · 개별 중에서 고른다. 자동은 연결을 먼저 쓰고 없거나 불완전하면 개별을 쓴다 (두 기준을 섞지 않는다). */
+export function BasisChoiceControl({ value, onChange, disabled, loadedBasis }: { value: BasisChoice; onChange: (b: BasisChoice) => void; disabled: boolean; loadedBasis: 'Consolidated' | 'Separate' | null }) {
+  const differs = loadedBasis !== null && value !== 'auto' && BASIS_NAME[loadedBasis] !== BASIS_LABEL[value];
+  return (
+    <div className="basis-choice">
+      <div className="row">
+        <span className="small muted" id="basis-choice-label">재무제표 기준</span>
+        <div className="seg" role="radiogroup" aria-labelledby="basis-choice-label">
+          {BASIS_CHOICES.map((b) => <button key={b} type="button" role="radio" aria-checked={value === b} className={value === b ? 'active' : ''} disabled={disabled} onClick={() => onChange(b)}>{BASIS_LABEL[b]}</button>)}
+        </div>
+      </div>
+      {differs ? <p className="hint">지금 불러온 데이터는 {BASIS_NAME[loadedBasis!]} 기준입니다. [재무데이터 불러오기]를 다시 누르면 {BASIS_LABEL[value]} 기준으로 바뀝니다.</p> : null}
+      {value === 'consolidated' ? <p className="hint">연결 재무제표가 없는 기업은 불러오지 못합니다. 그때는 개별 또는 자동을 고르세요.</p> : null}
+    </div>
+  );
+}
+
 /** [재무데이터 불러오기] / [데이터 새로고침] 과 상태 표시 (Loading / Historical loaded / 실패). */
 export function HistoricalLoadControls({ compact = false }: { compact?: boolean }) {
-  const { project, historicalStatus, loadHistorical, removeHistorical } = useProject();
+  const { project, historicalStatus, loadHistorical, removeHistorical, basisChoice, setBasisChoice } = useProject();
   const company = project.selectedCompany;
   const p = project.historicalProvenance;
   const loading = historicalStatus.kind === 'loading';
@@ -37,6 +57,7 @@ export function HistoricalLoadControls({ compact = false }: { compact?: boolean 
   if (!company) return <p className="small muted">기업을 검색해 선택하면 실제 재무데이터를 불러올 수 있습니다.</p>;
   return (
     <div className="hist-load" aria-label="재무데이터 불러오기">
+      <BasisChoiceControl value={basisChoice} onChange={setBasisChoice} disabled={loading} loadedBasis={project.historicalData && actual ? project.historicalData.company.basis : null} />
       <div className="row action-row">
         <button className="btn primary" onClick={() => loadHistorical()} disabled={loading}>{loading && !historicalStatus.refresh ? 'Loading financial data...' : '재무데이터 불러오기'}</button>
         {actual && !compact && (

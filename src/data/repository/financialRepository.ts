@@ -2,6 +2,7 @@
 // 구현체: FixtureFinancialRepository (현재) → DartFinancialRepository / DatabaseFinancialRepository (이후).
 import type { HistoricalData } from '../types.ts';
 import type { DartBasis } from '../dart/types.ts';
+import type { BasisChoice } from '../types.ts';
 import type { DataQuality } from '../normalization/quality.ts';
 import type { DartFetchQuality } from '../dart/types.ts';
 
@@ -39,6 +40,8 @@ export interface HistoricalFinancialsRequest extends CompanyRef {
   /** 비우면 저장소가 가진 최신 3개년. */
   fiscalYears?: number[];
   preferredBasis?: DartBasis;
+  /** 재무제표 기준 선택 (없으면 preferredBasis → 연결 우선 auto). */
+  basisMode?: BasisChoice;
 }
 
 export type HistoricalFinancialsResult =

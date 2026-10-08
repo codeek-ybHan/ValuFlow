@@ -23,6 +23,10 @@ export interface HistoricalMeta {
  * 현재 Historical 데이터가 어디서 왔는가. 실제 데이터(database / opendart)와 학습용 fixture 를 화면에서 구분하는 근거다.
  * 저장 정책: database / opendart 는 식별 정보(corpCode · fiscalYears)만 저장하고 reload 때 backend 에서 다시 조회한다.
  */
+/** 사용자가 고르는 재무제표 기준: auto 는 연결 우선(없거나 불완전하면 개별), consolidated / separate 는 그 기준만 쓴다 (섞지 않는다). */
+export type BasisChoice = 'auto' | 'consolidated' | 'separate';
+export const BASIS_CHOICES: readonly BasisChoice[] = ['auto', 'consolidated', 'separate'];
+
 export interface HistoricalProvenance {
   source: 'database' | 'opendart' | 'fixture';
   /** 이 결과가 backend DB 에 저장되었는가 (fixture 는 false) */
@@ -32,6 +36,8 @@ export interface HistoricalProvenance {
   corpCode?: string;
   /** reload 시 같은 key 로 다시 조회하기 위한 회계연도 */
   fiscalYears?: number[];
+  /** 사용자가 고른 재무제표 기준 (reload 때 같은 기준으로 다시 조회한다). 실제로 쓴 기준은 data.company.basis */
+  basisChoice?: BasisChoice;
 }
 
 /** Workspace 에서 사용자가 고른 기업. Historical 재무데이터와는 별개이며, 선택만으로 재무데이터가 붙지 않는다. */
