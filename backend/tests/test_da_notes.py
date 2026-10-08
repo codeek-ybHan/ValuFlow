@@ -112,7 +112,7 @@ def test_enrich_fills_only_years_without_da_accounts_with_provenance():
     r = next(r for r in rows if r.fiscal_year == 2025)
     assert r.raw["sourceType"] == "cash-flow-adjustment" and r.raw["receiptNo"] == "R2025" and r.raw_statement_type == "NOTE" and r.statement_type == "CF"
     assert "R2024" not in src.fetched, "R2025 문서가 2025 · 2024 를 모두 덮는다"
-    assert any("taken from annual report notes" in w for w in warnings)
+    assert any("taken from annual report notes" in w and "cash-flow adjustments" in w.lower().replace("현금흐름 조정내역", "cash-flow adjustments") for w in warnings)
 
 
 def test_falls_back_to_nature_of_expense_when_adjustments_are_absent():
@@ -129,7 +129,7 @@ def test_falls_back_to_nature_of_expense_when_adjustments_are_absent():
 
 def test_source_unavailable_is_kept_without_estimating():
     # 주석에 D&A 행이 없다 / 사업보고서가 목록에 없다 / 문서를 못 받는다 → 행을 만들지 않고 이유만 남긴다
-    for filings, docs, text in [([filing("R2025", "사업보고서 (2025.12)", 2025, date(2026, 3, 10))], {"R2025": NO_DA}, "no depreciation/amortization row"),
+    for filings, docs, text in [([filing("R2025", "사업보고서 (2025.12)", 2025, date(2026, 3, 10))], {"R2025": NO_DA}, "no complete depreciation+amortization row"),
                                 ([], {}, "no annual report found"),
                                 ([filing("R2025", "사업보고서 (2025.12)", 2025, date(2026, 3, 10))], {}, "could not be read")]:
         rows, warnings = AnnualReportNoteSource(FakeFilings(filings, docs)).enrich(CORP, [], [2025], "Consolidated")
@@ -184,3 +184,38 @@ def test_note_titles_inside_table_groups_become_their_own_sections_without_losin
     nat = next(s for s in parsed.sections if "21." in s.path[-1])
     assert any("감가상각비" in b.text for b in nat.blocks), "표는 자기 제목 아래에 있다 (마지막 제목으로 라벨링되지 않는다)"
     assert extract_da_notes(parsed)[0].section.endswith("21. 비용의 성격별 분류 (연결)")
+
+
+def titled_period(title, label="당기", unit="백만원"):
+    """실제 문서처럼 제목 줄과 `당기 | (단위 : …)` 줄이 한 블록에 있는 헤더."""
+    return table([[title], [label, f"(단위 : {unit})"]])
+
+
+def test_generalized_layouts_combined_label_cashflow_note_and_function_allocation():
+    """LG화학형(합산 행 '감가상각비, 무형자산상각비' · 현금흐름 주석) 과 SK하이닉스형(유형/무형자산 주석의 기능별 배분)."""
+    combined = doc_xml([notes_section("23. 비용의 성격별 분류 (연결)", [period("당기"), table([["공시금액"], ["원재료 등의 사용액", "1"], ["감가상각비, 무형자산상각비", "5,247,870"]])])])
+    n = extract_da_notes(parse_document_xml(combined))[0]
+    assert n.source_type == "annual-report-note" and n.values == {"combined": 5_247_870 * 1_000_000}
+    cf_note = doc_xml([notes_section("32. 현금흐름 (연결)", [period("당기"), table([["영업활동현금흐름"], ["감가상각비", "4,694,488"], ["무형자산상각비", "563,417"]])])])
+    n = extract_da_notes(parse_document_xml(cf_note))[0]
+    assert n.source_type == "cash-flow-adjustment" and set(n.values) == {"depreciation", "amortization"}
+    alloc = doc_xml([notes_section("12. 유형자산 (연결)", [titled_period("감가상각비의 기능별 배분"), table([["감가상각비", "11,839,495", "766,325", "12,663,516"]])]),
+                     notes_section("13. 무형자산 (연결)", [titled_period("무형자산상각비의 기능별 배분"), table([["무형자산상각비", "1,000", "266,614", "1,266,614"]])])])
+    # 기능별 배분 표는 마지막 열(합계)을 쓰고, 유형 · 무형 주석을 같은 기간으로 합친다
+    notes = [x for x in extract_da_notes(parse_document_xml(alloc)) if x.source_type == "ppe-intangible-note"]
+    assert {k: v for x in notes for k, v in x.values.items()} == {"depreciation": 12_663_516 * 1_000_000, "amortization": 1_266_614 * 1_000_000}
+    f = FakeFilings([filing("R2025", "사업보고서 (2025.12)", 2025, date(2026, 3, 17))], {"R2025": alloc})
+    rows, warnings = AnnualReportNoteSource(f).enrich(CORP, [], [2025], "Consolidated")
+    assert {r.account_name for r in rows} == {"감가상각비", "무형자산상각비"} and rows[0].raw["sourceType"] == "ppe-intangible-note"
+
+
+def test_partial_components_are_not_used_as_a_da_total_and_next_source_is_tried():
+    cf_partial = notes_section("32. 현금흐름 (연결)", [period("당기"), table([["영업활동현금흐름"], ["무형자산상각비", "398,713"]])])
+    nature_combined = notes_section("23. 비용의 성격별 분류 (연결)", [period("당기"), table([["공시금액"], ["원재료 등의 사용액", "1"], ["감가상각비, 무형자산상각비", "3,912,960"]])])
+    f = FakeFilings([filing("R2023", "사업보고서 (2023.12)", 2023, date(2024, 3, 15))], {"R2023": doc_xml([cf_partial, nature_combined])})
+    rows, warnings = AnnualReportNoteSource(f).enrich(CORP, [], [2023], "Consolidated")
+    assert [(r.account_name, r.amount, r.raw["sourceType"]) for r in rows] == [("감가상각비 및 무형자산상각비", 3_912_960 * 1_000_000, "annual-report-note")]
+    assert any("partial" in w and "not used" in w for w in warnings)
+    only_partial = FakeFilings([filing("R2023", "사업보고서 (2023.12)", 2023, date(2024, 3, 15))], {"R2023": doc_xml([cf_partial])})
+    rows, warnings = AnnualReportNoteSource(only_partial).enrich(CORP, [], [2023], "Consolidated")
+    assert rows == [], "한쪽 구성요소만으로 D&A 합계를 만들지 않는다"

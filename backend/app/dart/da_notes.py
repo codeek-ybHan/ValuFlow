@@ -2,7 +2,8 @@
 
 배경: OpenDART 단일회사 전체 재무제표(fnlttSinglAcntAll)에는 현금흐름표 "조정" 합계만 있고 감가상각비 · 무형자산상각비 세부 계정이 없는 회사가 있다
 (삼성전자 2025 사업보고서: 연결/별도 모두 감가상각 계열 계정 0건 — 원본에 없다). 그런 경우 사업보고서 재무제표 주석에 같은 금액이 공시된다.
-탐색 순서(source): ① 현금흐름 주석 "조정내역" 표(cash-flow-adjustment) → ② 주석 "비용의 성격별 분류" 표(annual-report-note). 표는 제목 문구가 아니라
+탐색 순서(source): ① 현금흐름 주석 "조정내역"/"영업활동현금흐름" 표(cash-flow-adjustment) → ② 주석 "비용의 성격별 분류" 표(annual-report-note)
+→ ③ 유형자산 · 무형자산 주석의 "감가상각비/무형자산상각비의 기능별 배분" 표(ppe-intangible-note). 표는 제목 문구가 아니라
 구조(`당기|전기 (단위)` 헤더 블록 + 다음 데이터 블록의 행 구성)로 알아본다 — 보고서마다 제목 블록이 빠지는 경우가 있다.
 
 규칙
@@ -26,9 +27,10 @@ log = logging.getLogger("valuflow.da_notes")
 
 SOURCE_TYPE = "annual-report-note"
 SOURCE_CF = "cash-flow-adjustment"
+SOURCE_PPE = "ppe-intangible-note"
 NOTE_TITLE = "비용의 성격별 분류"
-NOTE_LABEL = {SOURCE_CF: "현금흐름 조정내역", SOURCE_TYPE: NOTE_TITLE}
-SOURCE_PRIORITY = [SOURCE_CF, SOURCE_TYPE]
+NOTE_LABEL = {SOURCE_CF: "현금흐름 조정내역", SOURCE_TYPE: NOTE_TITLE, SOURCE_PPE: "유형자산·무형자산 주석(기능별 배분)"}
+SOURCE_PRIORITY = [SOURCE_CF, SOURCE_TYPE, SOURCE_PPE]
 UNIT_KRW = {"원": 1, "천원": 1_000, "백만원": 1_000_000, "억원": 100_000_000}
 _HEADER = re.compile(r"^(당기|전기)\s*\|\s*\(\s*단위\s*:\s*([가-힣]+)\s*\)\s*$", re.M)
 _NUM = re.compile(r"^\(?-?[\d,]+(\.\d+)?\)?$")
@@ -38,6 +40,7 @@ ROW_KIND = {
     "감가상각비": "depreciation", "유형자산감가상각비": "depreciation",
     "무형자산상각비": "amortization",
     "감가상각비및무형자산상각비": "combined", "감가상각및무형자산상각비": "combined",
+    "감가상각비,무형자산상각비": "combined", "감가상각비·무형자산상각비": "combined", "감가상각비/무형자산상각비": "combined",
 }
 ROW_NAME = {"depreciation": "감가상각비", "amortization": "무형자산상각비", "combined": "감가상각비 및 무형자산상각비"}
 ROW_ID = {"depreciation": "note_DepreciationExpense", "amortization": "note_AmortizationExpense", "combined": "note_DepreciationAndAmortisationExpense"}
@@ -78,11 +81,13 @@ def _row_values(table: str) -> dict[str, int]:
     return out
 
 
-def _classify_table(text: str) -> str | None:
-    """데이터 표의 종류: 현금흐름 조정내역(조정내역 계) / 비용의 성격별 분류(원재료 등의 사용액 · 성격별 비용 합계)."""
-    if "조정내역 계" in text:
+def _classify_table(header: str, text: str, path: str) -> str | None:
+    """데이터 표의 종류. 현금흐름 조정내역(조정내역 계 · 현금흐름/영업창출 주석) · 비용의 성격별 분류 · 유형/무형자산 주석의 기능별 배분."""
+    if "기능별 배분" in header:
+        return SOURCE_PPE
+    if "조정내역 계" in text or re.search(r"현금흐름|영업(으로부터|에서) 창출", path):
         return SOURCE_CF
-    if "원재료 등의 사용액" in text or "성격별 비용" in text:
+    if "원재료 등의 사용액" in text or "성격별 비용" in text or "성격별 분류" in header or "성격별 분류" in path:
         return SOURCE_TYPE
     return None
 
@@ -97,7 +102,7 @@ def extract_da_notes(doc: ParsedDocument) -> list[NoteDa]:
             hdr = _HEADER.search(b.text)
             if hdr is None or hdr.group(2) not in UNIT_KRW:
                 continue
-            kind = _classify_table(blocks[i + 1].text)
+            kind = _classify_table(b.text, blocks[i + 1].text, path)
             if kind is None:
                 continue
             values = _row_values(blocks[i + 1].text)
@@ -152,6 +157,7 @@ class AnnualReportNoteSource:
             return [], []
         rows: list[FinancialAccount] = []
         warnings: list[str] = []
+        used_src: dict[int, tuple[str, str]] = {}
         pending = list(missing)
         while pending:
             report_year = pending[0]            # 보고서 R 은 당기 R 와 전기 R-1 을 담는다
@@ -170,13 +176,24 @@ class AnnualReportNoteSource:
             filing, notes = got
             covered = {report_year, report_year - 1}
             done: set[int] = set()
-            for src in SOURCE_PRIORITY:                 # 현금흐름 조정내역 → 비용의 성격별 분류 순으로 처음 값이 있는 source 를 쓴다 (섞지 않는다)
+            for src in SOURCE_PRIORITY:                 # 현금흐름 → 성격별 분류 → 자산 주석 순으로 처음 값이 있는 source 를 쓴다 (source 를 섞지 않는다)
+                merged: dict[str, NoteDa] = {}
                 for n in (n for n in notes if n.basis == basis and n.source_type == src):
+                    cur = merged.get(n.period)          # 같은 기간의 표가 둘로 나뉘어 있으면(유형 · 무형 주석) 구성요소를 합친다
+                    merged[n.period] = n if cur is None else NoteDa(n.basis, n.period, {**n.values, **cur.values}, cur.unit, cur.section, src)
+                for n in merged.values():
                     year = report_year if n.period == "당기" else report_year - 1
                     if year not in missing or year in done or not n.values:
                         continue
-                    # 합계 행과 구성요소가 함께 있으면 구성요소를 우선한다 (정규화가 합산한다)
-                    kinds = [k for k in ("depreciation", "amortization") if k in n.values] or [k for k in ("combined",) if k in n.values]
+                    # 감가상각비 + 무형자산상각비가 모두 있거나 합산 행이 있을 때만 쓴다: 한쪽만 있는 값은 D&A 합계를 과소 추정하므로 쓰지 않는다 (다음 source 로 넘어간다)
+                    if "depreciation" in n.values and "amortization" in n.values:
+                        kinds = ["depreciation", "amortization"]
+                    elif "combined" in n.values:
+                        kinds = ["combined"]
+                    else:
+                        warnings.append(f"D&A partial in {NOTE_LABEL[src]} of annual report {filing.receipt_no} for {year} ({', '.join(n.values)} only); not used")
+                        continue
+                    used_src[year] = (src, filing.receipt_no)
                     for k in kinds:
                         rows.append(FinancialAccount(
                             account_name=ROW_NAME[k], account_id=ROW_ID[k], statement_type="CF", raw_statement_type="NOTE", basis=basis, fiscal_year=year, report_year=report_year,
@@ -186,9 +203,9 @@ class AnnualReportNoteSource:
             got_years = {r.fiscal_year for r in rows}
             for y in sorted(covered & set(missing)):
                 if y not in got_years:
-                    warnings.append(f"D&A source unavailable for {y}: annual report {filing.receipt_no} notes (cash-flow adjustments / '{NOTE_TITLE}') have no depreciation/amortization row ({basis})")
+                    warnings.append(f"D&A source unavailable for {y}: annual report {filing.receipt_no} notes (cash-flow / expense-by-nature / PPE·intangible) have no complete depreciation+amortization row ({basis})")
             pending = [y for y in pending if y not in covered]
-        if rows:
-            ys = sorted({r.fiscal_year for r in rows})
-            warnings.append(f"D&A for {', '.join(str(y) for y in ys)} taken from annual report notes (cash-flow adjustments / '{NOTE_TITLE}'); not present in OpenDART financial statement accounts")
+        if used_src:
+            detail = "; ".join(f"{y}: {NOTE_LABEL[src]} (annual report {rc})" for y, (src, rc) in sorted(used_src.items()))
+            warnings.append(f"D&A taken from annual report notes because it is not present in OpenDART financial statement accounts — {detail}")
         return rows, list(dict.fromkeys(warnings))
