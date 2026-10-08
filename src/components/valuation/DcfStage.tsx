@@ -90,7 +90,6 @@ export function DcfStage() {
 
   return (
     <>
-      <p className="muted">{SECTION.summary}</p>
 
       <div className="dcf-inputs">
         {/* A. Terminal Value Assumption */}

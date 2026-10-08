@@ -45,7 +45,6 @@ export function CompanySearch({ repository = defaultFinancialRepository }: { rep
 
   return (
     <section className="panel company-search" aria-label="기업 검색">
-      <div className="panel-head"><h3>기업 검색</h3><span className="chip">OpenDART</span></div>
       <form className="row company-form" onSubmit={search} role="search">
         <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="기업명 또는 종목코드 (예: 삼성전자, 005930)" aria-label="기업명 또는 종목코드" />
         <button className="btn primary" type="submit" disabled={busy === 'search' || query.trim() === ''}>{busy === 'search' ? '검색 중…' : 'OpenDART 기업 검색'}</button>
@@ -72,8 +71,10 @@ export function CompanySearch({ repository = defaultFinancialRepository }: { rep
       {view && (
         <div className="company-selected" aria-label="선택한 기업">
           <h4>{view.title}</h4>
-          <dl className="stat-dl">{view.lines.map((l) => <div key={l.label}><dt>{l.label}</dt><dd className="num">{l.value}</dd></div>)}</dl>
-          <p className="small muted">기업만 선택되었습니다. 재무데이터는 자동으로 불러오지 않습니다. 아래 버튼으로 불러오세요.</p>
+          <details className="company-profile">
+            <summary>기업 개황</summary>
+            <dl className="stat-dl">{view.lines.map((l) => <div key={l.label}><dt>{l.label}</dt><dd className="num">{l.value}</dd></div>)}</dl>
+          </details>
           <HistoricalLoadControls compact />
         </div>
       )}

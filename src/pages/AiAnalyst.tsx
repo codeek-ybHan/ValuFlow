@@ -73,13 +73,13 @@ export function AiAnalyst() {
 
   return (
     <div className="ai-page">
-      <PageHeader eyebrow="AI Analyst" title="AI Analyst" actions={<>
+      <PageHeader title="AI Analyst" actions={<>
         <button type="button" className="btn small ai-drawer-btn" aria-expanded={drawer} onClick={() => setDrawer((v) => !v)}>Evidence · Sources</button>
       </>}>
-        <p className="muted">근거를 확인할 수 있는 Valuation 분석 도우미입니다. 계산은 ValuFlow 가 하고, AI 는 결과를 해석합니다. 이 화면에서는 Project 가정과 결과를 바꾸지 않습니다.</p>
+        <p className="muted">계산은 ValuFlow 가, 해석은 AI 가 합니다. 모든 답변은 근거와 함께 표시됩니다.</p>
       </PageHeader>
 
-      <div className="ai-grid">
+      <div className={`ai-grid${active ? '' : ' no-right'}`}>
         <aside className="ai-left" aria-label="대화 기록과 문서">
           <section className="ai-card">
             <div className="panel-head"><h4>History</h4><span className="small muted">{session.turns.length}</span></div>

@@ -19,9 +19,7 @@ export function Valuation() {
   const cur = stages[stageIndex(id)];
   return (
     <>
-      <PageHeader eyebrow="Valuation" title="Valuation Workspace">
-        <p className="lead">금액 단위는 억원, 비율은 소수로 계산하며 화면에서만 반올림해 표시합니다.</p>
-      </PageHeader>
+      <PageHeader title="Valuation" />
       <ValuationControls />
       <ValuationStepper current={id} />
       <h2 className="stage-title">{cur.no}. {cur.label}<span className="source-tag stage-basis" title="이 단계 입력의 출처">{id === 'historical' ? historicalStageBasis(project.historicalProvenance) : STAGE_BASIS[id]}</span></h2>

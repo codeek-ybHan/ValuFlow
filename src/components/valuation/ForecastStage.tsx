@@ -65,7 +65,6 @@ export function ForecastStage() {
 
   return (
     <>
-      <p className="muted">{SECTION.summary}</p>
 
       {/* Current Revenue / Tax Rate */}
       <section className="panel">
@@ -135,7 +134,7 @@ export function ForecastStage() {
           </tbody>
         </table>
       </div>
-      {!ref && <p className="hint">Historical Data 가 없어 과거 참고값을 표시하지 않습니다. 1단계 Historical 에서 [삼성전자 학습용 Historical 불러오기] 를 실행하면 참고값이 나타납니다.</p>}
+      {!ref && <p className="hint">Historical Data 가 없어 과거 참고값을 표시하지 않습니다.</p>}
       {ref && (
         <ul className="plain-list small fc-hints">
           {ref.hints.map((t) => <li key={t} className="num">{t}</li>)}

@@ -73,7 +73,7 @@ export function RelativePanel({ view }: { view: RelativeView }) {
           </div>
         ))}
       </div>
-      {scaleMismatch && <p className="hint">참고: 최근 Actual 값은 삼성전자 기준이고, 현재 가정은 STEP 04 학습용 가정(가상 기업, 매출 1,500억원 규모)이라 규모가 크게 다릅니다. 같은 기업 기준의 값으로 입력하세요.</p>}
+      {scaleMismatch && <p className="hint">Actual 값과 현재 가정의 규모가 크게 다릅니다. 같은 기업 기준의 값을 입력하세요.</p>}
 
       <h4 className="results-title">방법별 결과</h4>
       <div className="table-wrap">

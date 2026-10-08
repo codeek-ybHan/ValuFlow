@@ -87,7 +87,6 @@ export function WaccStage() {
 
   return (
     <>
-      <p className="muted">{SECTION.summary}</p>
 
       <div className="wacc-grid">
         {/* A. Cost of Equity */}

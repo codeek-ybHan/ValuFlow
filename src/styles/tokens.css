@@ -3,13 +3,13 @@
    색은 의미로만 쓴다. 강조/선택/주요 동작은 차콜(명도 대비), 완료·체크는 회색,
    퀴즈 정오답과 오류/주의에만 초록·빨강·앰버를 쓴다. */
 :root {
-  --bg: #f6f6f4;
+  --bg: #fafaf8;
   --surface: #ffffff;
   --surface-2: #fafaf8;
   --sunken: #efefec;
 
-  --line: #e5e5e1;
-  --line-strong: #d0d0cb;
+  --line: #ebebe8;
+  --line-strong: #d6d6d1;
 
   --ink: #1c1e22;
   --ink-2: #44484f;
@@ -41,9 +41,9 @@
   /* Charts */
   --c1: #2a2e35; --c2: #9aa0aa; --c3: #6a717d; --c4: #c6cad1;
 
-  --shadow-1: 0 1px 2px rgba(28, 30, 34, .04);
+  --shadow-1: none;
   --shadow-2: 0 8px 24px rgba(28, 30, 34, .12);
-  --radius: 12px;
+  --radius: 10px;
   --radius-sm: 8px;
 
   --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Segoe UI', sans-serif;
@@ -62,7 +62,7 @@
     --side-bg: #101113; --side-ink: #a3a8b1; --side-ink-strong: #ffffff; --side-label: #6f747d;
     --side-hover: rgba(255, 255, 255, .06); --side-active: rgba(255, 255, 255, .1); --side-line: rgba(255, 255, 255, .1); --side-accent: #e6e7ea;
     --c1: #e6e7ea; --c2: #8b919c; --c3: #b3b8c1; --c4: #5d636e;
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 8px 24px rgba(0, 0, 0, .5);
+    --shadow-1: none; --shadow-2: 0 8px 24px rgba(0, 0, 0, .5);
     color-scheme: dark;
   }
 }
@@ -76,6 +76,6 @@
   --side-bg: #101113; --side-ink: #a3a8b1; --side-ink-strong: #ffffff; --side-label: #6f747d;
   --side-hover: rgba(255, 255, 255, .06); --side-active: rgba(255, 255, 255, .1); --side-line: rgba(255, 255, 255, .1); --side-accent: #e6e7ea;
   --c1: #e6e7ea; --c2: #8b919c; --c3: #b3b8c1; --c4: #5d636e;
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 8px 24px rgba(0, 0, 0, .5);
+  --shadow-1: none; --shadow-2: 0 8px 24px rgba(0, 0, 0, .5);
   color-scheme: dark;
 }

@@ -30,10 +30,9 @@ export function ValidationStage() {
   if (!view) {
     return (
       <>
-        <p className="muted">{SECTION.summary}</p>
         <div className="empty-state">
           <h3>검증할 Valuation 결과가 없습니다</h3>
-          <p>Validation 은 DCF 결과를 기준으로 합니다. 모든 가정을 입력하고 Run Valuation 을 실행하거나, 상단의 [학습용 DCF 가정 적용] 으로 계산하세요. 계산되지 않은 값은 임의로 채우지 않습니다.</p>
+          <p>DCF 결과가 있어야 검증할 수 있습니다. 가정을 입력하고 Run Valuation 을 실행하세요.</p>
           <Link className="btn primary" to="/valuation/dcf">DCF 단계로 이동</Link>
         </div>
         <AssumptionCompleteness assumptions={a} />
@@ -44,8 +43,7 @@ export function ValidationStage() {
 
   return (
     <>
-      <p className="muted">{SECTION.summary}</p>
-      {isPracticeAssumptions(a) && <p className="hint"><span className="chip">학습용 가정</span> STEP 04 가상 실습값 기준의 검증입니다. 실제 기업의 가치평가가 아닙니다.</p>}
+      {isPracticeAssumptions(a) && <p className="hint"><span className="chip">Sample</span> 가상 실습값 기준의 검증입니다.</p>}
 
       <ValidationWarnings view={view} />
       {view.sensitivity && <SensitivityPanel view={view.sensitivity} />}

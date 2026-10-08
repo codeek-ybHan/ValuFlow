@@ -135,7 +135,7 @@ test('출처 표기: 가정이 없으면 미입력, Historical 이 없으면 불
 
 test('상단 패널은 Historical Data 와 Valuation Assumptions 를 따로 표시한다', () => {
   const c = src('../components/valuation/ValuationControls.tsx');
-  for (const needed of ['Historical Data', 'Valuation Assumptions', 'basis.historical.label', 'basis.assumptions.label', '학습용 가정']) assert.ok(c.includes(needed), needed);
+  for (const needed of ['<dt>Historical</dt>', '<dt>Assumptions</dt>', 'basis.historical.label', 'basis.assumptions.label', 'basis.caution']) assert.ok(c.includes(needed), needed);
 });
 
 // ---- 8. 단계별 Source / Basis ----

@@ -16,9 +16,9 @@ export function ReportPage() {
 
   return (
     <div className="rp-page">
-      <PageHeader eyebrow="Report" title="Report"
+      <PageHeader title="Report"
         actions={<button type="button" className="btn primary" onClick={() => void r.generate()}>{g ? 'Regenerate Report' : 'Generate Report'}</button>}>
-        <p className="muted">현재 Project 상태의 snapshot 으로 Valuation Report 를 만듭니다. 숫자는 ValuFlow Engine · 분석 결과를 그대로 옮기고, AI 서술은 검증된 Grounded Claim 만 사용합니다. Report 를 만들어도 Project 가정 · 결과는 바뀌지 않습니다.</p>
+        <p className="muted">현재 Project 상태로 Valuation Report 를 만듭니다. 숫자는 Engine 결과를 그대로 옮깁니다.</p>
       </PageHeader>
 
       {r.stale ? (

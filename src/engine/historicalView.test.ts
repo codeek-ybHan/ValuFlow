@@ -119,5 +119,4 @@ test('Empty State / CTA 문구가 화면 코드에 있다', () => {
   assert.ok(src.includes('No historical data loaded'));
   assert.ok(src.includes('삼성전자 학습용 Historical 불러오기'));
   assert.ok(src.includes('Continue to Forecast'));
-  assert.ok(src.includes('Use historical trends to build forecast assumptions'));
 });

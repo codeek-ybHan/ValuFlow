@@ -72,7 +72,7 @@ const STATUS_CLASS: Record<string, string> = { available: '', ambiguous: 'warn',
 /** 데이터 품질: 검토 필요 / 데이터 노트, 필드 상태, 대표 계정의 출처 보기. 오류가 아니라 참고 수준으로 표현한다. */
 export function DataQualityPanel({ quality }: { quality: DataQuality | null }) {
   const view = buildQualityView(quality);
-  if (!view) return <p className="hint">학습용 fixture 는 계정 매핑 정보가 없어 데이터 품질 상세를 제공하지 않습니다.</p>;
+  if (!view) return null;   // 샘플(fixture)은 계정 매핑 정보가 없어 품질 상세가 없다
   const review = view.notes.filter((n) => n.level === 'review');
   const notes = view.notes.filter((n) => n.level === 'note');
   return (
@@ -84,15 +84,18 @@ export function DataQualityPanel({ quality }: { quality: DataQuality | null }) {
           <ul className="plain-list small">{review.map((n) => <li key={n.text}>{n.text}</li>)}</ul>
         </div>
       )}
-      {notes.length > 0 && (
-        <div className="dq-notes" data-level="note">
-          <strong className="small">Data Note</strong>
-          <ul className="plain-list small muted">{notes.map((n) => <li key={n.text}>{n.text}</li>)}</ul>
-        </div>
-      )}
-      <ul className="dq-fields" aria-label="필드별 상태">
-        {view.fields.map((f) => <li key={f.field} className={STATUS_CLASS[f.status]}><span>{f.label}</span><span className="chip">{f.status}</span></li>)}
-      </ul>
+      <details className="dq-detail">
+        <summary>필드별 상태 · 데이터 노트</summary>
+        {notes.length > 0 && (
+          <div className="dq-notes" data-level="note">
+            <strong className="small">Data Note</strong>
+            <ul className="plain-list small muted">{notes.map((n) => <li key={n.text}>{n.text}</li>)}</ul>
+          </div>
+        )}
+        <ul className="dq-fields" aria-label="필드별 상태">
+          {view.fields.map((f) => <li key={f.field} className={STATUS_CLASS[f.status]}><span>{f.label}</span><span className="chip">{f.status}</span></li>)}
+        </ul>
+      </details>
       <details className="dq-sources">
         <summary>출처 보기 (Mapping Trace)</summary>
         <table className="fin-table">

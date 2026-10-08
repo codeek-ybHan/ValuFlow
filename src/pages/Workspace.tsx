@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { PageHeader, StatusBadge, fmtNum, fmtPct } from '../components/ui';
+import { PageHeader, fmtNum, fmtPct } from '../components/ui';
 import { useProject } from '../store/project';
 import { analyzeHistorical, type MetricSeries } from '../engine/historicalAnalysis';
 import type { HistoricalData } from '../data/types';
@@ -87,60 +87,53 @@ export function Workspace() {
   const { project, loadSamsung, reset } = useProject();
   const h = project.historicalData;
   const [tab, setTab] = useState<Tab>('Overview');
-  const [msg, setMsg] = useState<string | null>(null);
   const period = h?.company.period;
   const prov = h ? provenanceView(h, project.historicalProvenance) : null;
 
   return (
     <>
-      <PageHeader eyebrow="Workspace" title={h ? h.company.name : 'Workspace'}>
+      <PageHeader title={h ? h.company.name : 'Workspace'}
+        actions={h ? <button className="btn small" onClick={() => { reset(); setTab('Overview'); }}>입력값 초기화</button> : undefined}>
         <p className="muted">
           {h
-            ? `${h.company.ticker} · ${period![0].replace('A', '')} – ${period![period!.length - 1].replace('A', '')} · ${h.company.basis} · ${h.company.currency} ${h.company.unit}`
-            : '기업의 원천 재무데이터를 확인하는 영역입니다. 아직 불러온 데이터가 없습니다.'}
+            ? `${h.company.ticker} · ${period![0].replace('A', '')} – ${period![period!.length - 1].replace('A', '')} · ${h.company.basis} · ${h.company.currency} ${h.company.unit}${prov!.actual ? ` · ${prov!.sourceLabel}` : ' · Sample'}`
+            : '기업을 검색해 재무데이터를 불러오세요.'}
         </p>
       </PageHeader>
 
       <CompanySearch />
 
-      <h3 className="section-title">학습용 Historical <span className="chip">Fixture</span></h3>
-      <p className="small muted">OpenDART 기업 선택과는 별개입니다. 선택한 기업에 이 학습용 재무데이터가 붙지 않습니다.</p>
-      <div className="row action-row">
-        <button className="btn primary" onClick={() => { loadSamsung(); setMsg('삼성전자 FY2023~FY2025 학습 데이터를 불러왔습니다.'); }}>삼성전자 학습용 Historical 불러오기</button>
-        <button className="btn" onClick={() => { reset(); setMsg(null); setTab('Overview'); }} disabled={!h}>입력값 초기화</button>
-      </div>
+      <details className="sample-menu">
+        <summary>샘플 데이터</summary>
+        <p className="small muted">OpenDART 와 무관한 오프라인 샘플입니다.</p>
+        <button className="btn small" onClick={() => loadSamsung()}>삼성전자 학습용 Historical 불러오기</button>
+      </details>
 
-      {msg && h && (
-        <div className="callout" role="status">
-          {msg}<br />
-          <span className="small">Historical data: 공시 기반 · Forecast assumptions: 사용자 입력 필요</span>
-        </div>
-      )}
-
-      <nav className="steptabs" aria-label="Workspace 탭">
-        {TABS.map((t) => <button key={t} type="button" className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>{t}</button>)}
-      </nav>
-
-      {!h ? (
-        <div className="coming">
-          <StatusBadge label="NO DATA" />
-          <p className="muted">기업을 검색·선택한 뒤 [재무데이터 불러오기] 를 누르면 실제 Historical Financials 가 채워집니다. [삼성전자 학습용 Historical 불러오기] 는 학습용 fixture 입니다. 값을 임의로 만들지 않습니다.</p>
-        </div>
-      ) : tab === 'Overview' ? (
-        <section className="panel">
-          <div className="panel-head"><h3>Historical Financials</h3><StatusBadge label="COMPLETE" /></div>
-          <dl className="stat-dl">
-            <div><dt>Historical Financials</dt><dd>✓ Loaded · {prov!.actual ? `Actual · ${prov!.sourceLabel}` : 'Fixture (학습용)'}</dd></div>
-            <div><dt>Forecast Assumptions</dt><dd>미입력 (Valuation 에서 입력)</dd></div>
-          </dl>
-          <ProvenanceList h={h} provenance={project.historicalProvenance} />
-          {prov!.actual && <DataQualityPanel quality={project.historicalQuality} />}
-          <p className="small muted">탭에서 재무제표와 파생지표를 확인하세요. 이 화면의 값은 모두 Actual(A)이며, 가치평가 가정은 포함하지 않습니다.</p>
-        </section>
-      ) : tab === 'Historical Analysis' ? (
-        <Analysis h={h} />
-      ) : (
-        <Statements tab={tab} h={h} />
+      {!h ? null : (
+        <>
+          <nav className="steptabs" aria-label="Workspace 탭">
+            {TABS.map((t) => <button key={t} type="button" className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>{t}</button>)}
+          </nav>
+          {tab === 'Overview' ? (
+            <>
+              <FinTable period={h.company.period} rows={[
+                { label: 'Revenue', values: h.incomeStatement.revenue },
+                { label: 'Operating Profit', values: h.incomeStatement.operatingProfit },
+                { label: 'Net Income', values: h.incomeStatement.netIncome },
+                { label: 'CFO', values: h.cashFlow.cfo },
+              ]} />
+              <details className="source-detail">
+                <summary>출처 · 데이터 품질</summary>
+                <ProvenanceList h={h} provenance={project.historicalProvenance} />
+                {prov!.actual && <DataQualityPanel quality={project.historicalQuality} />}
+              </details>
+            </>
+          ) : tab === 'Historical Analysis' ? (
+            <Analysis h={h} />
+          ) : (
+            <Statements tab={tab} h={h} />
+          )}
+        </>
       )}
     </>
   );
