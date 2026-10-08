@@ -63,7 +63,15 @@ test('Fixture 와 OpenDART 는 상태와 표시가 모두 구분된다', async (
   const both = withSamsungHistorical(picked);
   assert.equal(both.selectedCompany, res.company);
   assert.equal(both.historicalData, samsungHistoricalData);
-  assert.equal(withSelectedCompany(both, null).historicalData, samsungHistoricalData);
+  // 기업을 해제하거나 다른 기업으로 바꾸면 이전 기업의 Historical · 가정 · 결과가 모두 사라진다 (같은 기업을 다시 고르면 유지)
+  const withAssumptions = withPracticeAssumptions(both);
+  assert.ok(withAssumptions.valuationResult);
+  assert.equal(withSelectedCompany(withAssumptions, res.company).valuationResult, withAssumptions.valuationResult);
+  for (const next of [null, { ...res.company, corpCode: '00164779', corpName: 'SK하이닉스' }]) {
+    const switched = withSelectedCompany(withAssumptions, next);
+    assert.deepEqual([switched.historicalData, switched.historicalProvenance, switched.valuationAssumptions, switched.valuationResult, switched.sensitivityResult, switched.relativeInputs], [null, null, null, null, null, {}]);
+    assert.equal(switched.selectedCompany, next);
+  }
   assert.equal(withPracticeAssumptions(both).selectedCompany, res.company);
   // 출처 표시
   assert.deepEqual(historicalSourceView(samsungHistoricalData), { source: 'Fixture', label: 'Fixture (학습용)', fetchedAt: null });
@@ -75,15 +83,14 @@ test('Fixture 와 OpenDART 는 상태와 표시가 모두 구분된다', async (
   const ws = readFileSync(new URL('../pages/Workspace.tsx', import.meta.url), 'utf8');
   const cs = readFileSync(new URL('../components/CompanySearch.tsx', import.meta.url), 'utf8');
   assert.ok(cs.includes('OpenDART 기업 검색'));
-  assert.ok(ws.includes('삼성전자 학습용 Historical 불러오기'));
+  assert.ok(!ws.includes('loadSamsung') && !ws.includes('삼성전자 학습용 Historical 불러오기'), '기업 선택 없이 fixture 데이터를 만드는 버튼은 없다');
   assert.ok(ws.includes('<CompanySearch'));
 });
 
 test('선택 기업은 저장 / 복원되고, 손상된 값은 버려진다. 기업 선택은 가정 결과를 건드리지 않는다', async () => {
   const res = await selectCompany(repo(), profile);
   assert.ok(res.ok);
-  const s = withSelectedCompany(withPracticeAssumptions(emptyProjectState), res.company);
-  assert.equal(s.valuationResult, withPracticeAssumptions(emptyProjectState).valuationResult === null ? null : s.valuationResult);
+  const s = withPracticeAssumptions(withSelectedCompany(emptyProjectState, res.company));   // 기업 선택 → 학습용 가정은 명시적으로 적용했을 때만
   assert.ok(s.valuationResult, '가정 / 결과 유지');
   const restored = restoreProjectState(JSON.parse(JSON.stringify(toPersisted(s))));
   assert.deepEqual(restored.selectedCompany, res.company);

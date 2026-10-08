@@ -71,9 +71,18 @@ function toMessage(e: unknown): string {
 
 // ---- 상태 전이 (모두 새 상태를 반환하며 입력 상태를 변경하지 않는다) ----
 
-/** 기업만 선택한다. 가정 · 결과 · historicalData 는 건드리지 않는다 (재무데이터는 STEP 06-3 에서 별도로 불러온다). */
+/**
+ * 기업을 선택 · 변경 · 해제한다. 다른 기업(또는 해제)이 되면 이전 기업의 Historical · 가정 · 결과 · 상대가치 입력을 모두 비운다
+ * (이전 기업 데이터가 새 기업 화면에 남지 않도록). 같은 기업을 다시 고르면 현재 상태를 그대로 둔다 (재무데이터는 별도로 불러온다).
+ */
 export function withSelectedCompany(state: ProjectState, selectedCompany: SelectedCompany | null): ProjectState {
-  return { ...state, selectedCompany };
+  if (selectedCompany !== null && state.selectedCompany?.corpCode === selectedCompany.corpCode) return { ...state, selectedCompany };
+  return { ...emptyProjectState, selectedCompany };
+}
+
+/** 이 상태에서 학습용 가정을 적용할 수 있는가: 기업을 선택했고 Historical 이 불러와진 뒤에만 (명시적으로 눌렀을 때). */
+export function canApplyPractice(state: ProjectState): boolean {
+  return state.selectedCompany !== null && state.historicalData !== null;
 }
 
 /** 데이터의 meta 로 출처를 추정한다 (provenance 없이 설정되거나 이전 버전에서 저장된 데이터). */
@@ -286,10 +295,16 @@ function sanitizeRelativeInputs(raw: unknown): RelativeInput {
  */
 export function restoreProjectState(raw: unknown): ProjectState {
   const p = (typeof raw === 'object' && raw !== null ? raw : {}) as Partial<PersistedProject>;
+  // 선택한 기업이 없으면 이전 세션의 어떤 데이터(Historical · 가정 · fixture)도 복원하지 않는다: 첫 화면은 항상 빈 상태다.
+  const selectedCompany = sanitizeSelectedCompany(p.selectedCompany);
+  if (selectedCompany === null) return emptyProjectState;
+  const historical = restoreHistorical(p);
+  // 저장된 Historical 이 다른 기업의 것이면(출처의 corpCode 불일치) 그 기업의 가정과 함께 버린다.
+  if (historical.historicalProvenance?.corpCode && historical.historicalProvenance.corpCode !== selectedCompany.corpCode) return { ...emptyProjectState, selectedCompany };
   const base: ProjectState = {
     ...emptyProjectState,
-    selectedCompany: sanitizeSelectedCompany(p.selectedCompany),
-    ...restoreHistorical(p),
+    selectedCompany,
+    ...historical,
     valuationAssumptions: p.valuationAssumptions ?? null,
     relativeInputs: sanitizeRelativeInputs(p.relativeInputs),
   };

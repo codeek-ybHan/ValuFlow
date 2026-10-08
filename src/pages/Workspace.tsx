@@ -84,7 +84,7 @@ function Analysis({ h }: { h: HistoricalData }) {
 }
 
 export function Workspace() {
-  const { project, loadSamsung, reset } = useProject();
+  const { project, reset } = useProject();
   const h = project.historicalData;
   const [tab, setTab] = useState<Tab>('Overview');
   const period = h?.company.period;
@@ -102,12 +102,6 @@ export function Workspace() {
       </PageHeader>
 
       <CompanySearch />
-
-      <details className="sample-menu">
-        <summary>샘플 데이터</summary>
-        <p className="small muted">OpenDART 와 무관한 오프라인 샘플입니다.</p>
-        <button className="btn small" onClick={() => loadSamsung()}>삼성전자 학습용 Historical 불러오기</button>
-      </details>
 
       {!h ? null : (
         <>

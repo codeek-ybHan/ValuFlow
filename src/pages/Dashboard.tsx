@@ -1,18 +1,27 @@
 import { Link } from 'react-router-dom';
 import { useProject } from '../store/project';
 import { isPracticeAssumptions } from '../store/projectModel';
-import { fmtNum, fmtPct } from '../components/ui';
+import { NoCompanyState, fmtNum, fmtPct } from '../components/ui';
 import { buildWorkflowProgress } from '../store/workflowStatus';
 
 /** 핵심만: 현재 기업 · 가치평가 결과 4개 숫자 · 다음에 할 일 · 진행 단계. */
 export function Dashboard() {
   const { project } = useProject();
+  // 기업을 선택하기 전에는 KPI · Workflow · Historical 어떤 데이터도 보이지 않는다
+  if (!project.selectedCompany) {
+    return (
+      <>
+        <header className="dash-head"><div><h1>ValuFlow</h1><p className="muted">OpenDART 재무제표에서 DCF 가치평가와 근거 있는 AI 분석까지.</p></div></header>
+        <NoCompanyState />
+      </>
+    );
+  }
   const h = project.historicalData;
   const r = project.valuationResult;
   const progress = buildWorkflowProgress(project);
   const sample = isPracticeAssumptions(project.valuationAssumptions);
 
-  const cta = !h ? { to: '/workspace', label: '기업 선택하기' }
+  const cta = !h ? { to: '/workspace', label: '재무데이터 불러오기' }
     : !r ? { to: '/valuation', label: 'Valuation 시작' }
     : { to: '/report', label: 'Report 만들기' };
 
@@ -27,10 +36,10 @@ export function Dashboard() {
     <>
       <header className="dash-head">
         <div>
-          <h1>{h ? h.company.name : 'ValuFlow'}</h1>
+          <h1>{project.selectedCompany.corpName}</h1>
           <p className="muted">
             {h ? `${h.company.ticker} · ${h.company.period.join(' · ')} · ${h.company.basis}`
-              : 'OpenDART 재무제표에서 DCF 가치평가와 근거 있는 AI 분석까지.'}
+              : '재무데이터를 불러오면 가치평가를 시작할 수 있습니다.'}
           </p>
         </div>
         <Link className="btn primary" to={cta.to}>{cta.label}</Link>

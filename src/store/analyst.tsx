@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { BackendAiClient, type AiGatewayClient } from '../ai/client.ts';
 import { askAnalyst, cancelledTurn, resolveMode, type Progress } from '../ai/analyst/ask.ts';
 import { activeTurn, addTurn, decideCheckpoint, emptySession, selectTurn, type AnalystSession } from '../ai/analyst/session.ts';
@@ -34,6 +34,20 @@ export function AnalystProvider({ children, client, initial, persistence }: { ch
   const pending = useRef<{ question: string } | null>(null);
   const latest = useRef({ project, historicalStatus });
   latest.current = { project, historicalStatus };
+
+  // 기업을 바꾸거나 해제하면 이전 기업의 대화 · 진행 중이던 질문을 버린다 (새 기업 기준으로 시작, 이전 기업 context 가 남지 않는다)
+  const corpCode = project.selectedCompany?.corpCode ?? null;
+  const prevCorp = useRef(corpCode);
+  useEffect(() => {
+    if (prevCorp.current === corpCode) return;
+    prevCorp.current = corpCode;
+    if (abort.current) abort.current.aborted = true;
+    abort.current = null;
+    pending.current = null;
+    seq.current += 1;
+    setRunning(null);
+    setSession(emptySession);
+  }, [corpCode]);
 
   const ask = useCallback(async (question: string) => {
     const q = question.trim();

@@ -10,7 +10,7 @@ import type { DcfInputs } from '../engine/dcfForm';
 import type { RelativeInput } from '../valuation';
 import {
   emptyProjectState, restoreProjectState, toPersisted, withAssumptions, withForecastInputs, withHistoricalData, withPracticeAssumptions,
-  withResultsCleared, withWaccInputs, withDcfInputs, withRelativeInputs, withSamsungHistorical, withSelectedCompany, withHistoricalCleared, needsHistoricalRefetch, withSensitivityRun, withValuationReset, withValuationRun, type ProjectState,
+  withResultsCleared, withWaccInputs, withDcfInputs, withRelativeInputs, canApplyPractice, withSelectedCompany, withHistoricalCleared, needsHistoricalRefetch, withSensitivityRun, withValuationReset, withValuationRun, type ProjectState,
 } from './projectModel';
 
 // PROJECT 영역 상태 (LEARN 상태 store/state.tsx 와 분리). 상태 전이는 projectModel.ts 의 순수 함수가 담당하고,
@@ -60,9 +60,7 @@ interface Ctx {
   loadHistorical: (options?: { refresh?: boolean }) => Promise<void>;
   /** Historical 만 제거 (기업 선택 · Valuation 가정은 유지) */
   removeHistorical: () => void;
-  /** 삼성전자 FY2023~FY2025 불러오기 (historicalData 만) */
-  loadSamsung: () => void;
-  /** STEP 04 학습용 가정 적용 + 계산 */
+  /** STEP 04 학습용 가정 적용 + 계산. 기업 선택과 Historical 로드 이후에만 동작한다 (명시적으로 눌렀을 때만 가정이 들어온다). */
   applyPracticeAssumptions: () => void;
   /** 모든 PROJECT 입력 초기화 */
   reset: () => void;
@@ -86,7 +84,11 @@ export function ProjectProvider({ children, repository = defaultFinancialReposit
     }
   }, [persisted]);
 
-  const setSelectedCompany = useCallback((c: SelectedCompany | null) => setProject((p) => withSelectedCompany(p, c)), []);
+  const setSelectedCompany = useCallback((c: SelectedCompany | null) => {
+    // 다른 기업(또는 해제)으로 바뀌면 진행 중이던 이전 기업의 Historical 요청 결과를 버리고 상태 표시도 초기화한다
+    if (c === null || latest.current.selectedCompany?.corpCode !== c.corpCode) { seq.current += 1; setHistoricalStatus({ kind: 'idle' }); }
+    setProject((p) => withSelectedCompany(p, c));
+  }, []);
   const setHistoricalData = useCallback((h: HistoricalData | null) => setProject((p) => withHistoricalData(p, h)), []);
   const setValuationAssumptions = useCallback((a: AssumptionsDraft | null) => setProject((p) => withAssumptions(p, a)), []);
   const setForecastInputs = useCallback((f: ForecastInputs) => setProject((p) => withForecastInputs(p, f)), []);
@@ -97,8 +99,7 @@ export function ProjectProvider({ children, repository = defaultFinancialReposit
   const runCurrentValuation = useCallback(() => setProject(withValuationRun), []);
   const runCurrentSensitivity = useCallback(() => setProject(withSensitivityRun), []);
   const resetValuation = useCallback(() => setProject(withValuationReset), []);
-  const loadSamsung = useCallback(() => setProject(withSamsungHistorical), []);
-  const applyPracticeAssumptions = useCallback(() => setProject(withPracticeAssumptions), []);
+  const applyPracticeAssumptions = useCallback(() => setProject((p) => (canApplyPractice(p) ? withPracticeAssumptions(p) : p)), []);
   const reset = useCallback(() => { seq.current += 1; setHistoricalStatus({ kind: 'idle' }); setProject(emptyProjectState); }, []);
   const removeHistorical = useCallback(() => { seq.current += 1; setHistoricalStatus({ kind: 'idle' }); setProject(withHistoricalCleared); }, []);
 
@@ -137,8 +138,8 @@ export function ProjectProvider({ children, repository = defaultFinancialReposit
   }, []);
 
   const value = useMemo(
-    () => ({ project, historicalStatus, loadHistorical, removeHistorical, setSelectedCompany, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, setDcfInputs, setRelativeInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, loadSamsung, applyPracticeAssumptions, reset }),
-    [project, historicalStatus, loadHistorical, removeHistorical, setSelectedCompany, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, setDcfInputs, setRelativeInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, loadSamsung, applyPracticeAssumptions, reset],
+    () => ({ project, historicalStatus, loadHistorical, removeHistorical, setSelectedCompany, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, setDcfInputs, setRelativeInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, applyPracticeAssumptions, reset }),
+    [project, historicalStatus, loadHistorical, removeHistorical, setSelectedCompany, setHistoricalData, setValuationAssumptions, setForecastInputs, setWaccInputs, setDcfInputs, setRelativeInputs, clearStaleResults, runCurrentValuation, runCurrentSensitivity, resetValuation, applyPracticeAssumptions, reset],
   );
   return <ProjectCtx.Provider value={value}>{children}</ProjectCtx.Provider>;
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { hasRelativeInputs, practiceApplyNeedsConfirmation } from '../../store/projectModel';
+import { canApplyPractice, hasRelativeInputs, practiceApplyNeedsConfirmation } from '../../store/projectModel';
 import { assumptionCompleteness } from '../../store/assumptions';
 import { describeBasis } from '../../store/workflowStatus';
 import { useProject } from '../../store/project';
@@ -10,7 +10,7 @@ const closeMenu = (e: React.MouseEvent<HTMLElement>) => { const d = e.currentTar
 
 /** Valuation 상단: 기업, 데이터/가정 불러오기, 실행, 상태, 오류. 계산은 store(→ valuation 공개 API)가 하고 여기서는 호출만 한다. */
 export function ValuationControls() {
-  const { project, loadSamsung, applyPracticeAssumptions, runCurrentValuation, runCurrentSensitivity, resetValuation } = useProject();
+  const { project, applyPracticeAssumptions, runCurrentValuation, runCurrentSensitivity, resetValuation } = useProject();
   const { historicalData: h, valuationAssumptions: a, valuationResult, sensitivityResult, valuationError, sensitivityError } = project;
   const completeness = assumptionCompleteness(a);
   const basis = describeBasis(project);
@@ -25,6 +25,7 @@ export function ValuationControls() {
   const onPractice = () => (practiceApplyNeedsConfirmation(project) ? setConfirming(true) : applyPracticeAssumptions());
 
   const sample = basis.assumptions.basis === 'learning';
+  const practiceReady = canApplyPractice(project);   // 기업 선택 + Historical 로드 이후에만
   return (
     <section className="vc" aria-label="Valuation 상태">
       <div className="vc-top">
@@ -44,8 +45,7 @@ export function ValuationControls() {
           <details className="sample-menu inline">
             <summary>샘플</summary>
             <div className="sample-pop">
-              <button className="btn small" onClick={(e) => { closeMenu(e); loadSamsung(); }}>삼성전자 학습용 Historical 불러오기</button>
-              <button className="btn small" onClick={(e) => { closeMenu(e); onPractice(); }}>학습용 DCF 가정 적용</button>
+              <button className="btn small" disabled={!practiceReady} title={practiceReady ? 'STEP 04 가상 실습값을 가정으로 넣습니다 (직접 누를 때만 적용됩니다).' : '기업을 선택하고 재무데이터를 불러온 뒤에 사용할 수 있습니다.'} onClick={(e) => { closeMenu(e); onPractice(); }}>학습용 DCF 가정 적용</button>
             </div>
           </details>
         </div>

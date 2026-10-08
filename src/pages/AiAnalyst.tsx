@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PageHeader } from '../components/ui';
+import { NoCompanyState, PageHeader } from '../components/ui';
 import { buildAiContext } from '../ai/context.ts';
 import { snapshotId } from '../ai/agent/run.ts';
 import { resolveMode } from '../ai/analyst/ask.ts';
@@ -47,7 +47,14 @@ function Answer({ turn, selected, onSelect, debug, onDecide }: { turn: AnalystTu
   );
 }
 
+/** 기업을 선택하기 전에는 질문 · 기록 · 문서 영역 없이 빈 상태만 보여 준다 (실행 불가). */
 export function AiAnalyst() {
+  const { project } = useProject();
+  if (!project.selectedCompany) return <div className="ai-page"><PageHeader title="AI Analyst" /><NoCompanyState /></div>;
+  return <AiAnalystView />;
+}
+
+function AiAnalystView() {
   const { project, historicalStatus } = useProject();
   const { session, active, running, preference, setPreference, ask, cancel, select, decide } = useAnalyst();
   const kn = useKnowledge();

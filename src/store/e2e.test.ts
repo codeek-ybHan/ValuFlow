@@ -10,6 +10,7 @@ import {
   withRelativeInputs, withSamsungHistorical, withSensitivityRun, withValuationReset, withValuationRun, withWaccInputs, type ProjectState,
 } from './projectModel.ts';
 import { assumptionBasis, buildWorkflowProgress, describeBasis, stageStatuses } from './workflowStatus.ts';
+import { withTestCompany } from './testCompany.ts';
 import { isCompleteAssumptions } from './assumptions.ts';
 import { buildValidationView } from '../engine/validationView.ts';
 import { parseForecastForm, forecastDraftToForm, type ForecastFormValues } from '../engine/forecastForm.ts';
@@ -149,7 +150,7 @@ test('Flow B: 삼성전자 Historical + Forecast / WACC / DCF 직접 입력 → 
 // ===========================================================================
 const calculatedManual = (): ProjectState =>
   withRelativeInputs(
-    withSensitivityRun(withValuationRun(withDcfInputs(withWaccInputs(withForecastInputs(withSamsungHistorical(emptyProjectState), parsedForecast()), parsedWacc()), parsedDcf()))),
+    withSensitivityRun(withValuationRun(withDcfInputs(withWaccInputs(withForecastInputs(withSamsungHistorical(withTestCompany(emptyProjectState)), parsedForecast()), parsedWacc()), parsedDcf()))),
     { netIncome: 150, per: 12, ebitda: 220, evEbitda: 10 },
   );
 
@@ -176,7 +177,7 @@ test('Reload: stale 결과가 없다 — 저장된 입력이 바뀐 뒤 복원�
 });
 
 test('Reload: 입력이 일부뿐이면 복원은 되지만 결과는 만들어지지 않는다', () => {
-  const partial = withWaccInputs(withForecastInputs(withSamsungHistorical(emptyProjectState), parsedForecast()), parsedWacc());
+  const partial = withWaccInputs(withForecastInputs(withSamsungHistorical(withTestCompany(emptyProjectState)), parsedForecast()), parsedWacc());
   const after = restoreProjectState(JSON.parse(JSON.stringify(toPersisted(partial))));
   assert.deepEqual(after.valuationAssumptions, partial.valuationAssumptions);
   assert.equal(after.valuationResult, null);

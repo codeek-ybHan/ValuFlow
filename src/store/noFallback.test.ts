@@ -4,6 +4,7 @@
 //   3. Forecast 만 입력된 상태를 완전한 ValuationInput 으로 강제 완성하지 않는다.
 //   4. Forecast / WACC / DCF·Equity 가 모두 준비되기 전에는 Run Valuation 이 불가능하다.
 import { test } from 'node:test';
+import { withTestCompany } from './testCompany.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { step04PracticeAssumptions as fixture } from '../data/step04PracticeAssumptions.ts';
@@ -198,7 +199,7 @@ test('불변 조건: [학습용 DCF 가정 적용] 없이 어떤 순서로 동�
 // 저장 / 복원
 // ---------------------------------------------------------------------------
 test('reload: 일부만 입력된 가정은 복원 후에도 완성되지 않고 fixture 로 채워지지 않는다', () => {
-  const partial = withForecastInputs(withSamsungHistorical(emptyProjectState), realForecast);
+  const partial = withForecastInputs(withSamsungHistorical(withTestCompany(emptyProjectState)), realForecast);
   const restored = restoreProjectState(JSON.parse(JSON.stringify(toPersisted(partial))));
   assert.deepEqual(restored.valuationAssumptions, partial.valuationAssumptions);
   for (const k of FIXTURE_ONLY_KEYS) assert.equal(restored.valuationAssumptions![k], undefined);

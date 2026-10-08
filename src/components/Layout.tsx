@@ -11,7 +11,7 @@ export function Layout() {
   const { project } = useProject();
   const { pathname } = useLocation();
   const nav = navActive(pathname);
-  const company = project.historicalData?.company;
+  const company = project.selectedCompany;
   const inLearn = pathname.startsWith('/learn');
 
   // 라우트가 바뀌면 화면 맨 위로 이동한다.
@@ -32,7 +32,7 @@ export function Layout() {
           </nav>
           <div className="topnav-right">
             <Link to="/workspace" className={`company-chip${company ? ' on' : ''}`} title="Workspace 로 이동">
-              <i aria-hidden />{company ? `${company.name} · ${company.ticker}` : '기업 미선택'}
+              <i aria-hidden />{company ? `${company.corpName}${company.stockCode ? ` · ${company.stockCode}` : ''}` : '기업 미선택'}
             </Link>
             <Link to="/learn" className={`learn-link${inLearn ? ' active' : ''}`}>Learn</Link>
             <ThemeToggle />

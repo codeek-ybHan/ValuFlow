@@ -12,15 +12,24 @@ import { restoreProjectState } from '../../store/projectModel.ts';
 import type { AnalystSession } from '../../ai/analyst/session';
 import type { PdfStatus } from './model.ts';
 
-export type HarnessOptions = { session?: AnalystSession; ai?: AiAnalysisInput | null; generated?: boolean; blocked?: boolean; pdf?: PdfStatus; selected?: string | null; touched?: boolean; hideOptional?: string[]; staleSnapshot?: boolean; saved?: ReportInitial['saved']; admin?: boolean };
+export type HarnessOptions = { session?: AnalystSession; ai?: AiAnalysisInput | null; generated?: boolean; blocked?: boolean; pdf?: PdfStatus; selected?: string | null; touched?: boolean; hideOptional?: string[]; staleSnapshot?: boolean; saved?: ReportInitial['saved']; admin?: boolean; noCompany?: boolean };
+
+/** 테스트용 선택 기업. 저장된 Project 에 선택 기업이 없으면 넣어 준다 (기업을 선택하기 전에는 화면이 빈 상태이므로). `noCompany` 로 빈 상태를 재현한다. */
+const TEST_COMPANY = { corpCode: '00126380', corpName: '삼성전자', corpNameEng: 'SAMSUNG ELECTRONICS CO.,LTD', stockCode: '005930', corpClass: 'Y', source: 'OpenDART', fetchedAt: '2026-10-08T00:00:00Z' };
+function withCompany(json: string | null, noCompany?: boolean): string | null {
+  if (noCompany) return json;
+  const o = json ? JSON.parse(json) : {};
+  return JSON.stringify(o.selectedCompany ? o : { ...o, selectedCompany: TEST_COMPANY });
+}
 
 export function renderReport(persistedProject: string | null, o: HarnessOptions = {}): string {
-  const store = { getItem: () => persistedProject, setItem: () => undefined, removeItem: () => undefined };
+  const injected = withCompany(persistedProject, o.noCompany);
+  const store = { getItem: () => injected, setItem: () => undefined, removeItem: () => undefined };
   (globalThis as { localStorage?: unknown }).localStorage = store;
   try {
     const initial: ReportInitial = { pdf: o.pdf, selectedAnalysisId: o.selected ?? null, touched: o.touched, saved: o.saved, hideOptional: (o.hideOptional ?? []) as never };
     if (o.generated || o.blocked) {
-      const project = persistedProject ? restoreProjectState(JSON.parse(persistedProject)) : restoreProjectState({});
+      const project = injected ? restoreProjectState(JSON.parse(injected)) : restoreProjectState({});
       const r = generateReport(buildReportInput(project, { aiAnalysis: o.ai ?? null, now: () => new Date('2026-10-08T01:02:03Z') }), { hideOptional: (o.hideOptional ?? []) as never });
       if (r.status === 'ok') {
         if (o.staleSnapshot) r.model.metadata.snapshot.contextSnapshotId = 'ctx-old00000';

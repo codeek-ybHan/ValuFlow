@@ -1,5 +1,6 @@
 // STEP 07-6: 상대가치 입력(relativeInputs)의 상태 동작. Valuation 가정 / 결과와는 별개의 입력이다.
 import { test } from 'node:test';
+import { TEST_COMPANY, withTestCompany } from './testCompany.ts';
 import assert from 'node:assert/strict';
 import { step04PracticeAssumptions as fixture } from '../data/step04PracticeAssumptions.ts';
 import {
@@ -59,7 +60,7 @@ test('상대가치 입력은 가정 완성도에 영향을 주지 않는다', ()
 });
 
 test('저장 대상에 포함되고 reload 후 그대로 복원된다', () => {
-  const s = withRelativeInputs(withPracticeAssumptions(emptyProjectState), { netIncome: 150, per: 12, ebitda: 220, evEbitda: 10 });
+  const s = withRelativeInputs(withPracticeAssumptions(withTestCompany(emptyProjectState)), { netIncome: 150, per: 12, ebitda: 220, evEbitda: 10 });
   const persisted = toPersisted(s);
   assert.deepEqual(persisted.relativeInputs, { netIncome: 150, per: 12, ebitda: 220, evEbitda: 10 });
   const restored = restoreProjectState(JSON.parse(JSON.stringify(persisted)));
@@ -68,11 +69,11 @@ test('저장 대상에 포함되고 reload 후 그대로 복원된다', () => {
 });
 
 test('옛 저장 형식(relativeInputs 없음)이나 손상된 값은 안전하게 복원된다', () => {
-  assert.deepEqual(restoreProjectState({ historicalData: null, valuationAssumptions: null }).relativeInputs, {});
-  const dirty = restoreProjectState({ relativeInputs: { netIncome: 150, per: 'abc', bookEquity: NaN, pbr: null, ebitda: Infinity, evEbitda: 10, hacked: 1 } });
+  assert.deepEqual(restoreProjectState({ selectedCompany: TEST_COMPANY, historicalData: null, valuationAssumptions: null }).relativeInputs, {});
+  const dirty = restoreProjectState({ selectedCompany: TEST_COMPANY, relativeInputs: { netIncome: 150, per: 'abc', bookEquity: NaN, pbr: null, ebitda: Infinity, evEbitda: 10, hacked: 1 } });
   assert.deepEqual(dirty.relativeInputs, { netIncome: 150, evEbitda: 10 });
-  assert.deepEqual(restoreProjectState({ relativeInputs: 'oops' }).relativeInputs, {});
-  assert.deepEqual(restoreProjectState({ relativeInputs: [1, 2] }).relativeInputs, {});
+  assert.deepEqual(restoreProjectState({ selectedCompany: TEST_COMPANY, relativeInputs: 'oops' }).relativeInputs, {});
+  assert.deepEqual(restoreProjectState({ selectedCompany: TEST_COMPANY, relativeInputs: [1, 2] }).relativeInputs, {});
 });
 
 test('전체 초기화(emptyProjectState)는 상대가치 입력도 비운다', () => {

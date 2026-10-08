@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { TEST_COMPANY, withTestCompany } from './testCompany.ts';
 import assert from 'node:assert/strict';
 import { step04PracticeAssumptions as practice } from '../data/step04PracticeAssumptions.ts';
 import { samsungHistoricalData } from '../data/samsungHistorical.ts';
@@ -117,7 +118,7 @@ test('저장 대상은 입력(selectedCompany, historical 출처 · fixture 데�
 });
 
 test('reload: 저장된 입력만으로 결과를 다시 계산한다', () => {
-  const before = withPracticeAssumptions(withSamsungHistorical(emptyProjectState));
+  const before = withPracticeAssumptions(withSamsungHistorical(withTestCompany(emptyProjectState)));
   const stored = JSON.parse(JSON.stringify(toPersisted(before))); // localStorage round-trip
   const after = restoreProjectState(stored);
   assert.deepEqual(after.historicalData, before.historicalData);
@@ -127,18 +128,18 @@ test('reload: 저장된 입력만으로 결과를 다시 계산한다', () => {
 });
 
 test('reload: 옛 저장 형식(가정 없음)이나 비정상 값도 안전하게 복원한다', () => {
-  assert.deepEqual(restoreProjectState(null), emptyProjectState);
+  assert.deepEqual(restoreProjectState(null), emptyProjectState);   // 선택한 기업이 없으면 어떤 데이터도 복원하지 않는다
   assert.deepEqual(restoreProjectState('oops'), emptyProjectState);
-  const legacy = restoreProjectState({ historicalData: samsungHistoricalData, valuationAssumptions: null, valuationResult: null });
+  const legacy = restoreProjectState({ selectedCompany: TEST_COMPANY, historicalData: samsungHistoricalData, valuationAssumptions: null, valuationResult: null });
   assert.equal(legacy.valuationAssumptions, null);
   assert.equal(legacy.valuationResult, null);
   // 연도별 배열 길이가 어긋난 저장값: 완성되지 않은 가정(Forecast INCOMPLETE)으로 취급되어 실행되지 않는다
-  const broken = restoreProjectState({ valuationAssumptions: { ...practice, capex: [1] } });
+  const broken = restoreProjectState({ selectedCompany: TEST_COMPANY, valuationAssumptions: { ...practice, capex: [1] } });
   assert.equal(broken.valuationResult, null);
   assert.equal(assumptionCompleteness(broken.valuationAssumptions).forecast, 'INCOMPLETE');
   assert.equal(withValuationRun(broken), broken);
   // 엔진이 거부하는 값(WACC ≤ g)은 오류 메시지로 남는다
-  const bad = restoreProjectState({ valuationAssumptions: { ...practice, terminalGrowth: 0.09 } });
+  const bad = restoreProjectState({ selectedCompany: TEST_COMPANY, valuationAssumptions: { ...practice, terminalGrowth: 0.09 } });
   assert.equal(bad.valuationResult, null);
   assert.ok(bad.valuationError);
 });
@@ -313,12 +314,12 @@ test('WACC Preview 는 Run 후 엔진의 WACC 와 같다 (같은 계산식을 �
 });
 
 test('reload: 일부만 채워진 가정도 복원되고(재계산 없음), 완성된 가정만 재계산된다', () => {
-  const partial = withForecastInputs(emptyProjectState, forecastOf());
+  const partial = withForecastInputs(withTestCompany(emptyProjectState), forecastOf());
   const restoredPartial = restoreProjectState(JSON.parse(JSON.stringify(toPersisted(partial))));
   assert.deepEqual(restoredPartial.valuationAssumptions, partial.valuationAssumptions);
   assert.equal(restoredPartial.valuationResult, null);
   assert.equal(restoredPartial.valuationError, null);
-  const full = withPracticeAssumptions(emptyProjectState);
+  const full = withPracticeAssumptions(withTestCompany(emptyProjectState));
   const restoredFull = restoreProjectState(JSON.parse(JSON.stringify(toPersisted(full))));
   assert.deepEqual(restoredFull.valuationResult, full.valuationResult);
 });

@@ -36,7 +36,7 @@ function FinTable({ periods, rows, unit }: { periods: string[]; rows: Historical
 }
 
 export function HistoricalStage() {
-  const { project, loadSamsung, historicalStatus } = useProject();
+  const { project, historicalStatus } = useProject();
   // DataQuality 를 함께 넘겨 weak 매핑 · 누락 계정의 안내가 표에 붙는다 (fixture 는 quality 가 없다)
   const view = useMemo(() => buildHistoricalView(project.historicalData, project.historicalQuality), [project.historicalData, project.historicalQuality]);
   const next = stages[1];
@@ -51,7 +51,6 @@ export function HistoricalStage() {
           {historicalStatus.kind === 'loading' && <p className="small muted" role="status">Loading financial data...</p>}
           {project.selectedCompany && <div><p className="small muted">선택한 기업: {project.selectedCompany.corpName} ({project.selectedCompany.stockCode ?? '비상장'})</p><HistoricalLoadControls compact /></div>}
           {!project.selectedCompany && <Link className="btn primary" to="/workspace">Workspace 로 이동</Link>}
-          <details className="sample-menu"><summary>샘플 데이터</summary><button className="btn small" onClick={loadSamsung}>삼성전자 학습용 Historical 불러오기</button></details>
         </div>
       </>
     );

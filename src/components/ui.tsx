@@ -45,6 +45,17 @@ export function PageHeader({ eyebrow, title, children, actions }: { eyebrow?: st
   );
 }
 
+/** 기업을 선택하기 전의 공통 빈 상태. Historical · Valuation · AI · Report 의 어떤 데이터도 보이지 않고 기업 검색/선택으로 안내한다. */
+export const NO_COMPANY_MESSAGE = '기업을 선택해 기업가치평가를 시작하세요.';
+export function NoCompanyState() {
+  return (
+    <div className="empty-state no-company" role="status" data-empty="no-company">
+      <h3>{NO_COMPANY_MESSAGE}</h3>
+      <Link className="btn primary" to="/workspace">기업 검색 · 선택</Link>
+    </div>
+  );
+}
+
 export function ComingSoon({ comingIn, children }: { comingIn: string; children?: ReactNode }) {
   return (
     <div className="coming">

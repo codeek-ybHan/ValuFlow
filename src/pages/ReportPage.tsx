@@ -1,11 +1,18 @@
 import { Link } from 'react-router-dom';
-import { PageHeader } from '../components/ui';
+import { NoCompanyState, PageHeader } from '../components/ui';
 import { AnalysisPicker, ExportCard, PreviewPane, SectionToggles, ValidationList } from '../components/report/ReportParts';
 import { renderHashOf } from '../report/export/bundle.ts';
 import { useProject } from '../store/project';
 import { useReport } from '../store/report';
 
+/** 기업을 선택하기 전에는 생성 · Preview · Export 없이 빈 상태만 보여 준다 (생성 불가). */
 export function ReportPage() {
+  const { project } = useProject();
+  if (!project.selectedCompany) return <div className="rp-page"><PageHeader title="Report" /><NoCompanyState /></div>;
+  return <ReportView />;
+}
+
+function ReportView() {
   const { project } = useProject();
   const r = useReport();
   const company = project.historicalData?.company ?? (project.selectedCompany ? { name: project.selectedCompany.corpName } : null);

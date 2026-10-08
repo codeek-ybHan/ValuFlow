@@ -230,14 +230,20 @@ test('reload: 실제 데이터는 복제 저장하지 않고 provenance 로 back
   assert.deepEqual([cleared.historicalProvenance, cleared.historicalData, cleared.selectedCompany?.corpCode], [null, null, '00126380']);
 
   // fixture: 데이터 그대로 복원, 다시 조회하지 않음
-  const fx = restoreProjectState(JSON.parse(JSON.stringify(toPersisted(withSamsungHistorical(emptyProjectState)))));
+  const withCo = (s: ProjectState) => ({ ...s, selectedCompany: restored.selectedCompany });
+  const fx = restoreProjectState(JSON.parse(JSON.stringify(toPersisted(withCo(withSamsungHistorical(emptyProjectState))))));
   assert.equal(fx.historicalData?.company.name, '삼성전자');
   assert.deepEqual(fx.historicalProvenance, { source: 'fixture', persisted: false });
   assert.equal(needsHistoricalRefetch(fx), false);
   // 이전 버전 저장값(출처 없음)은 meta 로 추정, 손상된 provenance 는 버린다
-  const legacy = restoreProjectState({ historicalData: samsungHistoricalData });
+  const legacy = restoreProjectState({ selectedCompany: restored.selectedCompany, historicalData: samsungHistoricalData });
   assert.equal(legacy.historicalProvenance?.source, 'fixture');
-  for (const bad of ['x', 5, { source: 'weird' }, { persisted: true }]) assert.equal(restoreProjectState({ historicalProvenance: bad }).historicalProvenance, null);
+  for (const bad of ['x', 5, { source: 'weird' }, { persisted: true }]) assert.equal(restoreProjectState({ selectedCompany: restored.selectedCompany, historicalProvenance: bad }).historicalProvenance, null);
+  // 선택한 기업이 없으면 저장된 fixture · 출처 · 가정이 있어도 아무것도 복원하지 않는다 (첫 화면은 항상 빈 상태)
+  assert.deepEqual(restoreProjectState(JSON.parse(JSON.stringify(toPersisted(withSamsungHistorical(emptyProjectState))))), emptyProjectState);
+  // 저장된 Historical 이 다른 기업의 것이면 버린다
+  const other = restoreProjectState({ selectedCompany: { ...restored.selectedCompany, corpCode: '00164779', corpName: 'SK하이닉스' }, historicalProvenance: { source: 'opendart', persisted: false, corpCode: '00126380', fiscalYears: [2023, 2024, 2025] } });
+  assert.deepEqual([other.selectedCompany?.corpCode, other.historicalProvenance, other.historicalData], ['00164779', null, null]);
   assert.equal(restoreProjectState({ historicalProvenance: { source: 'database', corpCode: '00126380' } }).historicalData, null);
   assert.equal(needsHistoricalRefetch(restoreProjectState({ historicalProvenance: { source: 'database', corpCode: '00126380' } })), false, '연도 정보가 없으면 다시 조회하지 않는다');
 });
@@ -371,7 +377,7 @@ test('UI 연결: 버튼 · 상태 문구 · DataQuality 전달이 화면 코드�
   assert.ok(read('../components/CompanySearch.tsx').includes('HistoricalLoadControls'));
   assert.ok(!read('../components/CompanySearch.tsx').includes('학습용'), '기업 검색 흐름에는 fixture 버튼이 없다');
   assert.ok(!hs.includes('loadSamsung') && !hs.includes('학습용 Historical 불러오기'), '실제 데이터 흐름에 fixture 버튼이 없다');
-  assert.ok(read('../pages/Workspace.tsx').includes('삼성전자 학습용 Historical 불러오기'));
+  assert.ok(!read('../pages/Workspace.tsx').includes('삼성전자 학습용 Historical 불러오기'), '기업 선택 없이 fixture 를 불러오는 버튼은 없다');
   const provider = read('./project.tsx');
   assert.ok(provider.includes('needsHistoricalRefetch') && provider.includes('withHistoricalCleared') && provider.includes('seq.current'));
   assert.ok(toLoadOutcome.length === 2);

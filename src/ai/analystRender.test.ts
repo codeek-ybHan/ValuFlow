@@ -61,13 +61,23 @@ test('페이지 렌더링: 기업 context · 질문 입력 · Quick / Deep 선�
   assert.doesNotMatch(html, /disabled=""[^>]*placeholder/, '기업이 있으면 질문창은 활성이다');
 });
 
-test('기업이 없으면 질문할 수 없고 Workspace 로 안내한다 (샘플 데이터를 채우지 않는다)', () => {
-  const html = h.renderPage(null);
-  assert.match(html, /현재 기업: 없음/);
-  assert.match(html, /Workspace 에서 기업을 선택하세요/);
-  assert.match(html, /<textarea[^>]*disabled/);
-  assert.match(html, /<button[^>]*disabled[^>]*>전송/);
+test('기업을 선택하기 전에는 질문 · 기록 · 문서 영역 없이 공통 빈 상태만 보인다 (실행 불가, 샘플을 채우지 않는다)', () => {
+  const html = h.renderPage(null, undefined, '/ai', { noCompany: true });
+  assert.match(html, /기업을 선택해 기업가치평가를 시작하세요\./);
+  assert.match(html, /href="\/workspace"[^>]*>기업 검색 · 선택/);
+  assert.doesNotMatch(html, /<textarea|전송|Quick Answer|History|Knowledge Documents|Upload PDF|Evidence/);
   assert.doesNotMatch(html, /삼성전자/);
+  // 저장된 이전 세션의 기업 데이터가 있어도 선택한 기업이 없으면 보이지 않는다 (reload 후 빈 상태)
+  const stale = h.renderPage(persisted(samsung()), undefined, '/ai', { noCompany: true });
+  assert.match(stale, /기업을 선택해 기업가치평가를 시작하세요\./);
+  assert.doesNotMatch(stale, /삼성전자|textarea/);
+});
+
+test('기업은 선택했지만 재무데이터가 없으면 불러오도록 안내하고 값을 만들어 보이지 않는다', () => {
+  const html = h.renderPage(null);
+  assert.match(html, /현재 기업: 삼성전자/);
+  assert.match(html, /Workspace 에서 재무데이터를 먼저 불러오세요/);
+  assert.doesNotMatch(html, /2,346|Enterprise Value/);
 });
 
 test('Valuation 이 없으면 안내만 하고 값을 자동으로 만들지 않는다', () => {

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { PERSIST_NOTE, defaultPersistence, type PersistenceClient, type PersistFailure, type SavedReportSummary, type SavedAnalysisSummary } from '../data/persist/client.ts';
 import { buildAiContext } from '../ai/context.ts';
 import { snapshotId } from '../ai/agent/run.ts';
@@ -65,6 +65,15 @@ export function ReportProvider({ children, initial = {}, pdfBaseUrl, persistence
   const [opening, setOpening] = useState(false);
   const corpCode = project.selectedCompany?.corpCode ?? project.historicalProvenance?.corpCode ?? null;
   const note = (reason: PersistFailure) => setPersistNote(PERSIST_NOTE[reason]);
+
+  // 기업을 바꾸거나 해제하면 이전 기업의 Report(Preview · PDF 상태 · 선택한 분석 · 저장 목록)를 버린다
+  const prevCorp = useRef(corpCode);
+  useEffect(() => {
+    if (prevCorp.current === corpCode) return;
+    prevCorp.current = corpCode;
+    setGenerated(null); setBlocked(null); setPdf({ status: 'idle' }); setPicked({ touched: false, id: null }); setHide([]);
+    setSavedAnalyses([]); setSavedReports([]); setPersistNote(null); setOpening(false);
+  }, [corpCode]);
 
   // 새로고침 뒤에도 저장된 분석 · Report 를 불러온다 (저장소가 없으면 조용히 이 세션 메모리만 쓴다)
   const reload = useCallback(async () => {

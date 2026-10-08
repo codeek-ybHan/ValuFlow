@@ -71,11 +71,18 @@ test('PDF client: 성공 · 서버 오류 · 연결 실패는 사용자 문구�
   assert.ok(!bad.ok && bad.code === 'backend-unreachable');
 });
 
-test('화면: 빈 Project → fixture 로 채우지 않고 안내만, Preview 없음 (hidden fixture fallback 0)', () => {
+test('기업을 선택하기 전에는 Report 생성 · Preview · Export 없이 공통 빈 상태만 보인다', () => {
+  const html = h.renderReport(null, { noCompany: true });
+  assert.match(html, /기업을 선택해 기업가치평가를 시작하세요\./);
+  assert.match(html, /href="\/workspace"[^>]*>기업 검색 · 선택/);
+  assert.doesNotMatch(html, /Generate Report|Download PDF|AI 서술|Saved reports|valuflow-report|2,346억원|삼성전자/);
+});
+
+test('화면: 기업 선택 후 빈 Project → fixture 로 채우지 않고 안내만, Preview 없음 (hidden fixture fallback 0)', () => {
   const html = h.renderReport(null);
   assert.match(html, /아직 생성된 Report 가 없습니다/);
   assert.match(html, /샘플 데이터로 자동 대체하지 않습니다/);
-  assert.ok(!html.includes('valuflow-report') && !html.includes('2,346억원') && !html.includes('삼성전자'));
+  assert.ok(!html.includes('valuflow-report') && !html.includes('2,346억원'));
   assert.match(html, /Generate Report/);
   assert.match(html, /<button[^>]*disabled[^>]*>Download PDF/);
   assert.match(html, /AI 서술 없음/);

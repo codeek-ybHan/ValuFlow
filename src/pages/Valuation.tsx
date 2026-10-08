@@ -1,5 +1,5 @@
 import { Navigate, useParams } from 'react-router-dom';
-import { PageHeader } from '../components/ui';
+import { NoCompanyState, PageHeader } from '../components/ui';
 import { ValuationStepper } from '../components/valuation/ValuationStepper';
 import { ValuationControls } from '../components/valuation/ValuationControls';
 import { HistoricalStage } from '../components/valuation/HistoricalStage';
@@ -15,6 +15,7 @@ export function Valuation() {
   const { project } = useProject();
   const { stage } = useParams();
   if (stage && stageIndex(stage) < 0) return <Navigate to="/valuation" replace />;
+  if (!project.selectedCompany) return <><PageHeader title="Valuation" /><NoCompanyState /></>;   // 기업 선택 전에는 Historical · 가정 · 결과 · Sensitivity 가 보이지 않는다
   const id = (stage ?? DEFAULT_STAGE) as StageId;
   const cur = stages[stageIndex(id)];
   return (

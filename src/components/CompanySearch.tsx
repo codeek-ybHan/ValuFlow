@@ -7,7 +7,7 @@ import { HistoricalLoadControls } from './HistoricalSource';
 
 // 기업 검색 (OpenDART). 검색 → [선택] → 기업개황 표시. 재무데이터는 자동으로 불러오지 않고 [재무데이터 불러오기] 로 명시적으로 불러온다.
 export function CompanySearch({ repository = defaultFinancialRepository }: { repository?: FinancialRepository }) {
-  const { project, setSelectedCompany } = useProject();
+  const { project, setSelectedCompany } = useProject();   // 변경 · 해제하면 이전 기업의 Historical · 가정 · 결과가 모두 초기화된다
   const selected = project.selectedCompany;
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CompanyProfile[] | null>(null);
@@ -70,7 +70,7 @@ export function CompanySearch({ repository = defaultFinancialRepository }: { rep
 
       {view && (
         <div className="company-selected" aria-label="선택한 기업">
-          <h4>{view.title}</h4>
+          <div className="row between"><h4>{view.title}</h4><button type="button" className="btn small" onClick={() => { setSelectedCompany(null); setResults(null); }}>기업 선택 해제</button></div>
           <details className="company-profile">
             <summary>기업 개황</summary>
             <dl className="stat-dl">{view.lines.map((l) => <div key={l.label}><dt>{l.label}</dt><dd className="num">{l.value}</dd></div>)}</dl>
