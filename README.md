@@ -105,7 +105,7 @@ Browser ── Vercel (React/Vite, 정적, secret 없음) ──▶ FastAPI (Doc
 
 ## 평가
 
-고정 평가셋(40문항·84회 실행)과 Guardrail 테스트로 검증했습니다: 근거 없는 숫자 claim · 출처 위조 · 단위 오류 · WACC 의미 오류 · 이전 기업 context 누수 · Prompt injection · System prompt 유출 · Tool routing · 문서 격리. 필수 Tool 호출 100%, 위 항목의 위반 0건, Guardrail 17/17.
+고정 평가셋(40문항·84회 실행)과 Guardrail 테스트로 검증했습니다: 근거 없는 숫자 claim · 출처 위조 · 단위 오류 · WACC 의미 오류 · 이전 기업 context 누수 · Prompt injection · System prompt 유출 · Tool routing · 문서 격리. 해당 평가셋의 최종 실행에서 필수 Tool 호출 100%, 위 항목의 위반 0건, Guardrail 17/17을 기록했습니다. Deep 첫 응답 12/42가 차단되어 재생성되었고, 최종 fallback은 4/42(9.5%)였습니다. 일반 질문에 대한 정확도 보장이 아닙니다.
 
 | OpenDART RAG | nDCG@5 |
 |---|---|
@@ -132,10 +132,17 @@ Browser ── Vercel (React/Vite, 정적, secret 없음) ──▶ FastAPI (Doc
 
 ---
 
+## 검증 바로가기
+
+- [테스트·빌드 실행 기록](https://github.com/codeek-ybHan/ValuFlow/actions/workflows/ci.yml): 프론트 계산·상태·보고서 테스트, 타입검사·빌드, PostgreSQL/pgvector 기반 백엔드 회귀 테스트. Live API 테스트는 제외합니다.
+- [계산 엔진](src/valuation/engine.ts) · [DCF 단위·경계 테스트](src/valuation/dcf.test.ts) · [D&A 주석 회귀 테스트](backend/tests/test_da_notes.py)
+- [평가 근거와 재현 범위](docs/EVALUATION_EVIDENCE.md)
+
 ## 시작하기
 
 ```bash
-npm install && npm run dev                      # Frontend  http://localhost:5173
+nvm use                                       # .nvmrc: Node 24.22.1
+npm ci && npm run dev                      # Frontend  http://localhost:5173
 cd backend && uv venv .venv && uv pip install -p .venv/bin/python -r requirements-dev.txt
 cp .env.example .env                            # DART_API_KEY 등 입력 (git 제외)
 .venv/bin/uvicorn app.main:get_app --factory --port 8000
