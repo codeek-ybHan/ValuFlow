@@ -1,0 +1,17 @@
+# Direct dependencies used by the offline CI suite (Python 3.12).
+fastapi==0.162.0
+uvicorn==0.54.0
+httpx==0.28.1
+sqlalchemy==2.1.6
+alembic==1.20.1
+psycopg==3.3.6
+psycopg-binary==3.3.6
+pgvector==0.5.1
+python-multipart==0.0.32
+pypdf==6.10.0
+reportlab==4.4.9
+yfinance==1.7.0
+pytest==9.2.0
+pgserver==0.1.4
+starlette==1.10.0
+pydantic==2.14.1
